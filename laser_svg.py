@@ -415,10 +415,6 @@ def segments_on_line(
     length = distance(p1, p2)
     if length == 0:
         return []
-    start = 0.0 if include_corners else spacing / 2
-    end = length if include_corners else length - spacing / 2
-    if end < start:
-        return []
     ex = (p2.x - p1.x) / length
     ey = (p2.y - p1.y) / length
     angle_rad = stitch_angle_deg * pi / 180
@@ -426,17 +422,33 @@ def segments_on_line(
     dy = ex * sin(angle_rad) + ey * cos(angle_rad)
     half = stitch_length / 2
     segments: list[tuple[Point, Point]] = []
-    pos = start
-    while pos <= end + 0.001:
-        cx = p1.x + ex * pos
-        cy = p1.y + ey * pos
-        segments.append(
-            (
-                Point(cx - dx * half, cy - dy * half),
-                Point(cx + dx * half, cy + dy * half),
+    if include_corners:
+        start = 0.0
+        end = length
+        pos = start
+        while pos <= end + 0.001:
+            cx = p1.x + ex * pos
+            cy = p1.y + ey * pos
+            segments.append(
+                (
+                    Point(cx - dx * half, cy - dy * half),
+                    Point(cx + dx * half, cy + dy * half),
+                )
             )
-        )
-        pos += spacing
+            pos += spacing
+    else:
+        count = max(1, int(length / spacing) + 1)
+        margin = (length - (count - 1) * spacing) / 2
+        for i in range(count):
+            pos = margin + i * spacing
+            cx = p1.x + ex * pos
+            cy = p1.y + ey * pos
+            segments.append(
+                (
+                    Point(cx - dx * half, cy - dy * half),
+                    Point(cx + dx * half, cy + dy * half),
+                )
+            )
     return segments
 
 

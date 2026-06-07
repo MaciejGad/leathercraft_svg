@@ -39,20 +39,64 @@ doc.save("example.svg")
 doc.save_png("example.png", background_color="white")
 ```
 
-## Running the Example
+## Running the Examples
 
-The repository includes a ready-made example:
+There is also a smaller focused example in `sample.py`:
 
 ```bash
-./.venv/bin/python example_shapes.py
+./.venv/bin/python sample.py
 ```
 
 This generates:
 
-- `example_shapes.svg`
-- `example_shapes.png`
+- `sample.svg`
+- `sample.png`
 
-The `test.sh` script runs the same example and opens the PNG.
+The `sample.py` example shows a `RoundedRectangle` with a 45 degree stitch pattern on the right, bottom, and left edges:
+
+```python
+from laser_svg import RoundedRectangle, SvgDocument
+
+
+doc = SvgDocument(width_mm=140, height_mm=90)
+shape = RoundedRectangle(20, 15, 100, 60, radius=10)
+
+doc.add_shape(shape, layer="cut")
+doc.add_stitch_pattern(
+    shape,
+    edges=[1, 2, 3],
+    spacing=8.0,
+    stitch_length=3.5,
+    stitch_angle_deg=45.0,
+    inset=7.0,
+    layer="stitch",
+    stitch_thickness=0.8,
+)
+
+doc.save("sample.svg")
+doc.save_png("sample.png", background_color="white")
+```
+
+Illustration:
+
+![Rounded rectangle with 45 degree stitches on the right, bottom, and left edges](sample.png)
+
+There is also a broader gallery example in `all_shapes.py`:
+
+```bash
+./.venv/bin/python all_shapes.py
+```
+
+This generates:
+
+- `all_shapes.svg`
+- `all_shapes.png`
+
+The `all_shapes.py` script renders a full overview of the supported shape variants and stitch or hole layouts.
+
+Illustration:
+
+![Overview of all generated shapes](all_shapes.png)
 
 ## SVG Format
 
@@ -347,8 +391,8 @@ If you use an external rasterizer, prefer tools with strong inline SVG support, 
 ## File Structure
 
 - `laser_svg.py` - library and geometry models,
-- `example_shapes.py` - example that generates several shapes,
-- `test.sh` - simple script that runs the example,
+- `sample.py` - focused rounded rectangle stitch example,
+- `all_shapes.py` - overview example that renders all shape variants,
 - `README.md` - documentation.
 
 ## Practical Notes

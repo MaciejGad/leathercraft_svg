@@ -39,20 +39,64 @@ doc.save("example.svg")
 doc.save_png("example.png", background_color="white")
 ```
 
-## Uruchomienie przykładu
+## Uruchomienie przykładów
 
-W repozytorium jest gotowy przykład:
+Jest też mniejszy, bardziej konkretny przykład w `sample.py`:
 
 ```bash
-./.venv/bin/python example_shapes.py
+./.venv/bin/python sample.py
 ```
 
 To wygeneruje:
 
-- `example_shapes.svg`
-- `example_shapes.png`
+- `sample.svg`
+- `sample.png`
 
-Skrypt `test.sh` uruchamia ten sam przykład i otwiera PNG.
+Przykład `sample.py` pokazuje `RoundedRectangle` z wzorem ściegu pod kątem 45 stopni na prawej, dolnej i lewej krawędzi:
+
+```python
+from laser_svg import RoundedRectangle, SvgDocument
+
+
+doc = SvgDocument(width_mm=140, height_mm=90)
+shape = RoundedRectangle(20, 15, 100, 60, radius=10)
+
+doc.add_shape(shape, layer="cut")
+doc.add_stitch_pattern(
+    shape,
+    edges=[1, 2, 3],
+    spacing=8.0,
+    stitch_length=3.5,
+    stitch_angle_deg=45.0,
+    inset=7.0,
+    layer="stitch",
+    stitch_thickness=0.8,
+)
+
+doc.save("sample.svg")
+doc.save_png("sample.png", background_color="white")
+```
+
+Ilustracja:
+
+![Rounded rectangle with 45 degree stitches on the right, bottom, and left edges](sample.png)
+
+Jest też szerszy przykład-galeria w `all_shapes.py`:
+
+```bash
+./.venv/bin/python all_shapes.py
+```
+
+To wygeneruje:
+
+- `all_shapes.svg`
+- `all_shapes.png`
+
+Skrypt `all_shapes.py` generuje poglądowy zestaw obsługiwanych wariantów figur oraz układów ściegów i dziurek.
+
+Ilustracja:
+
+![Overview of all generated shapes](all_shapes.png)
 
 ## Format SVG
 
@@ -347,8 +391,8 @@ Jeśli używasz zewnętrznego narzędzia do rasteryzacji, preferuj narzędzia z 
 ## Struktura plików
 
 - `laser_svg.py` - biblioteka i modele geometryczne,
-- `example_shapes.py` - przykład generujący kilka figur,
-- `test.sh` - prosty skrypt uruchamiający przykład,
+- `sample.py` - prosty przykład zaokrąglonego prostokąta ze ściegami,
+- `all_shapes.py` - przykład poglądowy generujący wszystkie warianty figur,
 - `README.md` - dokumentacja.
 
 ## Uwagi praktyczne

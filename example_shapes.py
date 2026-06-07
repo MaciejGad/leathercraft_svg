@@ -2,7 +2,6 @@ from math import atan2, degrees
 
 from laser_svg import (
     Circle,
-    PlacementMode,
     Point,
     Rectangle,
     RoundedRectangle,
@@ -40,11 +39,10 @@ def add_circle_holes_with_gap(
     hole_radius: float,
     inset: float,
     layer: str,
-    placement: PlacementMode,
     gap_start_deg: float = -135.0,
     gap_extent_deg: float = 90.0,
 ) -> None:
-    points = circle.hole_points(spacing=spacing, inset=inset, placement=placement)
+    points = circle.hole_points(spacing=spacing, inset=inset)
     for p in points:
         angle = degrees(atan2(p.y - circle.cy, p.x - circle.cx))
         if angle_in_sector(angle, gap_start_deg, gap_extent_deg):
@@ -61,7 +59,6 @@ def add_circle_stitches_with_gap(
     layer: str,
     stitch_thickness: float,
     stitch_angle_deg: float,
-    placement: PlacementMode,
     gap_start_deg: float = -135.0,
     gap_extent_deg: float = 90.0,
 ) -> None:
@@ -70,7 +67,6 @@ def add_circle_stitches_with_gap(
         stitch_length=stitch_length,
         inset=inset,
         stitch_angle_deg=stitch_angle_deg,
-        placement=placement,
     )
     for p1, p2 in segments:
         cx = (p1.x + p2.x) / 2
@@ -85,7 +81,6 @@ def add_variant(
     shape,
     variant: str,
     inset: float,
-    placement: PlacementMode,
     hole_radius: float = 1.2,
     rounded_path: bool = False,
 ) -> None:
@@ -97,7 +92,6 @@ def add_variant(
             hole_radius=hole_radius,
             inset=inset,
             layer="stitch",
-            placement=placement,
             rounded_path=rounded_path,
         )
         return
@@ -111,7 +105,6 @@ def add_variant(
                 hole_radius=hole_radius,
                 inset=inset,
                 layer="stitch",
-                placement=placement,
             )
             return
 
@@ -123,7 +116,6 @@ def add_variant(
             hole_radius=hole_radius,
             inset=inset,
             layer="stitch",
-            placement=placement,
             rounded_path=rounded_path,
         )
         return
@@ -140,7 +132,6 @@ def add_variant(
                 layer="stitch",
                 stitch_thickness=0.8,
                 stitch_angle_deg=0.0,
-                placement=placement,
             )
             return
 
@@ -154,7 +145,6 @@ def add_variant(
             inset=inset,
             layer="stitch",
             stitch_thickness=0.8,
-            placement=placement,
             rounded_path=rounded_path,
         )
         return
@@ -167,7 +157,6 @@ def add_variant(
         inset=inset,
         layer="stitch",
         stitch_thickness=0.8,
-        placement=placement,
         rounded_path=rounded_path,
     )
 
@@ -176,18 +165,17 @@ def add_row(
     doc: SvgDocument,
     shapes: list,
     inset: float,
-    placement: PlacementMode,
     hole_radius: float = 1.2,
     rounded_path: bool = False,
 ) -> None:
-    add_variant(doc, shapes[0], "holes", inset, placement, hole_radius, rounded_path)
-    add_variant(doc, shapes[1], "holes_gap", inset, placement, hole_radius, rounded_path)
-    add_variant(doc, shapes[2], "stitch_0", inset, placement, hole_radius, rounded_path)
-    add_variant(doc, shapes[3], "stitch_45", inset, placement, hole_radius, rounded_path)
-    add_variant(doc, shapes[4], "stitch_gap", inset, placement, hole_radius, rounded_path)
+    add_variant(doc, shapes[0], "holes", inset, hole_radius, rounded_path)
+    add_variant(doc, shapes[1], "holes_gap", inset, hole_radius, rounded_path)
+    add_variant(doc, shapes[2], "stitch_0", inset, hole_radius, rounded_path)
+    add_variant(doc, shapes[3], "stitch_45", inset, hole_radius, rounded_path)
+    add_variant(doc, shapes[4], "stitch_gap", inset, hole_radius, rounded_path)
 
 
-def generate_example(placement: PlacementMode, stem: str) -> None:
+def generate_example(stem: str) -> None:
     doc = SvgDocument(width_mm=640, height_mm=410)
 
     # Rectangle row: holes | stitch 0 | stitch 45
@@ -201,7 +189,6 @@ def generate_example(placement: PlacementMode, stem: str) -> None:
             Rectangle(col_x[4], row_y[0], 90, 55),
         ],
         inset=6.0,
-        placement=placement,
         hole_radius=1.0,
     )
 
@@ -216,7 +203,6 @@ def generate_example(placement: PlacementMode, stem: str) -> None:
             RoundedRectangle(col_x[4], row_y[1], 90, 55, radius=10),
         ],
         inset=7.0,
-        placement=placement,
         hole_radius=1.4,
     )
 
@@ -231,7 +217,6 @@ def generate_example(placement: PlacementMode, stem: str) -> None:
             Circle(col_x[4] + 45, row_y[2] + 30, 28),
         ],
         inset=7.0,
-        placement=placement,
         hole_radius=1.5,
     )
 
@@ -246,7 +231,6 @@ def generate_example(placement: PlacementMode, stem: str) -> None:
             Triangle.from_box(col_x[4], row_y[3], 90, 65),
         ],
         inset=7.0,
-        placement=placement,
         hole_radius=1.5,
     )
 
@@ -261,7 +245,6 @@ def generate_example(placement: PlacementMode, stem: str) -> None:
             RoundedTriangle(Point(col_x[4] + 45, row_y[4]), Point(col_x[4] + 90, row_y[4] + 70), Point(col_x[4], row_y[4] + 70), radius=12),
         ],
         inset=6.0,
-        placement=placement,
         hole_radius=1.5,
         rounded_path=True,
     )
@@ -274,4 +257,4 @@ def generate_example(placement: PlacementMode, stem: str) -> None:
     print(f"Generated: {png_path}")
 
 
-generate_example("centered", "example_shapes")
+generate_example("example_shapes")

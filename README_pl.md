@@ -128,7 +128,7 @@ Parametry:
 - `radius` - promień,
 - `layer` - warstwa stylu.
 
-### `doc.add_holes(shape, edges="all", spacing=5.0, hole_radius=1.2, inset=4.0, layer="cut", include_corners=False, placement="centered")`
+### `doc.add_holes(shape, edges="all", spacing=5.0, hole_radius=1.2, inset=4.0, layer="cut", include_corners=False)`
 
 Dodaje dziurki wyliczone na podstawie krawędzi figury.
 
@@ -141,13 +141,12 @@ Parametry:
 - `inset` - odsunięcie od krawędzi,
 - `layer` - warstwa dziurek,
 - `include_corners` - jeśli `True`, punktowanie zaczyna się od narożników; jeśli `False`, dziurki są odsunięte od końców krawędzi.
-- `placement` - tryb rozkładu gdy `include_corners=False`: `"centered"` (symetryczne marginesy) lub `"dense"` (gęstszy układ).
 
 ### `doc.add_stitch_holes(...)`
 
 Alias dla `add_holes(...)` z tymi samymi parametrami.
 
-### `doc.add_stitch_pattern(shape, edges="all", spacing=5.0, stitch_length=2.0, inset=4.0, layer="stitch", include_corners=False, stitch_thickness=None, stitch_angle_deg=0.0, placement="centered")`
+### `doc.add_stitch_pattern(shape, edges="all", spacing=5.0, stitch_length=2.0, inset=4.0, layer="stitch", include_corners=False, stitch_thickness=None, stitch_angle_deg=0.0)`
 
 Dodaje laserowy wzór ściegu (krótkie odcinki linii) na wybranych krawędziach figury.
 
@@ -162,7 +161,6 @@ Parametry:
 - `include_corners` - czy dodawać ściegi także w narożnikach,
 - `stitch_thickness` - opcjonalna grubość linii dla ściegów (jeśli `None`, używana jest domyślna grubość warstwy).
 - `stitch_angle_deg` - kąt pochylenia ściegu w stopniach (domyślnie `0.0` = na płasko, można podać własną wartość, np. `45`).
-- `placement` - tryb rozkładu gdy `include_corners=False`: `"centered"` lub `"dense"`.
 
 ### `doc.save(path)`
 

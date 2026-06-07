@@ -68,10 +68,10 @@ To zwiększa kompatybilność z rendererami, które słabo obsługują style kla
 
 Domyślne warstwy są zdefiniowane jako:
 
-- `cut` - czerwony, `#ff0000`, grubość `0.1`
-- `stitch` - niebieski, `#0000ff`, grubość `0.1`
-- `crease` - zielony, `#00aa00`, grubość `0.1`, kreskowanie `3 2`
-- `guide` - szary, `#777777`, grubość `0.1`, kreskowanie `2 2`
+- `cut` - warstwa cięcia, kolor czerwony, `#ff0000`, grubość `0.1`
+- `stitch` - warstwa szycia, kolor niebieski, `#0000ff`, grubość `0.1`
+- `crease` - warstwa bigowania / zgięcia, kolor zielony, `#00aa00`, grubość `0.1`, kreskowanie `3 2`
+- `guide` - warstwa pomocnicza / prowadząca, kolor szary, `#777777`, grubość `0.1`, kreskowanie `2 2`
 
 Każdy element dodany do dokumentu może być przypisany do jednej z tych warstw.
 

@@ -121,14 +121,16 @@ class SvgDocument:
     def save(self, path: str | Path) -> None:
         Path(path).write_text(self.to_svg(), encoding="utf-8")
 
-    def save_png(self, path: str | Path, background_color: str = "white") -> None:
+    def to_png_bytes(self, background_color: str = "white") -> bytes:
         import cairosvg
 
-        cairosvg.svg2png(
+        return cairosvg.svg2png(
             bytestring=self.to_svg().encode("utf-8"),
-            write_to=str(path),
             background_color=background_color,
         )
+
+    def save_png(self, path: str | Path, background_color: str = "white") -> None:
+        Path(path).write_bytes(self.to_png_bytes(background_color))
 
     def to_svg(self) -> str:
         body = "\n  ".join(self.elements)

@@ -52,6 +52,7 @@ doc.add_stitch_pattern(
     inset=7.0,
     layer="stitch",
     stitch_thickness=0.8,
+    placement="dense"
 )
 doc.add_line(10, 10, 310, 10, layer="guide")
 

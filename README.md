@@ -128,7 +128,7 @@ Parameters:
 - `radius` - radius,
 - `layer` - style layer.
 
-### `doc.add_holes(shape, edges="all", spacing=5.0, hole_radius=1.2, inset=4.0, layer="cut", include_corners=False)`
+### `doc.add_holes(shape, edges="all", spacing=5.0, hole_radius=1.2, inset=4.0, layer="cut", include_corners=False, placement="centered")`
 
 Adds holes computed from the edges of a shape.
 
@@ -141,12 +141,13 @@ Parameters:
 - `inset` - distance from the edge,
 - `layer` - layer for the holes,
 - `include_corners` - if `True`, hole placement starts and ends at corners; if `False`, holes are offset from edge endpoints.
+- `placement` - distribution mode when `include_corners=False`: `"centered"` (symmetric margins) or `"dense"` (denser layout).
 
 ### `doc.add_stitch_holes(...)`
 
 Alias for `add_holes(...)` with the same parameters.
 
-### `doc.add_stitch_pattern(shape, edges="all", spacing=5.0, stitch_length=2.0, inset=4.0, layer="stitch", include_corners=False, stitch_thickness=None, stitch_angle_deg=0.0)`
+### `doc.add_stitch_pattern(shape, edges="all", spacing=5.0, stitch_length=2.0, inset=4.0, layer="stitch", include_corners=False, stitch_thickness=None, stitch_angle_deg=0.0, placement="centered")`
 
 Adds a laser stitch pattern (short line segments) on selected shape edges.
 
@@ -161,6 +162,7 @@ Parameters:
 - `include_corners` - whether stitches are also placed at corners,
 - `stitch_thickness` - optional per-pattern stroke width override (if `None`, the layer default is used).
 - `stitch_angle_deg` - stitch tilt angle in degrees (default `0.0` = flat, custom values allowed, e.g. `45`).
+- `placement` - distribution mode when `include_corners=False`: `"centered"` or `"dense"`.
 
 ### `doc.save(path)`
 

@@ -146,7 +146,7 @@ Parametry:
 
 Alias dla `add_holes(...)` z tymi samymi parametrami.
 
-### `doc.add_stitch_pattern(shape, edges="all", spacing=5.0, stitch_length=2.0, inset=4.0, layer="stitch", include_corners=False, stitch_thickness=None)`
+### `doc.add_stitch_pattern(shape, edges="all", spacing=5.0, stitch_length=2.0, inset=4.0, layer="stitch", include_corners=False, stitch_thickness=None, stitch_angle_deg=0.0)`
 
 Dodaje laserowy wzór ściegu (krótkie odcinki linii) na wybranych krawędziach figury.
 
@@ -160,6 +160,7 @@ Parametry:
 - `layer` - warstwa ściegów,
 - `include_corners` - czy dodawać ściegi także w narożnikach,
 - `stitch_thickness` - opcjonalna grubość linii dla ściegów (jeśli `None`, używana jest domyślna grubość warstwy).
+- `stitch_angle_deg` - kąt pochylenia ściegu w stopniach (domyślnie `0.0` = na płasko, można podać własną wartość, np. `45`).
 
 ### `doc.save(path)`
 
@@ -330,6 +331,7 @@ doc.add_stitch_pattern(
     edges=[0, 2],
     spacing=8.0,
     stitch_length=3.5,
+    stitch_angle_deg=45,
     inset=7.0,
     layer="stitch",
     stitch_thickness=0.25,

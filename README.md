@@ -146,7 +146,7 @@ Parameters:
 
 Alias for `add_holes(...)` with the same parameters.
 
-### `doc.add_stitch_pattern(shape, edges="all", spacing=5.0, stitch_length=2.0, inset=4.0, layer="stitch", include_corners=False, stitch_thickness=None)`
+### `doc.add_stitch_pattern(shape, edges="all", spacing=5.0, stitch_length=2.0, inset=4.0, layer="stitch", include_corners=False, stitch_thickness=None, stitch_angle_deg=0.0)`
 
 Adds a laser stitch pattern (short line segments) on selected shape edges.
 
@@ -160,6 +160,7 @@ Parameters:
 - `layer` - layer for the stitches,
 - `include_corners` - whether stitches are also placed at corners,
 - `stitch_thickness` - optional per-pattern stroke width override (if `None`, the layer default is used).
+- `stitch_angle_deg` - stitch tilt angle in degrees (default `0.0` = flat, custom values allowed, e.g. `45`).
 
 ### `doc.save(path)`
 
@@ -330,6 +331,7 @@ doc.add_stitch_pattern(
     edges=[0, 2],
     spacing=8.0,
     stitch_length=3.5,
+    stitch_angle_deg=45,
     inset=7.0,
     layer="stitch",
     stitch_thickness=0.25,

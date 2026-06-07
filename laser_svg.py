@@ -96,6 +96,7 @@ class SvgDocument:
         layer: LayerName = "stitch",
         include_corners: bool = False,
         stitch_thickness: float | None = None,
+        stitch_angle_deg: float = 0.0,
     ) -> None:
         for p1, p2 in shape.stitch_segments(
             edges=edges,
@@ -103,6 +104,7 @@ class SvgDocument:
             inset=inset,
             include_corners=include_corners,
             stitch_length=stitch_length,
+            stitch_angle_deg=stitch_angle_deg,
         ):
             self.add_line(p1.x, p1.y, p2.x, p2.y, layer=layer, stroke_width=stitch_thickness)
 
@@ -158,6 +160,7 @@ class Shape:
         inset: float = 4.0,
         include_corners: bool = False,
         stitch_length: float = 2.0,
+        stitch_angle_deg: float = 0.0,
     ) -> list[tuple[Point, Point]]:
         raise NotImplementedError
 
@@ -193,6 +196,7 @@ class Rectangle(Shape):
         inset=4.0,
         include_corners=False,
         stitch_length=2.0,
+        stitch_angle_deg=0.0,
     ) -> list[tuple[Point, Point]]:
         x = self.x + inset
         y = self.y + inset
@@ -204,7 +208,14 @@ class Rectangle(Shape):
             (Point(x + w, y + h), Point(x, y + h)),
             (Point(x, y + h), Point(x, y)),
         ]
-        return segments_on_selected_edges(edge_defs, edges, spacing, stitch_length, include_corners)
+        return segments_on_selected_edges(
+            edge_defs,
+            edges,
+            spacing,
+            stitch_length,
+            include_corners,
+            stitch_angle_deg,
+        )
 
 
 @dataclass
@@ -252,10 +263,12 @@ class Circle(Shape):
         inset=4.0,
         include_corners=False,
         stitch_length=2.0,
+        stitch_angle_deg=0.0,
     ) -> list[tuple[Point, Point]]:
         r = max(self.radius - inset, 0.1)
         count = max(3, int((2 * pi * r) // spacing))
         half = stitch_length / 2
+        angle_offset = stitch_angle_deg * pi / 180
         segments = []
         for i in range(count):
             angle = 2 * pi * i / count
@@ -263,10 +276,12 @@ class Circle(Shape):
             cy = self.cy + r * sin(angle)
             tx = -sin(angle)
             ty = cos(angle)
+            ox = tx * cos(angle_offset) - ty * sin(angle_offset)
+            oy = tx * sin(angle_offset) + ty * cos(angle_offset)
             segments.append(
                 (
-                    Point(cx - tx * half, cy - ty * half),
-                    Point(cx + tx * half, cy + ty * half),
+                    Point(cx - ox * half, cy - oy * half),
+                    Point(cx + ox * half, cy + oy * half),
                 )
             )
         return segments
@@ -300,13 +315,21 @@ class Triangle(Shape):
         inset=4.0,
         include_corners=False,
         stitch_length=2.0,
+        stitch_angle_deg=0.0,
     ) -> list[tuple[Point, Point]]:
         centroid = Point((self.p1.x + self.p2.x + self.p3.x) / 3, (self.p1.y + self.p2.y + self.p3.y) / 3)
         p1 = move_towards(self.p1, centroid, inset)
         p2 = move_towards(self.p2, centroid, inset)
         p3 = move_towards(self.p3, centroid, inset)
         edge_defs = [(p1, p2), (p2, p3), (p3, p1)]
-        return segments_on_selected_edges(edge_defs, edges, spacing, stitch_length, include_corners)
+        return segments_on_selected_edges(
+            edge_defs,
+            edges,
+            spacing,
+            stitch_length,
+            include_corners,
+            stitch_angle_deg,
+        )
 
 
 @dataclass
@@ -344,12 +367,19 @@ def points_on_selected_edges(edge_defs, edges, spacing, include_corners) -> list
     return deduplicate_points(result)
 
 
-def segments_on_selected_edges(edge_defs, edges, spacing, stitch_length, include_corners) -> list[tuple[Point, Point]]:
+def segments_on_selected_edges(
+    edge_defs,
+    edges,
+    spacing,
+    stitch_length,
+    include_corners,
+    stitch_angle_deg,
+) -> list[tuple[Point, Point]]:
     selected = range(len(edge_defs)) if edges == "all" else edges
     result: list[tuple[Point, Point]] = []
     for index in selected:
         p1, p2 = edge_defs[index]
-        result.extend(segments_on_line(p1, p2, spacing, stitch_length, include_corners))
+        result.extend(segments_on_line(p1, p2, spacing, stitch_length, include_corners, stitch_angle_deg))
     return result
 
 
@@ -377,6 +407,7 @@ def segments_on_line(
     spacing: float,
     stitch_length: float,
     include_corners: bool = False,
+    stitch_angle_deg: float = 0.0,
 ) -> list[tuple[Point, Point]]:
     if (p2.x < p1.x) or (p2.x == p1.x and p2.y < p1.y):
         p1, p2 = p2, p1
@@ -388,18 +419,21 @@ def segments_on_line(
     end = length if include_corners else length - spacing / 2
     if end < start:
         return []
-    dx = (p2.x - p1.x) / length
-    dy = (p2.y - p1.y) / length
+    ex = (p2.x - p1.x) / length
+    ey = (p2.y - p1.y) / length
+    angle_rad = stitch_angle_deg * pi / 180
+    dx = ex * cos(angle_rad) - ey * sin(angle_rad)
+    dy = ex * sin(angle_rad) + ey * cos(angle_rad)
     half = stitch_length / 2
     segments: list[tuple[Point, Point]] = []
     pos = start
     while pos <= end + 0.001:
-        seg_start = max(0.0, pos - half)
-        seg_end = min(length, pos + half)
+        cx = p1.x + ex * pos
+        cy = p1.y + ey * pos
         segments.append(
             (
-                Point(p1.x + dx * seg_start, p1.y + dy * seg_start),
-                Point(p1.x + dx * seg_end, p1.y + dy * seg_end),
+                Point(cx - dx * half, cy - dy * half),
+                Point(cx + dx * half, cy + dy * half),
             )
         )
         pos += spacing

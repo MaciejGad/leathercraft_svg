@@ -15,8 +15,8 @@ row_y = [20, 95, 170, 245, 320]
 col_x = [20, 145, 270, 395, 520]
 
 MISSING_EDGE_MAP = {
-    Rectangle: [0, 1, 2],
-    RoundedRectangle: [0, 1, 2],
+    Rectangle: [1, 2, 3],
+    RoundedRectangle: [1, 2, 3],
     Triangle: [0, 1],
     RoundedTriangle: [0, 1],
 }
@@ -274,5 +274,4 @@ def generate_example(placement: PlacementMode, stem: str) -> None:
     print(f"Generated: {png_path}")
 
 
-generate_example("centered", "example_shapes_centered")
-generate_example("dense", "example_shapes_dense")
+generate_example("centered", "example_shapes")

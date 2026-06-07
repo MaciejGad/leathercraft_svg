@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Iterable, Literal, Sequence
 
 LayerName = Literal["cut", "stitch", "crease", "guide"]
-PlacementMode = Literal["centered", "dense"]
+PlacementMode = Literal["centered"]
 
 
 @dataclass(frozen=True)
@@ -551,11 +551,6 @@ class RoundedTriangle(Triangle):
 def points_on_selected_edges(edge_defs, edges, spacing, include_corners, placement) -> list[Point]:
     selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
 
-    if placement == "dense" and len(selected) > 1:
-        mapped = positions_on_edge_chain(edge_defs, selected, spacing, include_corners, placement)
-        result = [point_on_edge(edge_defs[edge_index][0], edge_defs[edge_index][1], distance_on_edge) for edge_index, distance_on_edge in mapped]
-        return deduplicate_points(result)
-
     result = []
     for index in selected:
         p1, p2 = edge_defs[index]
@@ -573,23 +568,6 @@ def segments_on_selected_edges(
     placement,
 ) -> list[tuple[Point, Point]]:
     selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
-
-    if placement == "dense" and len(selected) > 1:
-        mapped = positions_on_edge_chain(edge_defs, selected, spacing, include_corners, placement)
-        lengths_by_edge = {edge_index: distance(edge_defs[edge_index][0], edge_defs[edge_index][1]) for edge_index in selected}
-        shared_start, shared_end = shared_endpoints_in_selection(edge_defs, selected)
-        result: list[tuple[Point, Point]] = []
-        for edge_index, distance_on_edge in mapped:
-            if not include_corners:
-                min_center_distance = max(stitch_length * 0.55, spacing * 0.2)
-                edge_length = lengths_by_edge[edge_index]
-                if shared_start[edge_index] and distance_on_edge < min_center_distance - 0.001:
-                    continue
-                if shared_end[edge_index] and (edge_length - distance_on_edge) < min_center_distance - 0.001:
-                    continue
-            p1, p2 = edge_defs[edge_index]
-            result.append(segment_on_edge(p1, p2, distance_on_edge, stitch_length, stitch_angle_deg))
-        return result
 
     result: list[tuple[Point, Point]] = []
     for index in selected:
@@ -755,10 +733,7 @@ def positions_on_side_center(
             pos += spacing
         return positions
 
-    if placement == "dense":
-        count = max(1, int(length / spacing) + 1)
-    else:
-        count = max(1, int(length / spacing))
+    count = max(1, int(length / spacing))
 
     center = length / 2
     first = center - spacing * (count - 1) / 2
@@ -898,11 +873,6 @@ def positions_on_line(
             positions.append(pos)
             pos += spacing
         return positions
-
-    if placement == "dense":
-        count = max(1, int(length / spacing) + 1)
-        margin = (length - (count - 1) * spacing) / 2
-        return [margin + i * spacing for i in range(count)]
 
     count = max(1, int(length / spacing))
     margin = (length - (count - 1) * spacing) / 2
@@ -1044,10 +1014,7 @@ def positions_on_closed_length(
         step = total_length / count
         return [i * step for i in range(count)]
 
-    if placement == "dense":
-        count = max(1, int(total_length / spacing) + 1)
-    else:
-        count = max(1, int(total_length / spacing))
+    count = max(1, int(total_length / spacing))
 
     step = total_length / count
     offset = step / 2

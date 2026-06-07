@@ -1,5 +1,7 @@
 # leathercraft_svg
 
+![leathercraft_svg logo](logo-720.png)
+
 Library for generating simple SVG files for laser cutting, stitching, and scoring.
 It supports shapes, edge points, stitching holes, and PNG export with a white background.
 

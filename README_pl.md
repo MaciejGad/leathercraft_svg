@@ -1,5 +1,7 @@
 # leathercraft_svg
 
+![Logo leathercraft_svg](logo-720.png)
+
 Biblioteka do generowania prostych plików SVG dla cięcia laserowego, szycia i kreślenia.
 Obsługuje kształty, punkty na krawędziach, dziurki pod szycie oraz eksport do PNG z białym tłem.
 

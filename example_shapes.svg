@@ -24,26 +24,24 @@
   <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="25.000" cy="40.000" r="1.000" />
   <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="25.000" cy="30.000" r="1.000" />
   <path fill="none" stroke="#ff0000" stroke-width="0.1" vector-effect="non-scaling-stroke" d="M 130.000 20.000 L 200.000 20.000 Q 210.000 20.000 210.000 30.000 L 210.000 70.000 Q 210.000 80.000 200.000 80.000 L 130.000 80.000 Q 120.000 80.000 120.000 70.000 L 120.000 30.000 Q 120.000 20.000 130.000 20.000 Z" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="127.763" y1="25.763" x2="130.237" y2="28.237" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="135.763" y1="25.763" x2="138.237" y2="28.237" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="143.763" y1="25.763" x2="146.237" y2="28.237" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="151.763" y1="25.763" x2="154.237" y2="28.237" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="159.763" y1="25.763" x2="162.237" y2="28.237" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="167.763" y1="25.763" x2="170.237" y2="28.237" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="175.763" y1="25.763" x2="178.237" y2="28.237" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="183.763" y1="25.763" x2="186.237" y2="28.237" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="191.763" y1="25.763" x2="194.237" y2="28.237" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="199.763" y1="25.763" x2="202.237" y2="28.237" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="127.763" y1="71.763" x2="130.237" y2="74.237" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="135.763" y1="71.763" x2="138.237" y2="74.237" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="143.763" y1="71.763" x2="146.237" y2="74.237" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="151.763" y1="71.763" x2="154.237" y2="74.237" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="159.763" y1="71.763" x2="162.237" y2="74.237" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="167.763" y1="71.763" x2="170.237" y2="74.237" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="175.763" y1="71.763" x2="178.237" y2="74.237" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="183.763" y1="71.763" x2="186.237" y2="74.237" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="191.763" y1="71.763" x2="194.237" y2="74.237" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="199.763" y1="71.763" x2="202.237" y2="74.237" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="131.763" y1="25.763" x2="134.237" y2="28.237" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="139.763" y1="25.763" x2="142.237" y2="28.237" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="147.763" y1="25.763" x2="150.237" y2="28.237" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="155.763" y1="25.763" x2="158.237" y2="28.237" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="163.763" y1="25.763" x2="166.237" y2="28.237" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="171.763" y1="25.763" x2="174.237" y2="28.237" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="179.763" y1="25.763" x2="182.237" y2="28.237" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="187.763" y1="25.763" x2="190.237" y2="28.237" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="195.763" y1="25.763" x2="198.237" y2="28.237" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="131.763" y1="71.763" x2="134.237" y2="74.237" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="139.763" y1="71.763" x2="142.237" y2="74.237" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="147.763" y1="71.763" x2="150.237" y2="74.237" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="155.763" y1="71.763" x2="158.237" y2="74.237" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="163.763" y1="71.763" x2="166.237" y2="74.237" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="171.763" y1="71.763" x2="174.237" y2="74.237" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="179.763" y1="71.763" x2="182.237" y2="74.237" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="187.763" y1="71.763" x2="190.237" y2="74.237" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="195.763" y1="71.763" x2="198.237" y2="74.237" />
   <path fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" d="M 235.000 50.000 A 30.000 30.000 0 1 0 295.000 50.000 A 30.000 30.000 0 1 0 235.000 50.000 Z" />
   <circle fill="none" stroke="#ff0000" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="288.000" cy="50.000" r="2.000" />
   <circle fill="none" stroke="#ff0000" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="285.722" cy="59.979" r="2.000" />
@@ -60,67 +58,64 @@
   <circle fill="none" stroke="#ff0000" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="279.340" cy="32.018" r="2.000" />
   <circle fill="none" stroke="#ff0000" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="285.722" cy="40.021" r="2.000" />
   <path fill="none" stroke="#777777" stroke-width="0.1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" d="M 60.000 115.000 L 100.000 185.000 L 20.000 185.000 Z" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="61.983" cy="125.474" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="65.950" cy="132.421" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="69.916" cy="139.369" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="73.882" cy="146.316" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="77.849" cy="153.264" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="81.815" cy="160.211" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="85.781" cy="167.159" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="89.748" cy="174.106" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="89.954" cy="181.473" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="81.954" cy="181.473" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="73.954" cy="181.473" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="65.954" cy="181.473" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="57.954" cy="181.473" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="49.954" cy="181.473" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="41.954" cy="181.473" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="33.954" cy="181.473" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="28.030" cy="177.999" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="31.996" cy="171.052" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="35.962" cy="164.104" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="39.929" cy="157.157" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="43.895" cy="150.209" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="47.862" cy="143.262" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="51.828" cy="136.314" r="2.000" />
-  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="55.794" cy="129.367" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="63.094" cy="127.420" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="67.061" cy="134.368" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="71.027" cy="141.315" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="74.994" cy="148.263" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="78.960" cy="155.210" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="82.926" cy="162.158" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="86.893" cy="169.105" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="90.859" cy="176.053" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="88.000" cy="181.473" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="80.000" cy="181.473" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="72.000" cy="181.473" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="64.000" cy="181.473" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="56.000" cy="181.473" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="48.000" cy="181.473" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="40.000" cy="181.473" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="32.000" cy="181.473" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="29.141" cy="176.053" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="33.107" cy="169.105" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="37.074" cy="162.158" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="41.040" cy="155.210" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="45.006" cy="148.263" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="48.973" cy="141.315" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="52.939" cy="134.368" r="2.000" />
+  <circle fill="none" stroke="#0000ff" stroke-width="0.1" vector-effect="non-scaling-stroke" cx="56.906" cy="127.420" r="2.000" />
   <path fill="none" stroke="#00aa00" stroke-width="0.1" stroke-dasharray="3 2" vector-effect="non-scaling-stroke" d="M 187.859 119.068 L 237.141 175.932 Q 245.000 185.000 233.000 185.000 L 127.000 185.000 Q 115.000 185.000 122.859 175.932 L 172.141 119.068 Q 180.000 110.000 187.859 119.068 Z" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="181.428" y1="118.600" x2="183.759" y2="121.211" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="186.756" y1="124.567" x2="189.087" y2="127.178" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="192.084" y1="130.535" x2="194.415" y2="133.146" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="197.412" y1="136.503" x2="199.743" y2="139.114" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="202.740" y1="142.470" x2="205.071" y2="145.081" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="208.068" y1="148.438" x2="210.399" y2="151.049" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="213.396" y1="154.406" x2="215.727" y2="157.017" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="218.724" y1="160.374" x2="221.055" y2="162.984" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="224.052" y1="166.341" x2="226.383" y2="168.952" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="229.379" y1="172.309" x2="231.710" y2="174.920" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="234.707" y1="178.277" x2="237.038" y2="180.887" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="122.250" y1="182.487" x2="125.750" y2="182.487" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="130.250" y1="182.487" x2="133.750" y2="182.487" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="138.250" y1="182.487" x2="141.750" y2="182.487" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="146.250" y1="182.487" x2="149.750" y2="182.487" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="154.250" y1="182.487" x2="157.750" y2="182.487" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="162.250" y1="182.487" x2="165.750" y2="182.487" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="170.250" y1="182.487" x2="173.750" y2="182.487" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="178.250" y1="182.487" x2="181.750" y2="182.487" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="186.250" y1="182.487" x2="189.750" y2="182.487" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="194.250" y1="182.487" x2="197.750" y2="182.487" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="202.250" y1="182.487" x2="205.750" y2="182.487" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="210.250" y1="182.487" x2="213.750" y2="182.487" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="218.250" y1="182.487" x2="221.750" y2="182.487" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="226.250" y1="182.487" x2="229.750" y2="182.487" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="234.250" y1="182.487" x2="237.750" y2="182.487" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="122.962" y1="180.887" x2="125.293" y2="178.277" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="128.290" y1="174.920" x2="130.621" y2="172.309" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="133.617" y1="168.952" x2="135.948" y2="166.341" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="138.945" y1="162.984" x2="141.276" y2="160.374" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="144.273" y1="157.017" x2="146.604" y2="154.406" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="149.601" y1="151.049" x2="151.932" y2="148.438" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="154.929" y1="145.081" x2="157.260" y2="142.470" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="160.257" y1="139.114" x2="162.588" y2="136.503" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="165.585" y1="133.146" x2="167.916" y2="130.535" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="170.913" y1="127.178" x2="173.244" y2="124.567" />
-  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="176.241" y1="121.211" x2="178.572" y2="118.600" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="184.092" y1="121.584" x2="186.423" y2="124.194" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="189.420" y1="127.551" x2="191.751" y2="130.162" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="194.748" y1="133.519" x2="197.079" y2="136.130" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="200.076" y1="139.487" x2="202.407" y2="142.097" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="205.404" y1="145.454" x2="207.735" y2="148.065" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="210.732" y1="151.422" x2="213.063" y2="154.033" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="216.060" y1="157.390" x2="218.391" y2="160.001" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="221.388" y1="163.357" x2="223.719" y2="165.968" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="226.716" y1="169.325" x2="229.046" y2="171.936" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="232.043" y1="175.293" x2="234.374" y2="177.904" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="126.250" y1="182.487" x2="129.750" y2="182.487" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="134.250" y1="182.487" x2="137.750" y2="182.487" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="142.250" y1="182.487" x2="145.750" y2="182.487" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="150.250" y1="182.487" x2="153.750" y2="182.487" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="158.250" y1="182.487" x2="161.750" y2="182.487" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="166.250" y1="182.487" x2="169.750" y2="182.487" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="174.250" y1="182.487" x2="177.750" y2="182.487" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="182.250" y1="182.487" x2="185.750" y2="182.487" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="190.250" y1="182.487" x2="193.750" y2="182.487" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="198.250" y1="182.487" x2="201.750" y2="182.487" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="206.250" y1="182.487" x2="209.750" y2="182.487" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="214.250" y1="182.487" x2="217.750" y2="182.487" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="222.250" y1="182.487" x2="225.750" y2="182.487" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="230.250" y1="182.487" x2="233.750" y2="182.487" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="125.626" y1="177.904" x2="127.957" y2="175.293" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="130.954" y1="171.936" x2="133.284" y2="169.325" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="136.281" y1="165.968" x2="138.612" y2="163.357" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="141.609" y1="160.001" x2="143.940" y2="157.390" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="146.937" y1="154.033" x2="149.268" y2="151.422" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="152.265" y1="148.065" x2="154.596" y2="145.454" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="157.593" y1="142.097" x2="159.924" y2="139.487" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="162.921" y1="136.130" x2="165.252" y2="133.519" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="168.249" y1="130.162" x2="170.580" y2="127.551" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.8" vector-effect="non-scaling-stroke" x1="173.577" y1="124.194" x2="175.908" y2="121.584" />
   <line fill="none" stroke="#777777" stroke-width="0.1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" x1="10.000" y1="10.000" x2="310.000" y2="10.000" />
 </svg>

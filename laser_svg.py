@@ -387,17 +387,20 @@ def points_on_line(p1: Point, p2: Point, spacing: float, include_corners: bool =
     length = distance(p1, p2)
     if length == 0:
         return []
-    start = 0.0 if include_corners else spacing / 2
-    end = length if include_corners else length - spacing / 2
-    if end < start:
-        return []
     dx = (p2.x - p1.x) / length
     dy = (p2.y - p1.y) / length
     points = []
-    pos = start
-    while pos <= end + 0.001:
-        points.append(Point(p1.x + dx * pos, p1.y + dy * pos))
-        pos += spacing
+    if include_corners:
+        pos = 0.0
+        while pos <= length + 0.001:
+            points.append(Point(p1.x + dx * pos, p1.y + dy * pos))
+            pos += spacing
+    else:
+        count = max(1, int(length / spacing))
+        margin = (length - (count - 1) * spacing) / 2
+        for i in range(count):
+            pos = margin + i * spacing
+            points.append(Point(p1.x + dx * pos, p1.y + dy * pos))
     return points
 
 
@@ -437,7 +440,7 @@ def segments_on_line(
             )
             pos += spacing
     else:
-        count = max(1, int(length / spacing) + 1)
+        count = max(1, int(length / spacing))
         margin = (length - (count - 1) * spacing) / 2
         for i in range(count):
             pos = margin + i * spacing

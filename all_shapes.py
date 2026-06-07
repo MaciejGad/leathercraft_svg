@@ -257,4 +257,4 @@ def generate_example(stem: str) -> None:
     print(f"Generated: {png_path}")
 
 
-generate_example("example_shapes")
+generate_example("all_shapes")

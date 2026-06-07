@@ -42,17 +42,17 @@ rounded_triangle = RoundedTriangle(
     radius=12,
 )
 doc.add_shape(rounded_triangle, layer="crease")
-# doc.add_holes(rounded_triangle, edges="all", spacing=8.0, hole_radius=2.0, inset=7.0, layer="guide")
 doc.add_stitch_pattern(
     rounded_triangle,
-    edges=[0, 1, 2],
+    edges="all",
     spacing=8.0,
     stitch_length=3.5,
     stitch_angle_deg=0,
-    inset=7.0,
+    inset=5.0,
     layer="stitch",
     stitch_thickness=0.8,
-    placement="dense"
+    placement="dense",
+    rounded_path=True,
 )
 doc.add_line(10, 10, 310, 10, layer="guide")
 

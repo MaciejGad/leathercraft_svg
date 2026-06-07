@@ -72,6 +72,7 @@ class SvgDocument:
         layer: LayerName = "cut",
         include_corners: bool = False,
         placement: PlacementMode = "centered",
+        rounded_path: bool = False,
     ) -> None:
         for p in shape.hole_points(
             edges=edges,
@@ -79,6 +80,7 @@ class SvgDocument:
             inset=inset,
             include_corners=include_corners,
             placement=placement,
+            rounded_path=rounded_path,
         ):
             self.add_circle(p.x, p.y, hole_radius, layer)
 
@@ -92,8 +94,9 @@ class SvgDocument:
         layer: LayerName = "cut",
         include_corners: bool = False,
         placement: PlacementMode = "centered",
+        rounded_path: bool = False,
     ) -> None:
-        self.add_holes(shape, edges, spacing, hole_radius, inset, layer, include_corners, placement)
+        self.add_holes(shape, edges, spacing, hole_radius, inset, layer, include_corners, placement, rounded_path)
 
     def add_stitch_pattern(
         self,
@@ -107,6 +110,7 @@ class SvgDocument:
         stitch_thickness: float | None = None,
         stitch_angle_deg: float = 0.0,
         placement: PlacementMode = "centered",
+        rounded_path: bool = False,
     ) -> None:
         for p1, p2 in shape.stitch_segments(
             edges=edges,
@@ -116,6 +120,7 @@ class SvgDocument:
             stitch_length=stitch_length,
             stitch_angle_deg=stitch_angle_deg,
             placement=placement,
+            rounded_path=rounded_path,
         ):
             self.add_line(p1.x, p1.y, p2.x, p2.y, layer=layer, stroke_width=stitch_thickness)
 
@@ -162,6 +167,7 @@ class Shape:
         inset: float = 4.0,
         include_corners: bool = False,
         placement: PlacementMode = "centered",
+        rounded_path: bool = False,
     ) -> list[Point]:
         raise NotImplementedError
 
@@ -174,6 +180,7 @@ class Shape:
         stitch_length: float = 2.0,
         stitch_angle_deg: float = 0.0,
         placement: PlacementMode = "centered",
+        rounded_path: bool = False,
     ) -> list[tuple[Point, Point]]:
         raise NotImplementedError
 
@@ -189,7 +196,7 @@ class Rectangle(Shape):
         x, y, w, h = self.x, self.y, self.width, self.height
         return f"M {x:.3f} {y:.3f} L {x+w:.3f} {y:.3f} L {x+w:.3f} {y+h:.3f} L {x:.3f} {y+h:.3f} Z"
 
-    def hole_points(self, edges="all", spacing=5.0, inset=4.0, include_corners=False, placement="centered") -> list[Point]:
+    def hole_points(self, edges="all", spacing=5.0, inset=4.0, include_corners=False, placement="centered", rounded_path=False) -> list[Point]:
         x = self.x + inset
         y = self.y + inset
         w = self.width - 2 * inset
@@ -211,6 +218,7 @@ class Rectangle(Shape):
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         placement="centered",
+        rounded_path=False,
     ) -> list[tuple[Point, Point]]:
         x = self.x + inset
         y = self.y + inset
@@ -263,7 +271,7 @@ class Circle(Shape):
         x, y, r = self.cx, self.cy, self.radius
         return f"M {x-r:.3f} {y:.3f} A {r:.3f} {r:.3f} 0 1 0 {x+r:.3f} {y:.3f} A {r:.3f} {r:.3f} 0 1 0 {x-r:.3f} {y:.3f} Z"
 
-    def hole_points(self, edges="all", spacing=5.0, inset=4.0, include_corners=False, placement="centered") -> list[Point]:
+    def hole_points(self, edges="all", spacing=5.0, inset=4.0, include_corners=False, placement="centered", rounded_path=False) -> list[Point]:
         r = max(self.radius - inset, 0.1)
         count = max(3, int((2 * pi * r) // spacing))
         return [
@@ -280,6 +288,7 @@ class Circle(Shape):
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         placement="centered",
+        rounded_path=False,
     ) -> list[tuple[Point, Point]]:
         r = max(self.radius - inset, 0.1)
         count = max(3, int((2 * pi * r) // spacing))
@@ -316,12 +325,20 @@ class Triangle(Shape):
     def path_d(self) -> str:
         return f"M {self.p1.x:.3f} {self.p1.y:.3f} L {self.p2.x:.3f} {self.p2.y:.3f} L {self.p3.x:.3f} {self.p3.y:.3f} Z"
 
-    def hole_points(self, edges="all", spacing=5.0, inset=4.0, include_corners=False, placement="centered") -> list[Point]:
-        centroid = Point((self.p1.x + self.p2.x + self.p3.x) / 3, (self.p1.y + self.p2.y + self.p3.y) / 3)
-        p1 = move_towards(self.p1, centroid, inset)
-        p2 = move_towards(self.p2, centroid, inset)
-        p3 = move_towards(self.p3, centroid, inset)
+    def hole_points(self, edges="all", spacing=5.0, inset=4.0, include_corners=False, placement="centered", rounded_path=False) -> list[Point]:
+        p1, p2, p3 = inset_triangle_vertices(self.p1, self.p2, self.p3, inset)
         edge_defs = [(p1, p2), (p2, p3), (p3, p1)]
+        selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
+
+        if selected == [0, 1, 2]:
+            selected_edge_defs = [edge_defs[i] for i in selected]
+            return points_on_closed_edges(
+                selected_edge_defs,
+                spacing,
+                include_corners,
+                placement,
+            )
+
         return points_on_selected_edges(edge_defs, edges, spacing, include_corners, placement)
 
     def stitch_segments(
@@ -333,12 +350,23 @@ class Triangle(Shape):
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         placement="centered",
+        rounded_path=False,
     ) -> list[tuple[Point, Point]]:
-        centroid = Point((self.p1.x + self.p2.x + self.p3.x) / 3, (self.p1.y + self.p2.y + self.p3.y) / 3)
-        p1 = move_towards(self.p1, centroid, inset)
-        p2 = move_towards(self.p2, centroid, inset)
-        p3 = move_towards(self.p3, centroid, inset)
+        p1, p2, p3 = inset_triangle_vertices(self.p1, self.p2, self.p3, inset)
         edge_defs = [(p1, p2), (p2, p3), (p3, p1)]
+        selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
+
+        if selected == [0, 1, 2]:
+            selected_edge_defs = [edge_defs[i] for i in selected]
+            return segments_on_closed_edges(
+                selected_edge_defs,
+                spacing,
+                stitch_length,
+                include_corners,
+                stitch_angle_deg,
+                placement,
+            )
+
         return segments_on_selected_edges(
             edge_defs,
             edges,
@@ -375,9 +403,85 @@ class RoundedTriangle(Triangle):
             )
         return d + "Z"
 
+    def hole_points(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=False,
+        placement="centered",
+        rounded_path=False,
+    ) -> list[Point]:
+        all_triangle_edges = edges == "all" or sorted(set(edges)) == [0, 1, 2]
+        if not rounded_path or not all_triangle_edges:
+            return super().hole_points(
+                edges=edges,
+                spacing=spacing,
+                inset=inset,
+                include_corners=include_corners,
+                placement=placement,
+                rounded_path=rounded_path,
+            )
+
+        p1, p2, p3 = inset_triangle_vertices(self.p1, self.p2, self.p3, inset)
+        effective_radius = max(0.0, self.radius - inset)
+        contour = rounded_triangle_contour([p1, p2, p3], effective_radius)
+        if len(contour) < 2:
+            return []
+        return points_on_closed_polyline(
+            contour,
+            spacing=spacing,
+            include_corners=include_corners,
+            placement=placement,
+        )
+
+    def stitch_segments(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=False,
+        stitch_length=2.0,
+        stitch_angle_deg=0.0,
+        placement="centered",
+        rounded_path=False,
+    ) -> list[tuple[Point, Point]]:
+        all_triangle_edges = edges == "all" or sorted(set(edges)) == [0, 1, 2]
+        if not rounded_path or not all_triangle_edges:
+            return super().stitch_segments(
+                edges=edges,
+                spacing=spacing,
+                inset=inset,
+                include_corners=include_corners,
+                stitch_length=stitch_length,
+                stitch_angle_deg=stitch_angle_deg,
+                placement=placement,
+                rounded_path=rounded_path,
+            )
+
+        p1, p2, p3 = inset_triangle_vertices(self.p1, self.p2, self.p3, inset)
+        effective_radius = max(0.0, self.radius - inset)
+        contour = rounded_triangle_contour([p1, p2, p3], effective_radius)
+        if len(contour) < 2:
+            return []
+        return stitch_segments_on_closed_polyline(
+            contour,
+            spacing=spacing,
+            stitch_length=stitch_length,
+            stitch_angle_deg=stitch_angle_deg,
+            include_corners=include_corners,
+            placement=placement,
+        )
+
 
 def points_on_selected_edges(edge_defs, edges, spacing, include_corners, placement) -> list[Point]:
-    selected = range(len(edge_defs)) if edges == "all" else edges
+    selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
+
+    if placement == "dense" and len(selected) > 1:
+        mapped = positions_on_edge_chain(edge_defs, selected, spacing, include_corners, placement)
+        result = [point_on_edge(edge_defs[edge_index][0], edge_defs[edge_index][1], distance_on_edge) for edge_index, distance_on_edge in mapped]
+        return deduplicate_points(result)
+
     result = []
     for index in selected:
         p1, p2 = edge_defs[index]
@@ -394,12 +498,182 @@ def segments_on_selected_edges(
     stitch_angle_deg,
     placement,
 ) -> list[tuple[Point, Point]]:
-    selected = range(len(edge_defs)) if edges == "all" else edges
+    selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
+
+    if placement == "dense" and len(selected) > 1:
+        mapped = positions_on_edge_chain(edge_defs, selected, spacing, include_corners, placement)
+        lengths_by_edge = {edge_index: distance(edge_defs[edge_index][0], edge_defs[edge_index][1]) for edge_index in selected}
+        shared_start, shared_end = shared_endpoints_in_selection(edge_defs, selected)
+        result: list[tuple[Point, Point]] = []
+        for edge_index, distance_on_edge in mapped:
+            if not include_corners:
+                min_center_distance = max(stitch_length * 0.55, spacing * 0.2)
+                edge_length = lengths_by_edge[edge_index]
+                if shared_start[edge_index] and distance_on_edge < min_center_distance - 0.001:
+                    continue
+                if shared_end[edge_index] and (edge_length - distance_on_edge) < min_center_distance - 0.001:
+                    continue
+            p1, p2 = edge_defs[edge_index]
+            result.append(segment_on_edge(p1, p2, distance_on_edge, stitch_length, stitch_angle_deg))
+        return result
+
     result: list[tuple[Point, Point]] = []
     for index in selected:
         p1, p2 = edge_defs[index]
         result.extend(segments_on_line(p1, p2, spacing, stitch_length, include_corners, stitch_angle_deg, placement))
     return result
+
+
+def positions_on_edge_chain(
+    edge_defs,
+    selected: list[int],
+    spacing: float,
+    include_corners: bool,
+    placement: PlacementMode,
+) -> list[tuple[int, float]]:
+    lengths = [distance(edge_defs[index][0], edge_defs[index][1]) for index in selected]
+    total_length = sum(lengths)
+    if total_length == 0:
+        return []
+
+    chain_positions = positions_on_line(total_length, spacing, include_corners, placement)
+    mapped: list[tuple[int, float]] = []
+    prefix = 0.0
+    position_index = 0
+
+    for local_index, edge_index in enumerate(selected):
+        edge_length = lengths[local_index]
+        edge_end = prefix + edge_length
+        is_last = local_index == len(selected) - 1
+
+        while position_index < len(chain_positions):
+            pos = chain_positions[position_index]
+            if pos < prefix - 0.001:
+                position_index += 1
+                continue
+
+            if pos < edge_end - 0.001 or (is_last and pos <= edge_end + 0.001):
+                mapped.append((edge_index, max(0.0, min(edge_length, pos - prefix))))
+                position_index += 1
+                continue
+
+            break
+
+        prefix = edge_end
+
+    return mapped
+
+
+def shared_endpoints_in_selection(edge_defs, selected: list[int], precision: int = 6) -> tuple[dict[int, bool], dict[int, bool]]:
+    endpoint_counts: dict[tuple[float, float], int] = {}
+    for edge_index in selected:
+        p1, p2 = edge_defs[edge_index]
+        k1 = (round(p1.x, precision), round(p1.y, precision))
+        k2 = (round(p2.x, precision), round(p2.y, precision))
+        endpoint_counts[k1] = endpoint_counts.get(k1, 0) + 1
+        endpoint_counts[k2] = endpoint_counts.get(k2, 0) + 1
+
+    shared_start: dict[int, bool] = {}
+    shared_end: dict[int, bool] = {}
+    for edge_index in selected:
+        p1, p2 = edge_defs[edge_index]
+        k1 = (round(p1.x, precision), round(p1.y, precision))
+        k2 = (round(p2.x, precision), round(p2.y, precision))
+        shared_start[edge_index] = endpoint_counts.get(k1, 0) > 1
+        shared_end[edge_index] = endpoint_counts.get(k2, 0) > 1
+
+    return shared_start, shared_end
+
+
+def point_on_edge(p1: Point, p2: Point, distance_on_edge: float) -> Point:
+    length = distance(p1, p2)
+    if length == 0:
+        return p1
+    ex = (p2.x - p1.x) / length
+    ey = (p2.y - p1.y) / length
+    return Point(p1.x + ex * distance_on_edge, p1.y + ey * distance_on_edge)
+
+
+def segment_on_edge(
+    p1: Point,
+    p2: Point,
+    distance_on_edge: float,
+    stitch_length: float,
+    stitch_angle_deg: float,
+) -> tuple[Point, Point]:
+    length = distance(p1, p2)
+    if length == 0:
+        return p1, p2
+    ex = (p2.x - p1.x) / length
+    ey = (p2.y - p1.y) / length
+    center_x = p1.x + ex * distance_on_edge
+    center_y = p1.y + ey * distance_on_edge
+    angle_rad = stitch_angle_deg * pi / 180
+    dx = ex * cos(angle_rad) - ey * sin(angle_rad)
+    dy = ex * sin(angle_rad) + ey * cos(angle_rad)
+    half = stitch_length / 2
+    return (Point(center_x - dx * half, center_y - dy * half), Point(center_x + dx * half, center_y + dy * half))
+
+
+def segments_on_closed_edges(
+    edge_defs: list[tuple[Point, Point]],
+    spacing: float,
+    stitch_length: float,
+    include_corners: bool,
+    stitch_angle_deg: float,
+    placement: PlacementMode,
+) -> list[tuple[Point, Point]]:
+    result: list[tuple[Point, Point]] = []
+    for a, b in edge_defs:
+        length = distance(a, b)
+        if length == 0:
+            continue
+        for local_pos in positions_on_side_center(length, spacing, include_corners, placement):
+            result.append(segment_on_edge(a, b, local_pos, stitch_length, stitch_angle_deg))
+    return result
+
+
+def points_on_closed_edges(
+    edge_defs: list[tuple[Point, Point]],
+    spacing: float,
+    include_corners: bool,
+    placement: PlacementMode,
+) -> list[Point]:
+    result: list[Point] = []
+    for a, b in edge_defs:
+        length = distance(a, b)
+        if length == 0:
+            continue
+        for local_pos in positions_on_side_center(length, spacing, include_corners, placement):
+            result.append(point_on_edge(a, b, local_pos))
+    return deduplicate_points(result)
+
+
+def positions_on_side_center(
+    length: float,
+    spacing: float,
+    include_corners: bool,
+    placement: PlacementMode,
+) -> list[float]:
+    if length <= 0:
+        return []
+
+    if include_corners:
+        positions: list[float] = []
+        pos = 0.0
+        while pos <= length + 0.001:
+            positions.append(pos)
+            pos += spacing
+        return positions
+
+    if placement == "dense":
+        count = max(1, int(length / spacing) + 1)
+    else:
+        count = max(1, int(length / spacing))
+
+    center = length / 2
+    first = center - spacing * (count - 1) / 2
+    return [first + i * spacing for i in range(count)]
 
 
 def points_on_line(
@@ -472,24 +746,223 @@ def positions_on_line(
         return positions
 
     if placement == "dense":
-        start = spacing / 2
-        end = length - spacing / 2
-        if end < start:
-            return [length / 2]
-        positions: list[float] = []
-        pos = start
-        while pos <= end + 0.001:
-            positions.append(pos)
-            pos += spacing
-        return positions
+        count = max(1, int(length / spacing) + 1)
+        margin = (length - (count - 1) * spacing) / 2
+        return [margin + i * spacing for i in range(count)]
 
     count = max(1, int(length / spacing))
     margin = (length - (count - 1) * spacing) / 2
     return [margin + i * spacing for i in range(count)]
 
 
+def rounded_triangle_contour(points: list[Point], radius: float, arc_steps: int = 12) -> list[Point]:
+    if len(points) != 3:
+        return []
+    if radius <= 0:
+        return points
+
+    start_points: list[Point] = []
+    end_points: list[Point] = []
+    for i in range(3):
+        prev_p = points[(i - 1) % 3]
+        p = points[i]
+        next_p = points[(i + 1) % 3]
+        cut = min(radius, distance(p, prev_p) / 3, distance(p, next_p) / 3)
+        start_points.append(move_towards(p, prev_p, cut))
+        end_points.append(move_towards(p, next_p, cut))
+
+    contour: list[Point] = [end_points[0]]
+    for i in range(1, 4):
+        idx = i % 3
+        contour.append(start_points[idx])
+        control = points[idx]
+        a = start_points[idx]
+        b = end_points[idx]
+        for step in range(1, arc_steps):
+            t = step / arc_steps
+            contour.append(quadratic_bezier(a, control, b, t))
+        contour.append(b)
+
+    return contour
+
+
+def stitch_segments_on_closed_polyline(
+    polyline: list[Point],
+    spacing: float,
+    stitch_length: float,
+    stitch_angle_deg: float,
+    include_corners: bool,
+    placement: PlacementMode,
+) -> list[tuple[Point, Point]]:
+    edges = [(polyline[i], polyline[(i + 1) % len(polyline)]) for i in range(len(polyline))]
+    lengths = [distance(a, b) for a, b in edges]
+    total = sum(lengths)
+    if total <= 0:
+        return []
+
+    positions = positions_on_closed_length(total, spacing, include_corners, placement)
+    return map_stitch_positions_on_closed_edges(edges, lengths, positions, stitch_length, stitch_angle_deg)
+
+
+def points_on_closed_polyline(
+    polyline: list[Point],
+    spacing: float,
+    include_corners: bool,
+    placement: PlacementMode,
+) -> list[Point]:
+    edges = [(polyline[i], polyline[(i + 1) % len(polyline)]) for i in range(len(polyline))]
+    lengths = [distance(a, b) for a, b in edges]
+    total = sum(lengths)
+    if total <= 0:
+        return []
+
+    positions = positions_on_closed_length(total, spacing, include_corners, placement)
+    points: list[Point] = []
+    prefixes = [0.0]
+    for length in lengths:
+        prefixes.append(prefixes[-1] + length)
+
+    for pos in positions:
+        for i, edge_len in enumerate(lengths):
+            start = prefixes[i]
+            end = prefixes[i + 1]
+            if pos < end - 0.001 or i == len(lengths) - 1:
+                local = max(0.0, min(edge_len, pos - start))
+                a, b = edges[i]
+                points.append(point_on_edge(a, b, local))
+                break
+
+    return deduplicate_points(points)
+
+
+def positions_on_closed_length(
+    total_length: float,
+    spacing: float,
+    include_corners: bool,
+    placement: PlacementMode,
+) -> list[float]:
+    if total_length <= 0:
+        return []
+
+    if include_corners:
+        count = max(1, int(total_length / spacing))
+        step = total_length / count
+        return [i * step for i in range(count)]
+
+    if placement == "dense":
+        count = max(1, int(total_length / spacing) + 1)
+    else:
+        count = max(1, int(total_length / spacing))
+
+    step = total_length / count
+    offset = step / 2
+    return [offset + i * step for i in range(count)]
+
+
+def map_stitch_positions_on_closed_edges(
+    edges: list[tuple[Point, Point]],
+    lengths: list[float],
+    positions: list[float],
+    stitch_length: float,
+    stitch_angle_deg: float,
+) -> list[tuple[Point, Point]]:
+    prefixes = [0.0]
+    for length in lengths:
+        prefixes.append(prefixes[-1] + length)
+
+    segments: list[tuple[Point, Point]] = []
+    for pos in positions:
+        for i, edge_len in enumerate(lengths):
+            start = prefixes[i]
+            end = prefixes[i + 1]
+            if pos < end - 0.001 or i == len(lengths) - 1:
+                local = max(0.0, min(edge_len, pos - start))
+                a, b = edges[i]
+                segments.append(segment_on_edge(a, b, local, stitch_length, stitch_angle_deg))
+                break
+
+    return segments
+
+
+def quadratic_bezier(a: Point, c: Point, b: Point, t: float) -> Point:
+    mt = 1 - t
+    x = mt * mt * a.x + 2 * mt * t * c.x + t * t * b.x
+    y = mt * mt * a.y + 2 * mt * t * c.y + t * t * b.y
+    return Point(x, y)
+
+
 def distance(a: Point, b: Point) -> float:
     return hypot(b.x - a.x, b.y - a.y)
+
+
+def inset_triangle_vertices(p1: Point, p2: Point, p3: Point, inset: float) -> tuple[Point, Point, Point]:
+    if inset <= 0:
+        return p1, p2, p3
+
+    points = [p1, p2, p3]
+    area2 = signed_double_area(p1, p2, p3)
+    if area2 == 0:
+        centroid = Point((p1.x + p2.x + p3.x) / 3, (p1.y + p2.y + p3.y) / 3)
+        return (
+            move_towards(p1, centroid, inset),
+            move_towards(p2, centroid, inset),
+            move_towards(p3, centroid, inset),
+        )
+
+    # For CCW polygons, inward is the left normal. For CW, inward is right normal.
+    ccw = area2 > 0
+    offset_edges: list[tuple[Point, Point]] = []
+    for i in range(3):
+        a = points[i]
+        b = points[(i + 1) % 3]
+        nx, ny = inward_unit_normal(a, b, ccw)
+        offset_edges.append((Point(a.x + nx * inset, a.y + ny * inset), Point(b.x + nx * inset, b.y + ny * inset)))
+
+    # New vertex i is intersection of offset edge (i-1)->i and i->(i+1).
+    new_points: list[Point] = []
+    for i in range(3):
+        e_prev = offset_edges[(i - 1) % 3]
+        e_curr = offset_edges[i]
+        inter = line_intersection(e_prev[0], e_prev[1], e_curr[0], e_curr[1])
+        if inter is None:
+            centroid = Point((p1.x + p2.x + p3.x) / 3, (p1.y + p2.y + p3.y) / 3)
+            new_points.append(move_towards(points[i], centroid, inset))
+        else:
+            new_points.append(inter)
+
+    return new_points[0], new_points[1], new_points[2]
+
+
+def inward_unit_normal(a: Point, b: Point, ccw: bool) -> tuple[float, float]:
+    dx = b.x - a.x
+    dy = b.y - a.y
+    length = hypot(dx, dy)
+    if length == 0:
+        return 0.0, 0.0
+    if ccw:
+        return -dy / length, dx / length
+    return dy / length, -dx / length
+
+
+def line_intersection(a1: Point, a2: Point, b1: Point, b2: Point) -> Point | None:
+    x1, y1 = a1.x, a1.y
+    x2, y2 = a2.x, a2.y
+    x3, y3 = b1.x, b1.y
+    x4, y4 = b2.x, b2.y
+
+    den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+    if abs(den) < 1e-9:
+        return None
+
+    det1 = x1 * y2 - y1 * x2
+    det2 = x3 * y4 - y3 * x4
+    px = (det1 * (x3 - x4) - (x1 - x2) * det2) / den
+    py = (det1 * (y3 - y4) - (y1 - y2) * det2) / den
+    return Point(px, py)
+
+
+def signed_double_area(a: Point, b: Point, c: Point) -> float:
+    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
 
 
 def move_towards(a: Point, b: Point, amount: float) -> Point:

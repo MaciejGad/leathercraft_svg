@@ -17,15 +17,15 @@ class Point:
 @dataclass
 class StrokeStyle:
     color: str
-    width: float = 0.1
+    width: float = 0.2
     dasharray: str | None = None
 
 
 DEFAULT_STYLES: dict[str, StrokeStyle] = {
-    "cut": StrokeStyle("#ff0000", 0.1),
-    "stitch": StrokeStyle("#0000ff", 0.1),
-    "crease": StrokeStyle("#00aa00", 0.1, "3 2"),
-    "guide": StrokeStyle("#777777", 0.1, "2 2"),
+    "cut": StrokeStyle("#ff0000", 0.2),
+    "stitch": StrokeStyle("#0000ff", 0.2),
+    "crease": StrokeStyle("#00aa00", 0.2, "3 2"),
+    "guide": StrokeStyle("#777777", 0.2, "2 2"),
 }
 
 

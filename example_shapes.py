@@ -16,7 +16,15 @@ doc.add_holes(rect, edges="all", spacing=10.0, hole_radius=1.0, inset=5.0, layer
 
 rounded_rect = RoundedRectangle(120, 20, 90, 60, radius=10)
 doc.add_shape(rounded_rect, layer="cut")
-doc.add_holes(rounded_rect, edges=[0, 2], spacing=8.0, hole_radius=2.0, inset=7.0, layer="cut")
+doc.add_stitch_pattern(
+    rounded_rect,
+    edges=[0, 2],
+    spacing=8.0,
+    stitch_length=3.5,
+    inset=7.0,
+    layer="stitch",
+    stitch_thickness=0.8,
+)
 
 circle = Circle(265, 50, 30)
 doc.add_shape(circle, layer="stitch")

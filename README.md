@@ -8,6 +8,7 @@ Main features:
 - no CSS in the generated SVG, styles are written inline on each element,
 - layers: `cut`, `stitch`, `crease`, `guide`,
 - automatic hole generation along shape edges,
+- optional laser stitch pattern (short line segments) as an alternative to holes,
 - SVG and PNG export,
 - simple API built around geometry classes.
 
@@ -144,6 +145,21 @@ Parameters:
 ### `doc.add_stitch_holes(...)`
 
 Alias for `add_holes(...)` with the same parameters.
+
+### `doc.add_stitch_pattern(shape, edges="all", spacing=5.0, stitch_length=2.0, inset=4.0, layer="stitch", include_corners=False, stitch_thickness=None)`
+
+Adds a laser stitch pattern (short line segments) on selected shape edges.
+
+Parameters:
+
+- `shape` - shape that implements `stitch_segments()`,
+- `edges` - which edges to use: `"all"` or a list of indices,
+- `spacing` - distance between stitches,
+- `stitch_length` - length of each stitch segment,
+- `inset` - distance from the edge,
+- `layer` - layer for the stitches,
+- `include_corners` - whether stitches are also placed at corners,
+- `stitch_thickness` - optional per-pattern stroke width override (if `None`, the layer default is used).
 
 ### `doc.save(path)`
 
@@ -298,6 +314,27 @@ doc.save("triangle.svg")
 
 ```python
 doc.save_png("output.png", background_color="white")
+```
+
+### Laser stitch pattern instead of holes
+
+```python
+from laser_svg import RoundedRectangle, SvgDocument
+
+doc = SvgDocument(140, 90)
+shape = RoundedRectangle(20, 15, 100, 60, radius=10)
+
+doc.add_shape(shape, layer="cut")
+doc.add_stitch_pattern(
+    shape,
+    edges=[0, 2],
+    spacing=8.0,
+    stitch_length=3.5,
+    inset=7.0,
+    layer="stitch",
+    stitch_thickness=0.25,
+)
+doc.save("stitch_pattern.svg")
 ```
 
 ## Compatibility

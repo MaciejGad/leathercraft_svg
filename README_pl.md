@@ -8,6 +8,7 @@ Najważniejsze cechy:
 - brak CSS w wygenerowanym SVG, style są zapisywane inline na elementach,
 - warstwy: `cut`, `stitch`, `crease`, `guide`,
 - automatyczne generowanie dziurek na krawędziach figur,
+- opcjonalny laserowy wzór ściegu (krótkie odcinki linii) zamiast dziurek,
 - eksport SVG i PNG,
 - proste API oparte o klasy geometryczne.
 
@@ -144,6 +145,21 @@ Parametry:
 ### `doc.add_stitch_holes(...)`
 
 Alias dla `add_holes(...)` z tymi samymi parametrami.
+
+### `doc.add_stitch_pattern(shape, edges="all", spacing=5.0, stitch_length=2.0, inset=4.0, layer="stitch", include_corners=False, stitch_thickness=None)`
+
+Dodaje laserowy wzór ściegu (krótkie odcinki linii) na wybranych krawędziach figury.
+
+Parametry:
+
+- `shape` - figura implementująca `stitch_segments()`,
+- `edges` - które krawędzie użyć: `"all"` albo lista indeksów,
+- `spacing` - odstęp między ściegami,
+- `stitch_length` - długość pojedynczego odcinka ściegu,
+- `inset` - odsunięcie od krawędzi,
+- `layer` - warstwa ściegów,
+- `include_corners` - czy dodawać ściegi także w narożnikach,
+- `stitch_thickness` - opcjonalna grubość linii dla ściegów (jeśli `None`, używana jest domyślna grubość warstwy).
 
 ### `doc.save(path)`
 
@@ -298,6 +314,27 @@ doc.save("triangle.svg")
 
 ```python
 doc.save_png("output.png", background_color="white")
+```
+
+### Laserowy wzór ściegu zamiast dziurek
+
+```python
+from laser_svg import RoundedRectangle, SvgDocument
+
+doc = SvgDocument(140, 90)
+shape = RoundedRectangle(20, 15, 100, 60, radius=10)
+
+doc.add_shape(shape, layer="cut")
+doc.add_stitch_pattern(
+    shape,
+    edges=[0, 2],
+    spacing=8.0,
+    stitch_length=3.5,
+    inset=7.0,
+    layer="stitch",
+    stitch_thickness=0.25,
+)
+doc.save("stitch_pattern.svg")
 ```
 
 ## Kompatybilność

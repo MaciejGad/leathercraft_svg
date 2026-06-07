@@ -39,9 +39,18 @@ class SvgDocument:
     def add_path(self, d: str, layer: LayerName = "cut") -> None:
         self.elements.append(f'<path {self._style_attributes(layer)} d="{d}" />')
 
-    def add_line(self, x1: float, y1: float, x2: float, y2: float, layer: LayerName = "cut") -> None:
+    def add_line(
+        self,
+        x1: float,
+        y1: float,
+        x2: float,
+        y2: float,
+        layer: LayerName = "cut",
+        stroke_width: float | None = None,
+    ) -> None:
         self.elements.append(
-            f'<line {self._style_attributes(layer)} x1="{x1:.3f}" y1="{y1:.3f}" x2="{x2:.3f}" y2="{y2:.3f}" />'
+            f'<line {self._style_attributes(layer, stroke_width=stroke_width)} '
+            f'x1="{x1:.3f}" y1="{y1:.3f}" x2="{x2:.3f}" y2="{y2:.3f}" />'
         )
 
     def add_circle(self, x: float, y: float, radius: float, layer: LayerName = "cut") -> None:
@@ -77,6 +86,26 @@ class SvgDocument:
     ) -> None:
         self.add_holes(shape, edges, spacing, hole_radius, inset, layer, include_corners)
 
+    def add_stitch_pattern(
+        self,
+        shape: "Shape",
+        edges: Sequence[int] | Literal["all"] = "all",
+        spacing: float = 5.0,
+        stitch_length: float = 2.0,
+        inset: float = 4.0,
+        layer: LayerName = "stitch",
+        include_corners: bool = False,
+        stitch_thickness: float | None = None,
+    ) -> None:
+        for p1, p2 in shape.stitch_segments(
+            edges=edges,
+            spacing=spacing,
+            inset=inset,
+            include_corners=include_corners,
+            stitch_length=stitch_length,
+        ):
+            self.add_line(p1.x, p1.y, p2.x, p2.y, layer=layer, stroke_width=stitch_thickness)
+
     def save(self, path: str | Path) -> None:
         Path(path).write_text(self.to_svg(), encoding="utf-8")
 
@@ -99,11 +128,12 @@ class SvgDocument:
             '</svg>\n'
         )
 
-    def _style_attributes(self, layer: LayerName) -> str:
+    def _style_attributes(self, layer: LayerName, stroke_width: float | None = None) -> str:
         style = self.styles[layer]
         dash = f' stroke-dasharray="{style.dasharray}"' if style.dasharray else ""
+        width = style.width if stroke_width is None else stroke_width
         return (
-            f'fill="none" stroke="{style.color}" stroke-width="{style.width}"'
+            f'fill="none" stroke="{style.color}" stroke-width="{width}"'
             f'{dash} vector-effect="non-scaling-stroke"'
         )
 
@@ -119,6 +149,16 @@ class Shape:
         inset: float = 4.0,
         include_corners: bool = False,
     ) -> list[Point]:
+        raise NotImplementedError
+
+    def stitch_segments(
+        self,
+        edges: Sequence[int] | Literal["all"] = "all",
+        spacing: float = 5.0,
+        inset: float = 4.0,
+        include_corners: bool = False,
+        stitch_length: float = 2.0,
+    ) -> list[tuple[Point, Point]]:
         raise NotImplementedError
 
 
@@ -145,6 +185,26 @@ class Rectangle(Shape):
             (Point(x, y + h), Point(x, y)),
         ]
         return points_on_selected_edges(edge_defs, edges, spacing, include_corners)
+
+    def stitch_segments(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=False,
+        stitch_length=2.0,
+    ) -> list[tuple[Point, Point]]:
+        x = self.x + inset
+        y = self.y + inset
+        w = self.width - 2 * inset
+        h = self.height - 2 * inset
+        edge_defs = [
+            (Point(x, y), Point(x + w, y)),
+            (Point(x + w, y), Point(x + w, y + h)),
+            (Point(x + w, y + h), Point(x, y + h)),
+            (Point(x, y + h), Point(x, y)),
+        ]
+        return segments_on_selected_edges(edge_defs, edges, spacing, stitch_length, include_corners)
 
 
 @dataclass
@@ -185,6 +245,32 @@ class Circle(Shape):
             for i in range(count)
         ]
 
+    def stitch_segments(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=False,
+        stitch_length=2.0,
+    ) -> list[tuple[Point, Point]]:
+        r = max(self.radius - inset, 0.1)
+        count = max(3, int((2 * pi * r) // spacing))
+        half = stitch_length / 2
+        segments = []
+        for i in range(count):
+            angle = 2 * pi * i / count
+            cx = self.cx + r * cos(angle)
+            cy = self.cy + r * sin(angle)
+            tx = -sin(angle)
+            ty = cos(angle)
+            segments.append(
+                (
+                    Point(cx - tx * half, cy - ty * half),
+                    Point(cx + tx * half, cy + ty * half),
+                )
+            )
+        return segments
+
 
 @dataclass
 class Triangle(Shape):
@@ -206,6 +292,21 @@ class Triangle(Shape):
         p3 = move_towards(self.p3, centroid, inset)
         edge_defs = [(p1, p2), (p2, p3), (p3, p1)]
         return points_on_selected_edges(edge_defs, edges, spacing, include_corners)
+
+    def stitch_segments(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=False,
+        stitch_length=2.0,
+    ) -> list[tuple[Point, Point]]:
+        centroid = Point((self.p1.x + self.p2.x + self.p3.x) / 3, (self.p1.y + self.p2.y + self.p3.y) / 3)
+        p1 = move_towards(self.p1, centroid, inset)
+        p2 = move_towards(self.p2, centroid, inset)
+        p3 = move_towards(self.p3, centroid, inset)
+        edge_defs = [(p1, p2), (p2, p3), (p3, p1)]
+        return segments_on_selected_edges(edge_defs, edges, spacing, stitch_length, include_corners)
 
 
 @dataclass
@@ -243,6 +344,15 @@ def points_on_selected_edges(edge_defs, edges, spacing, include_corners) -> list
     return deduplicate_points(result)
 
 
+def segments_on_selected_edges(edge_defs, edges, spacing, stitch_length, include_corners) -> list[tuple[Point, Point]]:
+    selected = range(len(edge_defs)) if edges == "all" else edges
+    result: list[tuple[Point, Point]] = []
+    for index in selected:
+        p1, p2 = edge_defs[index]
+        result.extend(segments_on_line(p1, p2, spacing, stitch_length, include_corners))
+    return result
+
+
 def points_on_line(p1: Point, p2: Point, spacing: float, include_corners: bool = False) -> list[Point]:
     length = distance(p1, p2)
     if length == 0:
@@ -259,6 +369,41 @@ def points_on_line(p1: Point, p2: Point, spacing: float, include_corners: bool =
         points.append(Point(p1.x + dx * pos, p1.y + dy * pos))
         pos += spacing
     return points
+
+
+def segments_on_line(
+    p1: Point,
+    p2: Point,
+    spacing: float,
+    stitch_length: float,
+    include_corners: bool = False,
+) -> list[tuple[Point, Point]]:
+    if (p2.x < p1.x) or (p2.x == p1.x and p2.y < p1.y):
+        p1, p2 = p2, p1
+
+    length = distance(p1, p2)
+    if length == 0:
+        return []
+    start = 0.0 if include_corners else spacing / 2
+    end = length if include_corners else length - spacing / 2
+    if end < start:
+        return []
+    dx = (p2.x - p1.x) / length
+    dy = (p2.y - p1.y) / length
+    half = stitch_length / 2
+    segments: list[tuple[Point, Point]] = []
+    pos = start
+    while pos <= end + 0.001:
+        seg_start = max(0.0, pos - half)
+        seg_end = min(length, pos + half)
+        segments.append(
+            (
+                Point(p1.x + dx * seg_start, p1.y + dy * seg_start),
+                Point(p1.x + dx * seg_end, p1.y + dy * seg_end),
+            )
+        )
+        pos += spacing
+    return segments
 
 
 def distance(a: Point, b: Point) -> float:

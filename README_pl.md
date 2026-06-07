@@ -1,4 +1,4 @@
-# laser_svg
+# leathercraft_svg
 
 Biblioteka do generowania prostych plików SVG dla cięcia laserowego, szycia i kreślenia.
 Obsługuje kształty, punkty na krawędziach, dziurki pod szycie oraz eksport do PNG z białym tłem.
@@ -27,7 +27,7 @@ Jeśli chcesz tylko generować SVG, sama biblioteka działa też bez dodatkowych
 ## Szybki start
 
 ```python
-from laser_svg import Rectangle, SvgDocument
+from leathercraft_svg import Rectangle, SvgDocument
 
 doc = SvgDocument(width_mm=100, height_mm=60)
 shape = Rectangle(10, 10, 80, 40)
@@ -55,7 +55,7 @@ To wygeneruje:
 Przykład `sample.py` pokazuje `RoundedRectangle` z wzorem ściegu pod kątem 45 stopni na prawej, dolnej i lewej krawędzi:
 
 ```python
-from laser_svg import RoundedRectangle, SvgDocument
+from leathercraft_svg import RoundedRectangle, SvgDocument
 
 
 doc = SvgDocument(width_mm=140, height_mm=90)
@@ -332,7 +332,7 @@ Jeśli `edges="all"`, używane są wszystkie krawędzie figury.
 ### Prostokąt z dziurkami na wszystkich krawędziach
 
 ```python
-from laser_svg import Rectangle, SvgDocument
+from leathercraft_svg import Rectangle, SvgDocument
 
 doc = SvgDocument(100, 60)
 shape = Rectangle(10, 10, 80, 40)
@@ -345,7 +345,7 @@ doc.save("rect.svg")
 ### Trójkąt z dziurkami tylko na wybranych krawędziach
 
 ```python
-from laser_svg import Point, Triangle, SvgDocument
+from leathercraft_svg import Point, Triangle, SvgDocument
 
 doc = SvgDocument(120, 90)
 shape = Triangle(Point(20, 20), Point(100, 70), Point(20, 70))
@@ -364,7 +364,7 @@ doc.save_png("output.png", background_color="white")
 ### Laserowy wzór ściegu zamiast dziurek
 
 ```python
-from laser_svg import RoundedRectangle, SvgDocument
+from leathercraft_svg import RoundedRectangle, SvgDocument
 
 doc = SvgDocument(140, 90)
 shape = RoundedRectangle(20, 15, 100, 60, radius=10)
@@ -390,7 +390,7 @@ Jeśli używasz zewnętrznego narzędzia do rasteryzacji, preferuj narzędzia z 
 
 ## Struktura plików
 
-- `laser_svg.py` - biblioteka i modele geometryczne,
+- `leathercraft_svg.py` - biblioteka i modele geometryczne,
 - `sample.py` - prosty przykład zaokrąglonego prostokąta ze ściegami,
 - `all_shapes.py` - przykład poglądowy generujący wszystkie warianty figur,
 - `README.md` - dokumentacja.

@@ -1,4 +1,4 @@
-# laser_svg
+# leathercraft_svg
 
 Library for generating simple SVG files for laser cutting, stitching, and scoring.
 It supports shapes, edge points, stitching holes, and PNG export with a white background.
@@ -27,7 +27,7 @@ If you only want to generate SVG, the library works without any extra packages.
 ## Quick Start
 
 ```python
-from laser_svg import Rectangle, SvgDocument
+from leathercraft_svg import Rectangle, SvgDocument
 
 doc = SvgDocument(width_mm=100, height_mm=60)
 shape = Rectangle(10, 10, 80, 40)
@@ -55,7 +55,7 @@ This generates:
 The `sample.py` example shows a `RoundedRectangle` with a 45 degree stitch pattern on the right, bottom, and left edges:
 
 ```python
-from laser_svg import RoundedRectangle, SvgDocument
+from leathercraft_svg import RoundedRectangle, SvgDocument
 
 
 doc = SvgDocument(width_mm=140, height_mm=90)
@@ -332,7 +332,7 @@ If `edges="all"`, all edges of the shape are used.
 ### Rectangle with holes on all edges
 
 ```python
-from laser_svg import Rectangle, SvgDocument
+from leathercraft_svg import Rectangle, SvgDocument
 
 doc = SvgDocument(100, 60)
 shape = Rectangle(10, 10, 80, 40)
@@ -345,7 +345,7 @@ doc.save("rect.svg")
 ### Triangle with holes only on selected edges
 
 ```python
-from laser_svg import Point, Triangle, SvgDocument
+from leathercraft_svg import Point, Triangle, SvgDocument
 
 doc = SvgDocument(120, 90)
 shape = Triangle(Point(20, 20), Point(100, 70), Point(20, 70))
@@ -364,7 +364,7 @@ doc.save_png("output.png", background_color="white")
 ### Laser stitch pattern instead of holes
 
 ```python
-from laser_svg import RoundedRectangle, SvgDocument
+from leathercraft_svg import RoundedRectangle, SvgDocument
 
 doc = SvgDocument(140, 90)
 shape = RoundedRectangle(20, 15, 100, 60, radius=10)
@@ -390,7 +390,7 @@ If you use an external rasterizer, prefer tools with strong inline SVG support, 
 
 ## File Structure
 
-- `laser_svg.py` - library and geometry models,
+- `leathercraft_svg.py` - library and geometry models,
 - `sample.py` - focused rounded rectangle stitch example,
 - `all_shapes.py` - overview example that renders all shape variants,
 - `README.md` - documentation.

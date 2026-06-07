@@ -1,4 +1,4 @@
-from laser_svg import RoundedRectangle, SvgDocument
+from leathercraft_svg import RoundedRectangle, SvgDocument
 
 
 def generate_sample() -> None:

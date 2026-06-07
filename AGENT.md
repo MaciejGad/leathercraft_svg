@@ -1,14 +1,14 @@
-# laser_svg — AI Agent Reference
+# leathercraft_svg — AI Agent Reference
 
-This file is intended for AI agents generating code with the `laser_svg` library. It covers every public class and method, default values, edge indices, key constraints, and annotated examples. Read this before writing any code.
+This file is intended for AI agents generating code with the `leathercraft_svg` library. It covers every public class and method, default values, edge indices, key constraints, and annotated examples. Read this before writing any code.
 
 ---
 
 ## Setup
 
 ```python
-# Standard import pattern — all public names live in laser_svg
-from laser_svg import (
+# Standard import pattern — all public names live in leathercraft_svg
+from leathercraft_svg import (
     SvgDocument, StrokeStyle,
     Point,
     Rectangle, RoundedRectangle,
@@ -108,7 +108,7 @@ Default layers:
 To use custom styles:
 
 ```python
-from laser_svg import StrokeStyle, SvgDocument
+from leathercraft_svg import StrokeStyle, SvgDocument
 
 doc = SvgDocument(100, 60, styles={
     "cut":    StrokeStyle("#ff0000", 0.1),
@@ -270,7 +270,7 @@ doc.add_holes(shape, spacing=8.0, hole_radius=1.5, inset=6.0, rounded_path=True)
 ### 1. Rectangle with holes on all edges
 
 ```python
-from laser_svg import Rectangle, SvgDocument
+from leathercraft_svg import Rectangle, SvgDocument
 
 doc = SvgDocument(100, 60)
 shape = Rectangle(10, 10, 80, 40)
@@ -283,7 +283,7 @@ doc.save("rect_holes.svg")
 ### 2. Rounded rectangle — stitch on 3 sides only
 
 ```python
-from laser_svg import RoundedRectangle, SvgDocument
+from leathercraft_svg import RoundedRectangle, SvgDocument
 
 doc = SvgDocument(140, 90)
 shape = RoundedRectangle(20, 15, 100, 60, radius=10)
@@ -306,7 +306,7 @@ doc.save_png("rounded_rect_stitch.png")
 ### 3. Circle with holes
 
 ```python
-from laser_svg import Circle, SvgDocument
+from leathercraft_svg import Circle, SvgDocument
 
 doc = SvgDocument(100, 100)
 shape = Circle(50, 50, 35)
@@ -319,7 +319,7 @@ doc.save("circle_holes.svg")
 ### 4. Triangle with partial edge selection
 
 ```python
-from laser_svg import Point, Triangle, SvgDocument
+from leathercraft_svg import Point, Triangle, SvgDocument
 
 doc = SvgDocument(120, 90)
 shape = Triangle(Point(60, 10), Point(110, 80), Point(10, 80))
@@ -332,7 +332,7 @@ doc.save("triangle.svg")
 ### 5. RoundedTriangle with rounded contour
 
 ```python
-from laser_svg import Point, RoundedTriangle, SvgDocument
+from leathercraft_svg import Point, RoundedTriangle, SvgDocument
 
 doc = SvgDocument(130, 100)
 shape = RoundedTriangle(
@@ -356,7 +356,7 @@ doc.save("rounded_triangle.svg")
 ### 6. Custom styles
 
 ```python
-from laser_svg import Rectangle, StrokeStyle, SvgDocument
+from leathercraft_svg import Rectangle, StrokeStyle, SvgDocument
 
 doc = SvgDocument(100, 60, styles={
     "cut":    StrokeStyle("#ff0000", 0.1),
@@ -373,7 +373,7 @@ doc.save("custom_styles.svg")
 ### 7. Mix holes and raw geometry
 
 ```python
-from laser_svg import Rectangle, SvgDocument
+from leathercraft_svg import Rectangle, SvgDocument
 
 doc = SvgDocument(120, 80)
 shape = Rectangle(10, 10, 100, 60)

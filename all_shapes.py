@@ -1,6 +1,6 @@
 from math import atan2, degrees
 
-from laser_svg import (
+from leathercraft_svg import (
     Circle,
     Point,
     Rectangle,

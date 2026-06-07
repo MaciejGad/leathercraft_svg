@@ -100,6 +100,8 @@ Ilustracja:
 
 ![Overview of all generated shapes](all_shapes.png)
 
+Pełny przegląd testów wizualnych z fragmentami kodu i obrazami bazowymi znajdziesz w [VISUAL_TESTS.md](VISUAL_TESTS.md).
+
 ## Format SVG
 
 Wygenerowany SVG:

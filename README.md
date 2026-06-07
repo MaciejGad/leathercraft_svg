@@ -100,6 +100,8 @@ Illustration:
 
 ![Overview of all generated shapes](all_shapes.png)
 
+For a scenario-by-scenario visual reference with code snippets and baseline images, see [VISUAL_TESTS.md](VISUAL_TESTS.md).
+
 ## SVG Format
 
 The generated SVG:

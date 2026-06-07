@@ -48,8 +48,8 @@ W repozytorium jest gotowy przykład:
 
 To wygeneruje:
 
-- `przyklad_ksztaltow_z_dziurkami.svg`
-- `przyklad_ksztaltow_z_dziurkami.png`
+- `example_shapes.svg`
+- `example_shapes.png`
 
 Skrypt `test.sh` uruchamia ten sam przykład i otwiera PNG.
 

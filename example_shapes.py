@@ -37,5 +37,5 @@ doc.add_holes(rounded_triangle, edges="all", spacing=8.0, hole_radius=2.0, inset
 
 doc.save("example_shapes.svg")
 doc.save_png("example_shapes.png", background_color="white")
-print("Wygenerowano: example_shapes.svg")
-print("Wygenerowano: example_shapes.png")
+print("Generated: example_shapes.svg")
+print("Generated: example_shapes.png")

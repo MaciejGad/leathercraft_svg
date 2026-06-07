@@ -207,7 +207,25 @@ class Rectangle(Shape):
             (Point(x + w, y + h), Point(x, y + h)),
             (Point(x, y + h), Point(x, y)),
         ]
-        return points_on_selected_edges(edge_defs, edges, spacing, include_corners, placement)
+        selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
+        selected_set = set(selected)
+        result: list[Point] = []
+        for edge_index, (p1, p2) in enumerate(edge_defs):
+            length = distance(p1, p2)
+            if length == 0:
+                continue
+            positions = positions_on_side_center(length, spacing, include_corners, placement)
+            positions = adjust_positions_near_corners(
+                positions,
+                length,
+                include_corners,
+                spacing,
+            )
+            for local_pos in positions:
+                if edge_index not in selected_set:
+                    continue
+                result.append(point_on_edge(p1, p2, local_pos))
+        return deduplicate_points(result)
 
     def stitch_segments(
         self,
@@ -237,10 +255,18 @@ class Rectangle(Shape):
             length = distance(p1, p2)
             if length == 0:
                 continue
-            for local_pos in positions_on_side_center(length, spacing, include_corners, placement):
+            positions = positions_on_side_center(length, spacing, include_corners, placement)
+            adjusted = adjust_stitch_positions_and_lengths(
+                positions,
+                length,
+                include_corners,
+                spacing,
+                stitch_length,
+            )
+            for local_pos, local_stitch_length in adjusted:
                 if edge_index not in selected_set:
                     continue
-                result.append(segment_on_edge(p1, p2, local_pos, stitch_length, stitch_angle_deg))
+                result.append(segment_on_edge(p1, p2, local_pos, local_stitch_length, stitch_angle_deg))
         return result
 
 
@@ -676,8 +702,16 @@ def segments_on_closed_edges(
         length = distance(a, b)
         if length == 0:
             continue
-        for local_pos in positions_on_side_center(length, spacing, include_corners, placement):
-            result.append(segment_on_edge(a, b, local_pos, stitch_length, stitch_angle_deg))
+        positions = positions_on_side_center(length, spacing, include_corners, placement)
+        adjusted = adjust_stitch_positions_and_lengths(
+            positions,
+            length,
+            include_corners,
+            spacing,
+            stitch_length,
+        )
+        for local_pos, local_stitch_length in adjusted:
+            result.append(segment_on_edge(a, b, local_pos, local_stitch_length, stitch_angle_deg))
     return result
 
 
@@ -692,7 +726,14 @@ def points_on_closed_edges(
         length = distance(a, b)
         if length == 0:
             continue
-        for local_pos in positions_on_side_center(length, spacing, include_corners, placement):
+        positions = positions_on_side_center(length, spacing, include_corners, placement)
+        positions = adjust_positions_near_corners(
+            positions,
+            length,
+            include_corners,
+            spacing,
+        )
+        for local_pos in positions:
             result.append(point_on_edge(a, b, local_pos))
     return deduplicate_points(result)
 
@@ -722,6 +763,71 @@ def positions_on_side_center(
     center = length / 2
     first = center - spacing * (count - 1) / 2
     return [first + i * spacing for i in range(count)]
+
+
+def adjust_positions_near_corners(
+    positions: list[float],
+    length: float,
+    include_corners: bool,
+    spacing: float,
+) -> list[float]:
+    if include_corners or not positions or length <= 0:
+        return positions
+
+    count = len(positions)
+    target_clearance = spacing * 0.7
+    clearance = min(target_clearance, length / 2)
+
+    start = positions[0]
+    end = positions[-1]
+    span_original = end - start
+    span_target = max(0.0, length - 2 * clearance)
+
+    if count == 1:
+        return [length / 2]
+    if span_original <= 1e-9:
+        return [clearance + (span_target * i / (count - 1)) for i in range(count)]
+
+    scale = span_target / span_original
+    return [clearance + (pos - start) * scale for pos in positions]
+
+
+def adjust_stitch_positions_and_lengths(
+    positions: list[float],
+    length: float,
+    include_corners: bool,
+    spacing: float,
+    stitch_length: float,
+) -> list[tuple[float, float]]:
+    if include_corners or not positions or length <= 0:
+        return [(pos, stitch_length) for pos in positions]
+
+    # Preserve stitch count, move away from corners, and shorten near-corner stitches if needed.
+    count = len(positions)
+    target_clearance = max(stitch_length * 0.8, spacing * 0.7)
+    clearance = min(target_clearance, length / 2)
+
+    start = positions[0]
+    end = positions[-1]
+    span_original = end - start
+    span_target = max(0.0, length - 2 * clearance)
+
+    if count == 1:
+        shifted_positions = [length / 2]
+    elif span_original <= 1e-9:
+        shifted_positions = [clearance + (span_target * i / (count - 1)) for i in range(count)]
+    else:
+        scale = span_target / span_original
+        shifted_positions = [clearance + (pos - start) * scale for pos in positions]
+
+    adjusted: list[tuple[float, float]] = []
+    for pos in shifted_positions:
+        dist_to_corner = min(pos, length - pos)
+        max_safe_length = max(0.6, 2 * dist_to_corner * 0.9)
+        local_stitch_length = min(stitch_length, max_safe_length)
+        adjusted.append((pos, local_stitch_length))
+
+    return adjusted
 
 
 def points_on_line(

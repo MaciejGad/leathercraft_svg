@@ -36,7 +36,7 @@ echo "==> Coverage summary"
   --missing \
   --coverdir "$COVER_DIR" \
   --ignore-dir "$IGNORE_DIRS" \
-  --module pytest tests/test_visual.py tests/test_unit.py | tee "$REPORT_FILE"
+  --module pytest tests/test_visual.py tests/test_unit.py > "$REPORT_FILE"
 
 echo
 echo "==> Project coverage focus"

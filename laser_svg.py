@@ -230,15 +230,18 @@ class Rectangle(Shape):
             (Point(x + w, y + h), Point(x, y + h)),
             (Point(x, y + h), Point(x, y)),
         ]
-        return segments_on_selected_edges(
-            edge_defs,
-            edges,
-            spacing,
-            stitch_length,
-            include_corners,
-            stitch_angle_deg,
-            placement,
-        )
+        selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
+        selected_set = set(selected)
+        result: list[tuple[Point, Point]] = []
+        for edge_index, (p1, p2) in enumerate(edge_defs):
+            length = distance(p1, p2)
+            if length == 0:
+                continue
+            for local_pos in positions_on_side_center(length, spacing, include_corners, placement):
+                if edge_index not in selected_set:
+                    continue
+                result.append(segment_on_edge(p1, p2, local_pos, stitch_length, stitch_angle_deg))
+        return result
 
 
 @dataclass
@@ -258,6 +261,51 @@ class RoundedRectangle(Rectangle):
             f"Q {x:.3f} {y+h:.3f} {x:.3f} {y+h-r:.3f} "
             f"L {x:.3f} {y+r:.3f} "
             f"Q {x:.3f} {y:.3f} {x+r:.3f} {y:.3f} Z"
+        )
+
+    def stitch_segments(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=False,
+        stitch_length=2.0,
+        stitch_angle_deg=0.0,
+        placement="centered",
+        rounded_path=False,
+    ) -> list[tuple[Point, Point]]:
+        all_rectangle_edges = edges == "all" or sorted(set(edges)) == [0, 1, 2, 3]
+        if not all_rectangle_edges:
+            return super().stitch_segments(
+                edges=edges,
+                spacing=spacing,
+                inset=inset,
+                include_corners=include_corners,
+                stitch_length=stitch_length,
+                stitch_angle_deg=stitch_angle_deg,
+                placement=placement,
+                rounded_path=rounded_path,
+            )
+
+        x = self.x + inset
+        y = self.y + inset
+        w = self.width - 2 * inset
+        h = self.height - 2 * inset
+        if w <= 0 or h <= 0:
+            return []
+
+        r = max(0.0, min(self.radius - inset, w / 2, h / 2))
+        contour = rounded_rectangle_contour(x, y, w, h, r)
+        if len(contour) < 2:
+            return []
+
+        return stitch_segments_on_closed_polyline(
+            contour,
+            spacing=spacing,
+            stitch_length=stitch_length,
+            stitch_angle_deg=stitch_angle_deg,
+            include_corners=include_corners,
+            placement=placement,
         )
 
 
@@ -782,6 +830,47 @@ def rounded_triangle_contour(points: list[Point], radius: float, arc_steps: int 
             t = step / arc_steps
             contour.append(quadratic_bezier(a, control, b, t))
         contour.append(b)
+
+    return contour
+
+
+def rounded_rectangle_contour(
+    x: float,
+    y: float,
+    width: float,
+    height: float,
+    radius: float,
+    arc_steps: int = 12,
+) -> list[Point]:
+    if width <= 0 or height <= 0:
+        return []
+
+    r = max(0.0, min(radius, width / 2, height / 2))
+    if r == 0.0:
+        return [
+            Point(x, y),
+            Point(x + width, y),
+            Point(x + width, y + height),
+            Point(x, y + height),
+        ]
+
+    contour: list[Point] = []
+
+    def add_arc(cx: float, cy: float, start_angle: float, end_angle: float) -> None:
+        for step in range(1, arc_steps + 1):
+            t = step / arc_steps
+            angle = start_angle + (end_angle - start_angle) * t
+            contour.append(Point(cx + r * cos(angle), cy + r * sin(angle)))
+
+    contour.append(Point(x + r, y))
+    contour.append(Point(x + width - r, y))
+    add_arc(x + width - r, y + r, -pi / 2, 0.0)
+    contour.append(Point(x + width, y + height - r))
+    add_arc(x + width - r, y + height - r, 0.0, pi / 2)
+    contour.append(Point(x + r, y + height))
+    add_arc(x + r, y + height - r, pi / 2, pi)
+    contour.append(Point(x, y + r))
+    add_arc(x + r, y + r, pi, 3 * pi / 2)
 
     return contour
 

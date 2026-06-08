@@ -210,6 +210,19 @@ Parametry:
 - `stitch_thickness` - opcjonalna grubość linii dla ściegów (jeśli `None`, używana jest domyślna grubość warstwy).
 - `stitch_angle_deg` - kąt pochylenia ściegu w stopniach (domyślnie `0.0` = na płasko, można podać własną wartość, np. `45`).
 
+### `doc.add_stitch_on_polyline(points, spacing=5.0, stitch_length=2.0, stitch_angle_deg=0.0, layer="stitch", stitch_thickness=None)`
+
+Dodaje znaczniki ściegu rozmieszczone wzdłuż otwartej polilinii.
+
+Parametry:
+
+- `points` - lista krotek `(x, y)`,
+- `spacing` - odstęp między środkami ściegów,
+- `stitch_length` - długość każdego ściegu,
+- `stitch_angle_deg` - pochylenie względem kierunku ścieżki,
+- `layer` - warstwa stylu,
+- `stitch_thickness` - opcjonalne nadpisanie grubości linii.
+
 ### `doc.save(path)`
 
 Zapisuje SVG do pliku.
@@ -309,6 +322,65 @@ Parametry:
 - `p1`, `p2`, `p3` - wierzchołki,
 - `radius` - promień zaokrąglenia narożników.
 
+### `Polygon(points, smooth=False)`
+
+Figura zdefiniowana przez jawną listę krotek `(x, y)`.
+
+Parametry:
+
+- `points` - uporządkowana lista krotek `(x, y)` tworzących zamknięty wielokąt,
+- `smooth` - jeśli `True`, kontur jest rysowany krzywymi Béziera zamiast odcinków prostych.
+
+Metody `hole_points(...)` i `stitch_segments(...)` automatycznie przesuwają granicę wielokąta do wewnątrz o wartość `inset`.
+
+#### `Polygon.from_mirror(half_points, center_x, smooth=False)`
+
+Tworzy symetryczny zamknięty wielokąt z jednej połowy konturu.
+
+`half_points` powinno zaczynać i kończyć się na osi symetrii (`x == center_x`). Odbita prawa połowa jest dołączana w odwrotnej kolejności, tworząc jeden ciągły zamknięty kontur.
+
+```python
+from leathercraft_svg import Polygon, SvgDocument
+
+doc = SvgDocument(150, 80)
+
+lewa_polowa = [
+    (75, 5),
+    (40, 5),
+    (20, 40),
+    (40, 75),
+    (75, 75),
+]
+
+shape = Polygon.from_mirror(lewa_polowa, center_x=75, smooth=True)
+doc.add_shape(shape, layer="cut")
+doc.add_holes(shape, spacing=8.0, hole_radius=1.2, inset=5.0, layer="stitch")
+doc.save("polygon.svg")
+```
+
+### `offset_polyline(points, distance, side="right", miter_limit=8.0)`
+
+Przesuwa otwartą polilinię o `distance` mm.
+
+Parametry:
+
+- `points` - lista krotek `(x, y)`,
+- `distance` - odległość przesunięcia w mm,
+- `side` - `"right"` lub `"left"` względem kierunku ruchu wzdłuż ścieżki,
+- `miter_limit` - narożniki ostrzejsze niż `distance × miter_limit` są ścięte.
+
+Zwraca nową `list[tuple[float, float]]`.
+
+### `mirror_polyline(points, center_x)`
+
+Odbija poziomo listę krotek `(x, y)` względem `center_x`.
+
+Przydatne do generowania prawej ścieżki ściegu z lewej.
+
+### `stitch_segments_on_open_polyline(points, spacing, stitch_length, stitch_angle_deg=0.0)`
+
+Zwraca segmenty ściegu (`list[tuple[Point, Point]]`) rozmieszczone co `spacing` mm wzdłuż otwartej polilinii. Pierwszy ścieg jest umieszczony w odległości `spacing` od początku ścieżki.
+
 ## Parametry wspólne dla `hole_points(...)`
 
 Wszystkie figury implementują metodę:
@@ -365,6 +437,46 @@ doc.save("triangle.svg")
 doc.save_png("output.png", background_color="white")
 ```
 
+### Symetryczny wielokąt z dziurkami pod szycie
+
+```python
+from leathercraft_svg import Polygon, SvgDocument
+
+doc = SvgDocument(150, 80)
+
+lewa_polowa = [
+    (75, 5),
+    (40, 5),
+    (20, 40),
+    (40, 75),
+    (75, 75),
+]
+
+shape = Polygon.from_mirror(lewa_polowa, center_x=75, smooth=True)
+doc.add_shape(shape, layer="cut")
+doc.add_holes(shape, spacing=8.0, hole_radius=1.2, inset=5.0, layer="stitch")
+doc.save("polygon.svg")
+```
+
+### Otwarta polilinia z przesuniętym szwem ściegów
+
+```python
+from leathercraft_svg import SvgDocument, StrokeStyle, offset_polyline, mirror_polyline
+
+doc = SvgDocument(150, 100, styles={
+    "cut":    StrokeStyle("#ff0000", 0.12),
+    "stitch": StrokeStyle("#0000ff", 0.35),
+})
+
+lewa_krawedz = [(30, 10), (20, 50), (30, 90)]
+lewy_szew  = offset_polyline(lewa_krawedz, distance=4.0, side="right")
+prawy_szew = mirror_polyline(lewy_szew, center_x=75)
+
+doc.add_stitch_on_polyline(lewy_szew,  spacing=6, stitch_length=2.4, layer="stitch")
+doc.add_stitch_on_polyline(prawy_szew, spacing=6, stitch_length=2.4, layer="stitch")
+doc.save("szew.svg")
+```
+
 ### Laserowy wzór ściegu zamiast dziurek
 
 ```python
@@ -387,6 +499,88 @@ doc.add_stitch_pattern(
 doc.save("stitch_pattern.svg")
 ```
 
+## DSL dla wzorców
+
+Biblioteka zawiera kompilator DSL (`leathercraft_dsl.py`), który pozwala opisywać wzorce cięcia w prostym formacie tekstowym bez pisania kodu w Pythonie.
+
+### Uruchomienie kompilatora
+
+```bash
+python leathercraft_dsl.py build wzorzec.lcraft
+```
+
+Polecenie tworzy pliki `wzorzec.svg` i `wzorzec.png` obok pliku źródłowego.
+
+### Podstawowy prostokąt
+
+```text
+pattern card_panel
+size 120 80
+
+rectangle panel
+  at 10 10
+  size 100 60
+end
+
+stitches
+  source panel
+  edges all
+  margin 4
+  spacing 5
+  length 3
+end
+
+export card_panel
+```
+
+### Zaokrąglony prostokąt z ościegami na trzech krawędziach
+
+```text
+pattern rounded_pocket
+size 120 90
+
+rounded_rectangle pocket
+  at 10 10
+  size 100 70
+  radius 8
+end
+
+stitches
+  source pocket
+  edges except_top
+  margin 5
+  spacing 5
+  length 3.5
+  angle 45
+end
+
+export rounded_pocket
+```
+
+### Dziurki wzdłuż krawędzi figury
+
+```text
+holes
+  source panel
+  edges all
+  margin 4
+  spacing 6
+  radius 1.2
+end
+```
+
+### Wszystkie wartości podajemy w milimetrach
+
+Nie stosuj przyrostków jednostek takich jak `mm` ani `cm`. Każda liczba jest już w milimetrach.
+
+### Obsługiwane słowa kluczowe
+
+`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `outer`, `stitches`, `holes`, `hole`, `export`
+
+Nazwy krawędzi: `top`, `right`, `bottom`, `left`, `all`, `except_top`, `sides`, `horizontal`, `vertical`
+
+Przykładowe pliki `.lcraft` znajdują się w katalogu `examples/dsl/`.
+
 ## Kompatybilność
 
 Zachowanie projektu zostało zoptymalizowane pod renderery, które gorzej obsługują CSS w SVG.
@@ -395,8 +589,11 @@ Jeśli używasz zewnętrznego narzędzia do rasteryzacji, preferuj narzędzia z 
 ## Struktura plików
 
 - `leathercraft_svg.py` - biblioteka i modele geometryczne,
+- `leathercraft_dsl.py` - kompilator DSL (wzorce tekstowe → SVG/PNG),
 - `sample.py` - prosty przykład zaokrąglonego prostokąta ze ściegami,
 - `all_shapes.py` - przykład poglądowy generujący wszystkie warianty figur,
+- `lighter_sleeve.py` - symetryczny wzorzec skórzany z użyciem `Polygon.from_mirror`,
+- `examples/dsl/` - przykładowe pliki wzorców `.lcraft`,
 - `README.md` - dokumentacja.
 
 ## Uwagi praktyczne

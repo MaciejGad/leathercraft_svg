@@ -546,6 +546,401 @@ doc.save("mixed.svg")
 
 ---
 
+## DSL Compiler — leathercraft_dsl.py
+
+Use the DSL when you need to generate a pattern **without writing Python**. The DSL compiles `.lcraft` text files into SVG/PNG via the same `leathercraft_svg` library.
+
+### Import surface
+
+```python
+from leathercraft_dsl import parse, compile_document, build_file, DslError
+```
+
+| Function | Description |
+|----------|-------------|
+| `parse(text: str) -> PatternDocument` | Tokenise and validate DSL text; returns AST |
+| `compile_document(doc: PatternDocument) -> SvgDocument` | Convert AST to a ready-to-render `SvgDocument` |
+| `build_file(path) -> SvgDocument` | Parse + compile + export a `.lcraft` file on disk |
+
+### CLI
+
+```bash
+python leathercraft_dsl.py build pattern.lcraft
+# writes pattern.svg + pattern.png next to the source file
+```
+
+---
+
+### DSL syntax overview
+
+The DSL is line-based. Empty lines and `#` comments are ignored. All numeric values are **millimeters** — no unit suffixes allowed.
+
+```text
+# This is a comment
+pattern my_pattern        # optional name
+size 150 112              # document width height
+```
+
+Blocks start with a keyword and end with `end`:
+
+```text
+rectangle panel
+  at 10 10
+  size 100 60
+end
+```
+
+Indentation is optional but recommended.
+
+---
+
+### Document commands
+
+| Keyword | Syntax | Notes |
+|---------|--------|-------|
+| `pattern` | `pattern <name>` | Optional; used as default export filename |
+| `size` | `size <width> <height>` | **Required.** All in mm |
+| `layer` | `layer <name> <color> <stroke_width> [dashed]` | Overrides default layer styles |
+| `symmetry` | `symmetry <x>` or `symmetry vertical x=<x>` | Sets vertical mirror axis for mirrored shapes/stitches/holes |
+
+**Layer color** can be a named color (`red`, `blue`, `green`, `gray`) or a hex value (`#ff0000`).
+
+If `layer` commands are omitted, the compiler uses the same defaults as `SvgDocument` (red cut, blue stitch, green crease, gray guide).
+
+---
+
+### Shapes
+
+#### `rectangle`
+
+```text
+rectangle <id>
+  at <x> <y>
+  size <width> <height>
+  [layer <layer_name>]
+end
+```
+
+Compiles to `Rectangle(x, y, width, height)` + `doc.add_shape(...)`. Default layer: `cut`.
+
+#### `rounded_rectangle`
+
+```text
+rounded_rectangle <id>
+  at <x> <y>
+  size <width> <height>
+  radius <r>
+  [layer <layer_name>]
+end
+```
+
+Compiles to `RoundedRectangle(x, y, width, height, radius)`. `radius` must be > 0.
+
+#### `outer` — freeform shape
+
+```text
+outer [smooth|straight] [mirrored]
+  <x> <y>
+  <x> <y>
+  ...
+end
+```
+
+Compiles to `Polygon(points)` or `Polygon.from_mirror(points, center_x)`.
+
+- `smooth` → quadratic Bézier contour; `straight` → straight segments (default).
+- `mirrored` → requires a global `symmetry` axis; the listed points describe **one half** of the shape (must start and end on the axis).
+- Default layer: `cut`. Shape is registered as id `"outer"`.
+
+---
+
+### Operations
+
+#### `stitches` — on a named shape
+
+```text
+stitches
+  source <shape_id>
+  [edges <edge_name>...]
+  [margin <mm>]
+  [spacing <mm>]
+  [length <mm>]
+  [angle <degrees>]
+  [layer <layer_name>]
+end
+```
+
+Compiles to `doc.add_stitch_pattern(shape, edges=..., inset=margin, ...)`.
+
+Default values: `edges all`, `margin 4`, `spacing 5`, `length 3`, `angle 0`, `layer stitch`.
+
+#### `stitches` — along a custom path
+
+```text
+stitches
+  [side left|right]
+  [mirror]
+  margin <mm>
+  spacing <mm>
+  length <mm>
+  [angle <degrees>]
+  [layer <layer_name>]
+
+  path
+    <x> <y>
+    <x> <y>
+    ...
+  end
+end
+```
+
+Compiles to `offset_polyline(path_points, distance=margin, side=side)` then `doc.add_stitch_on_polyline(seam, ...)`.
+
+- `side` defaults to `"right"`.
+- If `mirror` is present, a mirrored copy is also rendered using `mirror_polyline(seam, symmetry_axis_x)`. Requires `symmetry`.
+
+#### `holes` — on a named shape
+
+```text
+holes
+  source <shape_id>
+  [edges <edge_name>...]
+  [margin <mm>]
+  [spacing <mm>]
+  [radius <mm>]
+  [layer <layer_name>]
+end
+```
+
+Compiles to `doc.add_holes(shape, edges=..., inset=margin, hole_radius=radius, ...)`.
+
+Default values: `edges all`, `margin 4`, `spacing 6`, `radius 1.2`, `layer cut`.
+
+#### `hole` — single or mirrored circle
+
+Single hole:
+
+```text
+hole <id>
+  at <x> <y>
+  radius <r>
+  [layer <layer_name>]
+end
+```
+
+Compiles to `doc.add_circle(x, y, radius)`.
+
+Mirrored pair (requires `symmetry`):
+
+```text
+hole <id>
+  mirror
+  x_from_center <distance>
+  y <y>
+  radius <r>
+  [layer <layer_name>]
+end
+```
+
+Places circles at `(axis_x − distance, y)` and `(axis_x + distance, y)`.
+
+---
+
+### Edges
+
+Named edge tokens for rectangle-like shapes:
+
+| Token | Equivalent indices |
+|-------|--------------------|
+| `top` | `[0]` |
+| `right` | `[1]` |
+| `bottom` | `[2]` |
+| `left` | `[3]` |
+| `all` | `[0, 1, 2, 3]` |
+| `except_top` | `[1, 2, 3]` |
+| `sides` | `[1, 3]` |
+| `horizontal` | `[0, 2]` |
+| `vertical` | `[1, 3]` |
+
+Multiple names can be combined: `edges left bottom right`.
+
+---
+
+### Export
+
+```text
+export <name>               # writes <name>.svg + <name>.png
+export svg <filename>       # SVG only
+export png <filename>       # PNG only
+export pdf <filename>       # PDF via cairosvg
+```
+
+If no `export` command is present, the compiler writes `<pattern_name>.svg` and `<pattern_name>.png` using the `pattern` name or the source filename stem.
+
+---
+
+### Validation errors
+
+The compiler raises `DslError` with clear messages:
+
+| Situation | Error message |
+|-----------|---------------|
+| `size` missing | `missing required command 'size'` |
+| Unknown shape reference | `stitches block references unknown source 'panel2'` |
+| `mirror` without `symmetry` | `hole 'keyring' uses mirror but no symmetry axis is defined` |
+| Invalid edge name | `unknown edge 'lower'. Use: top, right, bottom, left, ...` |
+| Zero or negative radius | `radius must be greater than 0` |
+| Unit suffix in value | `units are not allowed in numeric values. Use 'size 150 112', not 'size 150mm 112mm'` |
+| Block without `end` | `missing 'end' for block 'rounded_rectangle panel'` |
+
+---
+
+### Complete DSL examples
+
+#### Rectangle with stitches on all edges
+
+```text
+pattern card_panel
+size 120 80
+
+rectangle panel
+  at 10 10
+  size 100 60
+end
+
+stitches
+  source panel
+  edges all
+  margin 4
+  spacing 5
+  length 3
+end
+
+export card_panel
+```
+
+#### Rounded rectangle — stitches except top
+
+```text
+pattern rounded_pocket
+size 120 90
+
+rounded_rectangle pocket
+  at 10 10
+  size 100 70
+  radius 8
+end
+
+stitches
+  source pocket
+  edges except_top
+  margin 5
+  spacing 5
+  length 3.5
+  angle 45
+end
+
+export rounded_pocket
+```
+
+#### Panel with punch holes
+
+```text
+pattern panel_with_holes
+size 120 80
+
+rectangle panel
+  at 10 10
+  size 100 60
+end
+
+holes
+  source panel
+  edges all
+  margin 4
+  spacing 6
+  radius 1.2
+end
+
+export panel_with_holes
+```
+
+#### Symmetric lighter sleeve
+
+```text
+pattern lighter_sleeve
+size 150 112
+
+layer cut red 0.12
+layer stitch blue 0.35
+
+symmetry 75
+
+outer smooth mirrored
+  75 14
+  59 11
+  43 8
+  28 11
+  17 11
+  18 27
+  18 36
+  36 42
+  40 51
+  40 74
+  37 97
+  47 102
+  61 105
+  75 105
+end
+
+stitches
+  margin 4
+  spacing 5
+  length 3.8
+  mirror
+
+  path
+    43 15
+    28 11
+    17 11
+    18 27
+    18 36
+    36 42
+    40 51
+    40 74
+    37 97
+    47 102
+    61 105
+    75 105
+  end
+end
+
+hole keyring
+  mirror
+  x_from_center 30
+  y 21
+  radius 2.2
+end
+
+export lighter_sleeve
+```
+
+---
+
+### DSL common mistakes
+
+| Mistake | Fix |
+|---------|-----|
+| Writing `size 150mm 112mm` | Remove unit suffixes: `size 150 112` |
+| `stitches` with `mirror` but no `symmetry` | Add `symmetry <x>` at document level |
+| `outer mirrored` without `symmetry` | Same as above |
+| Referencing a shape before it is declared | Shape blocks must appear before the `stitches`/`holes` that reference them |
+| `hole` with `mirror` but missing `x_from_center` or `y` | Both fields are required for mirrored holes |
+| `outer` half-points don't start/end on the axis | First and last point must have `x == symmetry_axis_x` |
+| Using a reserved keyword as a shape id | Avoid names like `path`, `end`, `source`, `layer`, etc. |
+
+---
+
 ## SVG output characteristics
 
 - No CSS; all styles are inline attributes.

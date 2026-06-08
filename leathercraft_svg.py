@@ -81,6 +81,19 @@ class SvgDocument:
         ):
             self.add_circle(p.x, p.y, hole_radius, layer)
 
+    def add_stitch_on_polyline(
+        self,
+        points: "list[tuple[float, float]]",
+        spacing: float = 5.0,
+        stitch_length: float = 2.0,
+        stitch_angle_deg: float = 0.0,
+        layer: LayerName = "stitch",
+        stitch_thickness: float | None = None,
+    ) -> None:
+        """Add stitch marks distributed along an open polyline."""
+        for p1, p2 in stitch_segments_on_open_polyline(points, spacing, stitch_length, stitch_angle_deg):
+            self.add_line(p1.x, p1.y, p2.x, p2.y, layer=layer, stroke_width=stitch_thickness)
+
     def add_stitch_holes(
         self,
         shape: "Shape",
@@ -520,6 +533,80 @@ class RoundedTriangle(Triangle):
             return []
         return stitch_segments_on_closed_polyline(
             contour,
+            spacing=spacing,
+            stitch_length=stitch_length,
+            stitch_angle_deg=stitch_angle_deg,
+            include_corners=include_corners,
+        )
+
+
+@dataclass
+class Polygon(Shape):
+    """
+    Shape defined by an explicit list of (x, y) points.
+
+    Use ``Polygon.from_mirror`` to build a symmetric shape from one half
+    of the outline — the right side is generated automatically as a
+    horizontal mirror around ``center_x``.
+
+    Parameters:
+        points  - ordered list of (x, y) tuples forming a closed polygon.
+        smooth  - if True, the outline is drawn with quadratic Bézier curves
+                  instead of straight lines.
+    """
+
+    points: list[tuple[float, float]]
+    smooth: bool = False
+
+    @classmethod
+    def from_mirror(
+        cls,
+        half_points: "list[tuple[float, float]]",
+        center_x: float,
+        smooth: bool = False,
+    ) -> "Polygon":
+        """
+        Build a symmetric closed polygon from one half.
+
+        ``half_points`` should start and end on the mirror axis (x == center_x).
+        The mirrored right side is appended in reverse, so the outline forms
+        one continuous closed loop.
+        """
+        mirrored = [(2 * center_x - x, y) for x, y in half_points]
+        full = list(half_points) + list(reversed(mirrored[1:-1]))
+        return cls(points=full, smooth=smooth)
+
+    def path_d(self) -> str:
+        if self.smooth:
+            return _smooth_path_d(self.points)
+        return _straight_path_d(self.points)
+
+    def hole_points(
+        self,
+        edges: "Sequence[int] | Literal['all']" = "all",
+        spacing: float = 5.0,
+        inset: float = 4.0,
+        include_corners: bool = False,
+        rounded_path: bool = False,
+    ) -> list[Point]:
+        pts = _offset_closed_polygon(self.points, inset) if inset > 0 else self.points
+        polyline = [Point(x, y) for x, y in pts]
+        return points_on_closed_polyline(polyline, spacing=spacing, include_corners=include_corners)
+
+    def stitch_segments(
+        self,
+        edges: "Sequence[int] | Literal['all']" = "all",
+        spacing: float = 5.0,
+        inset: float = 4.0,
+        include_corners: bool = False,
+        stitch_length: float = 2.0,
+        stitch_angle_deg: float = 0.0,
+        rounded_path: bool = False,
+    ) -> "list[tuple[Point, Point]]":
+        pts = _offset_closed_polygon(self.points, inset) if inset > 0 else self.points
+        polyline = [Point(x, y) for x, y in pts]
+        return stitch_segments_on_closed_polyline(
+            polyline,
             spacing=spacing,
             stitch_length=stitch_length,
             stitch_angle_deg=stitch_angle_deg,
@@ -1111,4 +1198,240 @@ def deduplicate_points(points: Iterable[Point], precision: int = 3) -> list[Poin
         if key not in seen:
             seen.add(key)
             result.append(p)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Polygon path helpers
+# ---------------------------------------------------------------------------
+
+def _straight_path_d(points: "list[tuple[float, float]]") -> str:
+    """Closed SVG path from a list of (x, y) tuples using straight lines."""
+    return "M " + " L ".join(f"{x:.3f} {y:.3f}" for x, y in points) + " Z"
+
+
+def _smooth_path_d(points: "list[tuple[float, float]]") -> str:
+    """
+    Closed SVG path using quadratic Bézier curves.
+
+    Each original point becomes a control point; midpoints between consecutive
+    control points become anchor points. This produces a natural smooth curve
+    that passes close to (but not exactly through) each original point.
+    """
+    if len(points) < 3:
+        return _straight_path_d(points)
+
+    d = f"M {points[0][0]:.3f} {points[0][1]:.3f}"
+    for i in range(1, len(points) - 1):
+        cx, cy = points[i]
+        nx, ny = points[i + 1]
+        mid_x = (cx + nx) / 2
+        mid_y = (cy + ny) / 2
+        d += f" Q {cx:.3f} {cy:.3f} {mid_x:.3f} {mid_y:.3f}"
+    cx, cy = points[-1]
+    fx, fy = points[0]
+    d += f" Q {cx:.3f} {cy:.3f} {fx:.3f} {fy:.3f}"
+    d += " Z"
+    return d
+
+
+# ---------------------------------------------------------------------------
+# Polyline offset and mirroring
+# ---------------------------------------------------------------------------
+
+def offset_polyline(
+    points: "list[tuple[float, float]]",
+    distance: float,
+    side: str = "right",
+    miter_limit: float = 8.0,
+) -> "list[tuple[float, float]]":
+    """
+    Offset an open polyline by ``distance`` mm on the given ``side``.
+
+    In SVG coordinates Y grows downward. For a polyline running left-to-right
+    along the top, ``side="right"`` moves the offset downward (toward the
+    inside of a typical shape), and ``side="left"`` moves it upward.
+
+    Sharp corners are mitered up to ``miter_limit × distance``. Beyond that
+    limit the corner is bevel-cut (averaged normals are used instead).
+    """
+    if len(points) < 2:
+        return list(points)
+
+    if side not in ("left", "right"):
+        raise ValueError("side must be 'left' or 'right'")
+
+    # Build one offset segment per input segment.
+    offset_segs: list[tuple[tuple, tuple, tuple]] = []
+    for (x1, y1), (x2, y2) in zip(points, points[1:]):
+        dx, dy = x2 - x1, y2 - y1
+        length = hypot(dx, dy)
+        if length == 0:
+            offset_segs.append(((x1, y1), (x2, y2), (0.0, 0.0)))
+            continue
+        ux, uy = dx / length, dy / length
+        nx, ny = (uy, -ux) if side == "right" else (-uy, ux)
+        offset_segs.append((
+            (x1 + nx * distance, y1 + ny * distance),
+            (x2 + nx * distance, y2 + ny * distance),
+            (nx, ny),
+        ))
+
+    result: list[tuple[float, float]] = [offset_segs[0][0]]
+
+    for i in range(1, len(points) - 1):
+        orig_x, orig_y = points[i]
+        prev = offset_segs[i - 1]
+        curr = offset_segs[i]
+
+        inter = line_intersection(
+            Point(*prev[0]), Point(*prev[1]),
+            Point(*curr[0]), Point(*curr[1]),
+        )
+
+        if inter is not None and hypot(inter.x - orig_x, inter.y - orig_y) <= distance * miter_limit:
+            result.append((inter.x, inter.y))
+        else:
+            # Miter too long — bevel with averaged normals.
+            nx = (prev[2][0] + curr[2][0]) / 2
+            ny = (prev[2][1] + curr[2][1]) / 2
+            ln = hypot(nx, ny)
+            if ln > 0:
+                nx, ny = nx / ln, ny / ln
+            else:
+                nx, ny = prev[2]
+            result.append((orig_x + nx * distance, orig_y + ny * distance))
+
+    result.append(offset_segs[-1][1])
+    return result
+
+
+def mirror_polyline(
+    points: "list[tuple[float, float]]",
+    center_x: float,
+) -> "list[tuple[float, float]]":
+    """
+    Mirror a polyline horizontally around ``center_x``.
+
+    Useful for generating the right-hand stitch path from a left-hand one.
+    """
+    return [(2 * center_x - x, y) for x, y in points]
+
+
+# ---------------------------------------------------------------------------
+# Internal: closed-polygon offset used by Polygon.hole_points / stitch_segments
+# ---------------------------------------------------------------------------
+
+def _offset_closed_polygon(
+    points: "list[tuple[float, float]]",
+    distance: float,
+) -> "list[tuple[float, float]]":
+    """
+    Offset a closed polygon inward by ``distance``.
+
+    The inward direction is determined automatically from the polygon's
+    winding order (signed area in SVG Y-down coordinates).
+    """
+    n = len(points)
+    if n < 3:
+        return list(points)
+
+    # Signed area via the Shoelace formula.
+    # Positive → CW winding in SVG (Y down); inward is to the right of each edge.
+    # Negative → CCW winding; inward is to the left.
+    area2 = sum(
+        points[i][0] * points[(i + 1) % n][1] - points[(i + 1) % n][0] * points[i][1]
+        for i in range(n)
+    )
+    side = "right" if area2 > 0 else "left"
+
+    offset_segs: list[tuple[tuple, tuple, tuple]] = []
+    for i in range(n):
+        x1, y1 = points[i]
+        x2, y2 = points[(i + 1) % n]
+        dx, dy = x2 - x1, y2 - y1
+        length = hypot(dx, dy)
+        if length == 0:
+            offset_segs.append(((x1, y1), (x2, y2), (0.0, 0.0)))
+            continue
+        ux, uy = dx / length, dy / length
+        nx, ny = (uy, -ux) if side == "right" else (-uy, ux)
+        offset_segs.append((
+            (x1 + nx * distance, y1 + ny * distance),
+            (x2 + nx * distance, y2 + ny * distance),
+            (nx, ny),
+        ))
+
+    miter_limit = 8.0
+    result: list[tuple[float, float]] = []
+    for i in range(n):
+        orig_x, orig_y = points[i]
+        prev = offset_segs[(i - 1) % n]
+        curr = offset_segs[i]
+
+        inter = line_intersection(
+            Point(*prev[0]), Point(*prev[1]),
+            Point(*curr[0]), Point(*curr[1]),
+        )
+
+        if inter is not None and hypot(inter.x - orig_x, inter.y - orig_y) <= distance * miter_limit:
+            result.append((inter.x, inter.y))
+        else:
+            nx = (prev[2][0] + curr[2][0]) / 2
+            ny = (prev[2][1] + curr[2][1]) / 2
+            ln = hypot(nx, ny)
+            if ln > 0:
+                nx, ny = nx / ln, ny / ln
+            else:
+                nx, ny = prev[2]
+            result.append((orig_x + nx * distance, orig_y + ny * distance))
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Open-polyline stitch segments
+# ---------------------------------------------------------------------------
+
+def stitch_segments_on_open_polyline(
+    points: "list[tuple[float, float]]",
+    spacing: float,
+    stitch_length: float,
+    stitch_angle_deg: float = 0.0,
+) -> "list[tuple[Point, Point]]":
+    """
+    Return stitch segments placed every ``spacing`` mm along an open polyline.
+
+    The first stitch is placed ``spacing`` mm from the start of the path.
+    ``stitch_angle_deg=0`` aligns stitches with the local path direction;
+    ``stitch_angle_deg=45`` rotates them 45 degrees.
+    """
+    result: list[tuple[Point, Point]] = []
+    total = 0.0
+    next_pos = spacing
+
+    for (x1, y1), (x2, y2) in zip(points, points[1:]):
+        dx, dy = x2 - x1, y2 - y1
+        seg_len = hypot(dx, dy)
+        if seg_len == 0:
+            continue
+
+        ux, uy = dx / seg_len, dy / seg_len
+        angle_rad = stitch_angle_deg * pi / 180
+        sx = ux * cos(angle_rad) - uy * sin(angle_rad)
+        sy = ux * sin(angle_rad) + uy * cos(angle_rad)
+        half = stitch_length / 2
+
+        seg_end = total + seg_len
+        while next_pos < seg_end:
+            t = (next_pos - total) / seg_len
+            cx = x1 + dx * t
+            cy = y1 + dy * t
+            result.append((
+                Point(cx - sx * half, cy - sy * half),
+                Point(cx + sx * half, cy + sy * half),
+            ))
+            next_pos += spacing
+        total += seg_len
+
     return result

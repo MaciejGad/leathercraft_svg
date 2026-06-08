@@ -1,0 +1,56 @@
+pattern lighter_sleeve
+size 150 112
+
+layer cut red 0.12
+layer stitch blue 0.35
+
+symmetry 75
+
+outer smooth mirrored
+  75 14
+  59 11
+  43 8
+  28 11
+  17 11
+  18 27
+  18 36
+  36 42
+  40 51
+  40 74
+  37 97
+  47 102
+  61 105
+  75 105
+end
+
+stitches
+  margin 4
+  spacing 5
+  length 3.8
+  angle 0
+  mirror
+
+  path
+    43 15
+    28 11
+    17 11
+    18 27
+    18 36
+    36 42
+    40 51
+    40 74
+    37 97
+    47 102
+    61 105
+    75 105
+  end
+end
+
+hole keyring
+  mirror
+  x_from_center 30
+  y 21
+  radius 2.2
+end
+
+export lighter_sleeve

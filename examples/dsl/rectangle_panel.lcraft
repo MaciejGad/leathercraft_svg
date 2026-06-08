@@ -1,0 +1,17 @@
+pattern rectangle_panel
+size 120 80
+
+rectangle panel
+  at 10 10
+  size 100 60
+end
+
+stitches
+  source panel
+  edges all
+  margin 4
+  spacing 5
+  length 3
+end
+
+export rectangle_panel

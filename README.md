@@ -499,6 +499,88 @@ doc.add_stitch_pattern(
 doc.save("stitch_pattern.svg")
 ```
 
+## Pattern DSL
+
+The library includes a text-based DSL compiler (`leathercraft_dsl.py`) that lets you describe cutting patterns without writing Python.
+
+### Running the compiler
+
+```bash
+python leathercraft_dsl.py build pattern.lcraft
+```
+
+This produces `pattern.svg` and `pattern.png` next to the source file.
+
+### Basic rectangle
+
+```text
+pattern card_panel
+size 120 80
+
+rectangle panel
+  at 10 10
+  size 100 60
+end
+
+stitches
+  source panel
+  edges all
+  margin 4
+  spacing 5
+  length 3
+end
+
+export card_panel
+```
+
+### Rounded rectangle with partial stitches
+
+```text
+pattern rounded_pocket
+size 120 90
+
+rounded_rectangle pocket
+  at 10 10
+  size 100 70
+  radius 8
+end
+
+stitches
+  source pocket
+  edges except_top
+  margin 5
+  spacing 5
+  length 3.5
+  angle 45
+end
+
+export rounded_pocket
+```
+
+### Holes along shape edges
+
+```text
+holes
+  source panel
+  edges all
+  margin 4
+  spacing 6
+  radius 1.2
+end
+```
+
+### All values are millimeters
+
+Do not write unit suffixes such as `mm` or `cm`. Every numeric value is already in millimeters.
+
+### Supported keywords
+
+`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `outer`, `stitches`, `holes`, `hole`, `export`
+
+Edge names: `top`, `right`, `bottom`, `left`, `all`, `except_top`, `sides`, `horizontal`, `vertical`
+
+Example files are in `examples/dsl/`.
+
 ## Compatibility
 
 The project has been tuned for renderers that handle SVG CSS poorly.
@@ -507,9 +589,11 @@ If you use an external rasterizer, prefer tools with strong inline SVG support, 
 ## File Structure
 
 - `leathercraft_svg.py` - library and geometry models,
+- `leathercraft_dsl.py` - DSL compiler (text patterns → SVG/PNG),
 - `sample.py` - focused rounded rectangle stitch example,
 - `all_shapes.py` - overview example that renders all shape variants,
 - `lighter_sleeve.py` - symmetric leather pattern using `Polygon.from_mirror`,
+- `examples/dsl/` - example `.lcraft` pattern files,
 - `README.md` - documentation.
 
 ## Practical Notes

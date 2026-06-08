@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="210.0mm" height="297.0mm" viewBox="0 0 210.0 297.0" version="1.1">
+  <path fill="none" stroke="#00aa00" stroke-width="0.2" stroke-dasharray="3 2" vector-effect="non-scaling-stroke" d="M 88.000 80.000 L 112.000 80.000 Q 120.000 80.000 120.000 88.000 L 120.000 112.000 Q 120.000 120.000 112.000 120.000 L 88.000 120.000 Q 80.000 120.000 80.000 112.000 L 80.000 88.000 Q 80.000 80.000 88.000 80.000 Z" />
+  <circle fill="none" stroke="#ff0000" stroke-width="0.2" vector-effect="non-scaling-stroke" cx="100.000" cy="100.000" r="50.000" />
+  <circle fill="none" stroke="#00aa00" stroke-width="0.2" stroke-dasharray="3 2" vector-effect="non-scaling-stroke" cx="100.000" cy="100.000" r="45.000" />
+</svg>

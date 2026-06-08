@@ -1,0 +1,1066 @@
+# Leathercraft Pattern DSL — Draft Specification
+
+## 1. Goal
+
+The DSL describes leathercraft cutting patterns in a text format without requiring Python code.
+
+A DSL file should allow the user to define document size, layers, outer shapes, rectangles, rounded rectangles, freeform paths, mirrored shapes, stitch patterns, holes, keyring holes, and exports.
+
+The DSL is not meant to expose all internal geometry details. It should describe intent, while the compiler converts it to `leathercraft_svg` calls.
+
+Example command:
+
+```bash
+leathercraft-svg build lighter_sleeve.lcraft
+```
+
+Expected outputs may include:
+
+```text
+lighter_sleeve.svg
+lighter_sleeve.pdf
+lighter_sleeve.png
+```
+
+## 2. Basic Syntax
+
+The DSL is line-based.
+
+Empty lines are ignored.
+
+Comments start with `#`.
+
+```text
+# This is a comment
+pattern lighter_sleeve
+size 150 112
+```
+
+Blocks start with a keyword and end with `end`.
+
+```text
+rounded_rectangle panel
+  at 10 10
+  size 100 60
+  radius 8
+end
+```
+
+Indentation is recommended for readability but should not be required by the parser.
+
+Values are separated by spaces.
+
+```text
+at 10 10
+size 100 60
+radius 8
+```
+
+All numeric dimensions are interpreted as millimeters. The DSL supports only millimeters. Do not write unit suffixes such as `mm`, `cm`, `in`, `pt`, or `px` in the pattern file.
+
+Correct:
+
+```text
+size 150 112
+radius 8
+margin 4
+```
+
+Incorrect:
+
+```text
+size 150mm 112mm
+radius 8mm
+margin 4mm
+```
+
+## 3. Minimal File Structure
+
+A typical file should look like this:
+
+```text
+pattern example
+size 120 80
+
+rectangle panel
+  at 10 10
+  size 100 60
+end
+
+stitches
+  source panel
+  edges all
+  margin 4
+  spacing 5
+  length 3
+end
+
+export example
+```
+
+## 4. Document Commands
+
+### `pattern`
+
+Defines the pattern name.
+
+```text
+pattern lighter_sleeve
+```
+
+Syntax:
+
+```text
+pattern <name>
+```
+
+The name may be used as the default export filename.
+
+### `size`
+
+Defines document/page size in millimeters.
+
+```text
+size 150 112
+```
+
+Syntax:
+
+```text
+size <width> <height>
+```
+
+Example:
+
+```text
+size 120 80
+```
+
+## 5. Layers
+
+Layers define visual/export styles.
+
+```text
+layer cut red 0.12
+layer stitch blue 0.35
+layer guide gray 0.12 dashed
+```
+
+Syntax:
+
+```text
+layer <name> <color> <stroke_width> [style]
+```
+
+The stroke width is interpreted as millimeters.
+
+Color may be a named color or hex value.
+
+```text
+layer cut #ff0000 0.12
+layer stitch #0000ff 0.35
+```
+
+Recommended default layers:
+
+```text
+layer cut red 0.12
+layer stitch blue 0.35
+layer guide gray 0.12 dashed
+```
+
+If layers are not defined, the compiler should use defaults:
+
+```text
+cut: red, 0.2
+stitch: blue, 0.2
+crease: green, 0.2 dashed
+guide: gray, 0.2 dashed
+```
+
+## 6. Symmetry
+
+Global symmetry can be declared once.
+
+```text
+symmetry 75
+```
+
+Equivalent verbose form:
+
+```text
+symmetry vertical x=75
+```
+
+Syntax:
+
+```text
+symmetry <x>
+```
+
+or:
+
+```text
+symmetry vertical x=<x>
+```
+
+This means vertical mirror axis at `x` millimeters.
+
+Used by:
+
+```text
+outer smooth mirrored
+hole ... mirror
+stitches ... mirror
+```
+
+## 7. Shapes
+
+### 7.1 Rectangle
+
+```text
+rectangle panel
+  at 10 10
+  size 100 60
+  layer cut
+end
+```
+
+Syntax:
+
+```text
+rectangle <id>
+  at <x> <y>
+  size <width> <height>
+  [layer <layer_name>]
+end
+```
+
+Compiler mapping:
+
+```python
+Rectangle(x, y, width, height)
+doc.add_shape(shape, layer="cut")
+```
+
+Default layer: `cut`.
+
+Example with stitches:
+
+```text
+pattern card_panel
+size 120 80
+
+rectangle panel
+  at 10 10
+  size 100 60
+end
+
+stitches
+  source panel
+  edges all
+  margin 4
+  spacing 5
+  length 3
+end
+
+export card_panel
+```
+
+### 7.2 Rounded Rectangle
+
+```text
+rounded_rectangle panel
+  at 10 10
+  size 100 60
+  radius 8
+end
+```
+
+Syntax:
+
+```text
+rounded_rectangle <id>
+  at <x> <y>
+  size <width> <height>
+  radius <radius>
+  [layer <layer_name>]
+end
+```
+
+Compiler mapping:
+
+```python
+RoundedRectangle(x, y, width, height, radius)
+doc.add_shape(shape, layer="cut")
+```
+
+Example with stitches on three edges:
+
+```text
+pattern pocket_panel
+size 120 90
+
+rounded_rectangle pocket
+  at 10 10
+  size 100 70
+  radius 8
+end
+
+stitches
+  source pocket
+  edges left bottom right
+  margin 5
+  spacing 5
+  length 3.5
+  angle 45
+end
+
+export pocket_panel
+```
+
+### 7.3 Outer Freeform Shape
+
+For irregular leather patterns, use `outer`.
+
+```text
+outer smooth mirrored
+  75 14
+  59 11
+  43 8
+  28 11
+  17 11
+  18 27
+  18 36
+  36 42
+  40 51
+  40 74
+  37 97
+  47 102
+  61 105
+  75 105
+end
+```
+
+Syntax:
+
+```text
+outer [smooth|straight] [mirrored]
+  <x> <y>
+  <x> <y>
+  ...
+end
+```
+
+Behavior:
+
+`straight` means connect points with straight line segments.
+
+`smooth` means generate a smoother path using Bézier curves.
+
+`mirrored` means the provided points describe one side or half of the object. The compiler mirrors them around the global symmetry axis and joins them.
+
+Default layer: `cut`.
+
+Equivalent verbose form:
+
+```text
+shape outer
+  type smooth
+  mirror true
+  layer cut
+  points
+    75 14
+    59 11
+  end
+end
+```
+
+Recommended MVP form is the short form:
+
+```text
+outer smooth mirrored
+  ...
+end
+```
+
+## 8. Edges
+
+For rectangle-like shapes, supported edge names:
+
+```text
+top
+right
+bottom
+left
+all
+```
+
+Aliases may be supported:
+
+```text
+except_top = left bottom right
+sides = left right
+horizontal = top bottom
+vertical = left right
+```
+
+Example:
+
+```text
+stitches
+  source pocket
+  edges except_top
+  margin 5
+  spacing 5
+  length 3.5
+end
+```
+
+The compiler should translate aliases before validation.
+
+## 9. Stitches
+
+Stitches describe short laser-cut stitch marks along a shape edge or custom path.
+
+### 9.1 Stitches on Rectangle / Rounded Rectangle
+
+```text
+stitches
+  source panel
+  edges all
+  margin 4
+  spacing 5
+  length 3
+  angle 0
+end
+```
+
+Syntax:
+
+```text
+stitches
+  source <shape_id>
+  edges <edge_name>...
+  margin <distance>
+  spacing <distance>
+  length <distance>
+  [angle <degrees>]
+  [layer <layer_name>]
+end
+```
+
+Defaults:
+
+```text
+edges all
+margin 4
+spacing 5
+length 3
+angle 0
+layer stitch
+```
+
+Compiler mapping for built-in shapes:
+
+```python
+doc.add_stitch_pattern(
+    shape,
+    edges=...,
+    spacing=spacing,
+    stitch_length=length,
+    inset=margin,
+    layer="stitch",
+    stitch_angle_deg=angle,
+)
+```
+
+Example:
+
+```text
+rounded_rectangle pocket
+  at 10 10
+  size 100 70
+  radius 8
+end
+
+stitches
+  source pocket
+  edges left bottom right
+  margin 5
+  spacing 5
+  length 3.5
+end
+```
+
+### 9.2 Stitches Along Custom Path
+
+For irregular shapes, stitches can be defined by a path.
+
+```text
+stitches
+  margin 4
+  spacing 5
+  length 3.8
+  angle 0
+  mirror
+
+  path
+    43 15
+    28 11
+    17 11
+    18 27
+    18 36
+    36 42
+    40 51
+    40 74
+    37 97
+    47 102
+    61 105
+    75 105
+  end
+end
+```
+
+Syntax:
+
+```text
+stitches
+  [source <shape_id>]
+  [side left|right]
+  [mirror]
+  margin <distance>
+  spacing <distance>
+  length <distance>
+  [angle <degrees>]
+
+  path
+    <x> <y>
+    <x> <y>
+    ...
+  end
+end
+```
+
+Behavior:
+
+The `path` points describe the source path.
+
+The compiler creates an offset path using `margin`.
+
+Then it places stitch marks along that offset path.
+
+If `mirror` is present, stitch segments are mirrored around the global symmetry axis.
+
+`side` defines which side of the path the offset should use.
+
+For a left edge defined top-to-bottom, `side right` usually means “inside”.
+
+Defaults:
+
+```text
+side right
+margin 4
+spacing 5
+length 3
+angle 0
+layer stitch
+```
+
+Example for lighter sleeve:
+
+```text
+stitches
+  margin 4
+  spacing 5
+  length 3.8
+  angle 0
+  mirror
+
+  path
+    43 15
+    28 11
+    17 11
+    18 27
+    18 36
+    36 42
+    40 51
+    40 74
+    37 97
+    47 102
+    61 105
+    75 105
+  end
+end
+```
+
+## 10. Holes
+
+### 10.1 Single Hole
+
+```text
+hole keyring
+  at 100 20
+  radius 2.2
+end
+```
+
+Syntax:
+
+```text
+hole <id>
+  at <x> <y>
+  radius <r>
+  [layer <layer_name>]
+end
+```
+
+Compiler mapping:
+
+```python
+doc.add_circle(x, y, radius, layer="cut")
+```
+
+Default layer: `cut`.
+
+### 10.2 Mirrored Hole
+
+```text
+hole keyring
+  mirror
+  x_from_center 52
+  y 21
+  radius 2.2
+end
+```
+
+Syntax:
+
+```text
+hole <id>
+  mirror
+  x_from_center <distance>
+  y <y>
+  radius <r>
+  [layer <layer_name>]
+end
+```
+
+Requires global symmetry.
+
+If:
+
+```text
+symmetry 75
+x_from_center 52
+```
+
+then holes are generated at:
+
+```text
+x = 75 - 52
+x = 75 + 52
+```
+
+Example:
+
+```text
+hole keyring
+  mirror
+  x_from_center 52
+  y 21
+  radius 2.2
+end
+```
+
+Creates two holes:
+
+```text
+23 21
+127 21
+```
+
+### 10.3 Holes Along Shape Edges
+
+```text
+holes
+  source panel
+  edges all
+  margin 4
+  spacing 6
+  radius 1.2
+end
+```
+
+Syntax:
+
+```text
+holes
+  source <shape_id>
+  edges <edge_name>...
+  margin <distance>
+  spacing <distance>
+  radius <r>
+  [layer <layer_name>]
+end
+```
+
+Compiler mapping:
+
+```python
+doc.add_holes(
+    shape,
+    edges=...,
+    spacing=spacing,
+    hole_radius=radius,
+    inset=margin,
+    layer="cut",
+)
+```
+
+Recommended default layer: `cut`.
+
+## 11. Export
+
+### Simple Export
+
+```text
+export lighter_sleeve
+```
+
+Should generate:
+
+```text
+lighter_sleeve.svg
+lighter_sleeve.pdf
+lighter_sleeve.png
+```
+
+depending on compiler defaults.
+
+### Explicit Export
+
+```text
+export svg lighter_sleeve.svg
+export pdf lighter_sleeve.pdf
+export png lighter_sleeve.png
+```
+
+Syntax:
+
+```text
+export <format> <filename>
+```
+
+Supported formats:
+
+```text
+svg
+png
+pdf
+```
+
+PDF export should preserve vector geometry and physical dimensions in millimeters.
+
+## 12. Full Examples
+
+### 12.1 Rectangle
+
+```text
+pattern rectangle_panel
+size 120 80
+
+rectangle panel
+  at 10 10
+  size 100 60
+end
+
+stitches
+  source panel
+  edges all
+  margin 4
+  spacing 5
+  length 3
+end
+
+export rectangle_panel
+```
+
+### 12.2 Rounded Rectangle With Three Stitched Edges
+
+```text
+pattern rounded_pocket
+size 120 90
+
+rounded_rectangle pocket
+  at 10 10
+  size 100 70
+  radius 8
+end
+
+stitches
+  source pocket
+  edges except_top
+  margin 5
+  spacing 5
+  length 3.5
+  angle 45
+end
+
+export rounded_pocket
+```
+
+### 12.3 Simple Panel With Holes
+
+```text
+pattern panel_with_holes
+size 120 80
+
+rectangle panel
+  at 10 10
+  size 100 60
+end
+
+holes
+  source panel
+  edges all
+  margin 4
+  spacing 6
+  radius 1.2
+end
+
+export panel_with_holes
+```
+
+### 12.4 Symmetric Lighter Sleeve
+
+```text
+pattern lighter_sleeve
+size 150 112
+
+layer cut red 0.12
+layer stitch blue 0.35
+
+symmetry 75
+
+outer smooth mirrored
+  75 14
+  59 11
+  43 8
+  28 11
+  17 11
+  18 27
+  18 36
+  36 42
+  40 51
+  40 74
+  37 97
+  47 102
+  61 105
+  75 105
+end
+
+stitches
+  margin 4
+  spacing 5
+  length 3.8
+  angle 0
+  mirror
+
+  path
+    43 15
+    28 11
+    17 11
+    18 27
+    18 36
+    36 42
+    40 51
+    40 74
+    37 97
+    47 102
+    61 105
+    75 105
+  end
+end
+
+hole keyring
+  mirror
+  x_from_center 52
+  y 21
+  radius 2.2
+end
+
+export lighter_sleeve
+```
+
+## 13. Suggested Compiler Model
+
+Internally, the parser should convert DSL into a model like:
+
+```python
+PatternDocument
+  name: str
+  width_mm: float
+  height_mm: float
+  layers: dict[str, LayerStyle]
+  symmetry_axis_x: float | None
+  shapes: list[ShapeDefinition]
+  operations: list[OperationDefinition]
+  exports: list[ExportDefinition]
+```
+
+Possible shape definitions:
+
+```python
+RectangleDefinition
+RoundedRectangleDefinition
+FreeformPathDefinition
+CircleDefinition
+```
+
+Possible operations:
+
+```python
+AddStitchesOperation
+AddHolesOperation
+AddSingleHoleOperation
+ExportOperation
+```
+
+The implementation flow:
+
+```text
+Read text
+Remove comments and empty lines
+Tokenize lines
+Parse top-level commands and blocks
+Validate references and required fields
+Resolve all dimensions as millimeters
+Resolve edge aliases
+Build geometry
+Generate SVG with leathercraft_svg
+Export optional PNG/PDF
+```
+
+## 14. Validation Rules
+
+The compiler should produce clear errors.
+
+Examples:
+
+Missing document size:
+
+```text
+Error: missing required command 'size'
+```
+
+Unknown shape reference:
+
+```text
+Error: stitches block references unknown source 'panel2'
+```
+
+Missing symmetry for mirrored hole:
+
+```text
+Error: hole 'keyring' uses mirror but no symmetry axis is defined
+```
+
+Invalid edge:
+
+```text
+Error: edge 'lower' is invalid for rectangle 'panel'. Use: top, right, bottom, left, all.
+```
+
+Invalid numeric value:
+
+```text
+Error: radius must be greater than 0
+```
+
+Invalid unit suffix:
+
+```text
+Error: units are not allowed in numeric values. Use 'size 150 112', not 'size 150mm 112mm'. All dimensions are millimeters.
+```
+
+Invalid block:
+
+```text
+Error: missing 'end' for block 'rounded_rectangle panel'
+```
+
+## 15. Reserved Keywords
+
+Recommended reserved keywords:
+
+```text
+pattern
+size
+layer
+symmetry
+rectangle
+rounded_rectangle
+outer
+stitches
+holes
+hole
+path
+points
+source
+edges
+margin
+spacing
+length
+angle
+radius
+mirror
+at
+from
+to
+x
+y
+x_from_center
+export
+end
+```
+
+Shape IDs should not use reserved keywords.
+
+## 16. MVP Scope
+
+For the first implementation, support only:
+
+```text
+pattern
+size
+layer
+symmetry
+rectangle
+rounded_rectangle
+outer smooth mirrored
+stitches from shape edges
+stitches from custom path
+holes from shape edges
+single hole
+mirrored hole
+export
+```
+
+Do not implement yet:
+
+```text
+variables
+expressions
+includes
+loops
+conditionals
+text labels
+notches
+slots
+fold lines
+complex boolean operations
+multiple units
+```
+
+This keeps the language easy to implement and still useful for current leathercraft patterns.

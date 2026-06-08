@@ -1,0 +1,20 @@
+pattern circle 
+size 210 297
+
+hole podkladka
+    at 100 100
+    radius 50 
+end
+
+hole szwy
+    at 100 100
+    radius 45
+    layer crease
+end
+
+rounded_rectangle srodek
+    at 80 80
+    size 40 40
+    radius 8
+    layer crease
+end

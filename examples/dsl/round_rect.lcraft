@@ -1,0 +1,23 @@
+pattern ronded_rect
+size 210 297
+
+rounded_rectangle portfel
+    at 10 10
+    size 100 100
+    radius 10
+end
+
+stitches
+    source portfel
+    edges left bottom
+    magin 10
+    spacing 10
+    length 3
+    angle 30
+end
+
+hole keyring
+    at 90 30
+    radius 5
+    layer cut
+end

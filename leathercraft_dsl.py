@@ -598,6 +598,18 @@ def parse(text: str) -> PatternDocument:
         elif keyword == "stitches":
             data = _parse_block_body(body)
 
+            _KNOWN_STITCH_KEYS = {
+                "source", "edges", "margin", "spacing", "length", "angle",
+                "layer", "mirror", "side", "path", "rounded_path",
+            }
+            for _k in data:
+                if _k not in _KNOWN_STITCH_KEYS:
+                    _kln = data[_k][0] if isinstance(data[_k], tuple) else lineno
+                    raise DslError(
+                        f"Line {_kln}: unknown key '{_k}' in stitches block "
+                        f"(did you mean one of: {', '.join(sorted(_KNOWN_STITCH_KEYS))}?)"
+                    )
+
             source = None
             edges_raw: list[str] = ["all"]
             margin = 4.0
@@ -660,6 +672,18 @@ def parse(text: str) -> PatternDocument:
         # ------------------------------------------------------------------
         elif keyword == "holes":
             data = _parse_block_body(body)
+
+            _KNOWN_HOLES_KEYS = {
+                "source", "edges", "margin", "spacing", "radius",
+                "layer", "rounded_path",
+            }
+            for _k in data:
+                if _k not in _KNOWN_HOLES_KEYS:
+                    _kln = data[_k][0] if isinstance(data[_k], tuple) else lineno
+                    raise DslError(
+                        f"Line {_kln}: unknown key '{_k}' in holes block "
+                        f"(did you mean one of: {', '.join(sorted(_KNOWN_HOLES_KEYS))}?)"
+                    )
 
             def _req(k: str, ln=lineno) -> tuple[int, list[str]]:
                 if k not in data:

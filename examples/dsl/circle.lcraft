@@ -1,15 +1,17 @@
 pattern circle 
 size 210 297
 
-hole podkladka
+circle podkladka
     at 100 100
     radius 50 
 end
 
-hole szwy
-    at 100 100
-    radius 45
-    layer crease
+stitches
+    source podkladka
+    margin 5
+    spacing 13
+    length 3
+    angle 45
 end
 
 rounded_rectangle srodek

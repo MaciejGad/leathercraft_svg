@@ -11,7 +11,7 @@ def generate_sample() -> None:
     doc.add_stitch_pattern(
         shape,
         edges=[1, 2, 3],  # right, bottom, left
-        spacing=8.0,
+        spacing=15.0,
         stitch_length=3.5,
         stitch_angle_deg=45.0,
         inset=7.0,

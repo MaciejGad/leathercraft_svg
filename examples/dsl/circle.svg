@@ -1,6 +1,26 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="210.0mm" height="297.0mm" viewBox="0 0 210.0 297.0" version="1.1">
+  <path fill="none" stroke="#ff0000" stroke-width="0.2" vector-effect="non-scaling-stroke" d="M 50.000 100.000 A 50.000 50.000 0 1 0 150.000 100.000 A 50.000 50.000 0 1 0 50.000 100.000 Z" />
   <path fill="none" stroke="#00aa00" stroke-width="0.2" stroke-dasharray="3 2" vector-effect="non-scaling-stroke" d="M 88.000 80.000 L 112.000 80.000 Q 120.000 80.000 120.000 88.000 L 120.000 112.000 Q 120.000 120.000 112.000 120.000 L 88.000 120.000 Q 80.000 120.000 80.000 112.000 L 80.000 88.000 Q 80.000 80.000 88.000 80.000 Z" />
-  <circle fill="none" stroke="#ff0000" stroke-width="0.2" vector-effect="non-scaling-stroke" cx="100.000" cy="100.000" r="50.000" />
-  <circle fill="none" stroke="#00aa00" stroke-width="0.2" stroke-dasharray="3 2" vector-effect="non-scaling-stroke" cx="100.000" cy="100.000" r="45.000" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="146.061" y1="98.939" x2="143.939" y2="101.061" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="144.327" y1="112.563" x2="141.675" y2="113.965" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="138.655" y1="125.071" x2="135.707" y2="125.628" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="129.548" y1="135.350" x2="126.566" y2="135.014" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="117.815" y1="142.489" x2="115.066" y2="141.289" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="104.500" y1="145.853" x2="102.226" y2="143.896" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="90.785" y1="145.142" x2="89.189" y2="142.602" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="77.888" y1="140.420" x2="77.112" y2="137.522" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="66.957" y1="132.107" x2="67.069" y2="129.109" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="58.961" y1="120.941" x2="59.952" y2="118.109" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="54.612" y1="107.914" x2="56.393" y2="105.500" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="54.296" y1="94.184" x2="56.710" y2="92.402" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="58.041" y1="80.971" x2="60.872" y2="79.980" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="65.514" y1="69.448" x2="68.512" y2="69.336" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="76.051" y1="60.641" x2="78.949" y2="61.417" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="88.716" y1="55.330" x2="91.257" y2="56.926" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="102.384" y1="53.989" x2="104.341" y2="56.263" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="115.841" y1="56.736" x2="117.040" y2="59.486" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="127.889" y1="63.327" x2="128.225" y2="66.308" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="137.460" y1="73.177" x2="136.902" y2="76.124" />
+  <line fill="none" stroke="#0000ff" stroke-width="0.2" vector-effect="non-scaling-stroke" x1="143.702" y1="85.410" x2="142.300" y2="88.062" />
 </svg>

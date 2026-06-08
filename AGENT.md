@@ -562,12 +562,22 @@ from leathercraft_dsl import parse, compile_document, build_file, DslError
 | `compile_document(doc: PatternDocument) -> SvgDocument` | Convert AST to a ready-to-render `SvgDocument` |
 | `build_file(path) -> SvgDocument` | Parse + compile + export a `.lcraft` file on disk |
 
-### CLI
+### CLI — compile one file
 
 ```bash
 python leathercraft_dsl.py build pattern.lcraft
 # writes pattern.svg + pattern.png next to the source file
 ```
+
+### CLI — watch a directory
+
+```bash
+python leathercraft_watch.py [directory]        # watch, rebuild on every save
+python leathercraft_watch.py . --build-all      # also build everything at startup
+python leathercraft_watch.py examples/dsl -i 1  # 1-second poll interval
+```
+
+`leathercraft_watch.py` scans recursively for `*.lcraft` files, detects mtime changes, and calls `build_file()` automatically. DSL errors are printed without stopping the watcher.
 
 ---
 

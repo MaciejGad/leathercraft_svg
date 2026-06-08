@@ -644,6 +644,23 @@ Edge indices for triangles: `0`, `1`, `2`
 
 Example files are in `examples/dsl/`.
 
+## File Watcher
+
+`leathercraft_watch.py` monitors a directory for `.lcraft` changes and rebuilds SVG + PNG automatically whenever a file is saved.
+
+```bash
+# Watch the current directory
+python leathercraft_watch.py .
+
+# Watch a specific folder and build everything on startup
+python leathercraft_watch.py examples/dsl --build-all
+
+# Custom polling interval (default 0.5 s)
+python leathercraft_watch.py . -i 1
+```
+
+The watcher scans subdirectories recursively, prints a timestamped rebuild line on each change, and shows DSL error messages in place without crashing. Press **Ctrl+C** to stop.
+
 ## Compatibility
 
 The project has been tuned for renderers that handle SVG CSS poorly.
@@ -653,6 +670,7 @@ If you use an external rasterizer, prefer tools with strong inline SVG support, 
 
 - `leathercraft_svg.py` - library and geometry models,
 - `leathercraft_dsl.py` - DSL compiler (text patterns → SVG/PNG),
+- `leathercraft_watch.py` - file watcher (auto-rebuild on save),
 - `sample.py` - focused rounded rectangle stitch example,
 - `all_shapes.py` - overview example that renders all shape variants,
 - `lighter_sleeve.py` - symmetric leather pattern using `Polygon.from_mirror`,

@@ -644,6 +644,23 @@ Indeksy krawędzi trójkąta: `0`, `1`, `2`
 
 Przykładowe pliki `.lcraft` znajdują się w katalogu `examples/dsl/`.
 
+## Obserwator plików
+
+`leathercraft_watch.py` monitoruje katalog pod kątem zmian w plikach `.lcraft` i automatycznie przebudowuje SVG + PNG po każdym zapisaniu pliku.
+
+```bash
+# Obserwuj bieżący katalog
+python leathercraft_watch.py .
+
+# Obserwuj wybrany folder i zbuduj wszystko od razu
+python leathercraft_watch.py examples/dsl --build-all
+
+# Własny interwał odpytywania (domyślnie 0.5 s)
+python leathercraft_watch.py . -i 1
+```
+
+Obserwator skanuje podkatalogi rekurencyjnie, wypisuje znacznik czasowy przy każdym przebudowaniu i pokazuje komunikaty błędów DSL bez zatrzymywania działania. Aby zatrzymać, naciśnij **Ctrl+C**.
+
 ## Kompatybilność
 
 Zachowanie projektu zostało zoptymalizowane pod renderery, które gorzej obsługują CSS w SVG.
@@ -653,6 +670,7 @@ Jeśli używasz zewnętrznego narzędzia do rasteryzacji, preferuj narzędzia z 
 
 - `leathercraft_svg.py` - biblioteka i modele geometryczne,
 - `leathercraft_dsl.py` - kompilator DSL (wzorce tekstowe → SVG/PNG),
+- `leathercraft_watch.py` - obserwator plików (automatyczne przebudowanie po zapisaniu),
 - `sample.py` - prosty przykład zaokrąglonego prostokąta ze ściegami,
 - `all_shapes.py` - przykład poglądowy generujący wszystkie warianty figur,
 - `lighter_sleeve.py` - symetryczny wzorzec skórzany z użyciem `Polygon.from_mirror`,

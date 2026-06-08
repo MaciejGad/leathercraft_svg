@@ -319,7 +319,138 @@ end
 export pocket_panel
 ```
 
-### 7.3 Outer Freeform Shape
+### 7.3 Circle
+
+```text
+circle <id>
+  at <cx> <cy>
+  radius <r>
+  [layer <layer_name>]
+end
+```
+
+Compiler mapping:
+
+```python
+Circle(cx, cy, radius)
+doc.add_shape(shape, layer="cut")
+```
+
+Default layer: `cut`.
+
+Example with holes:
+
+```text
+circle medallion
+  at 60 60
+  radius 40
+end
+
+holes
+  source medallion
+  margin 7
+  spacing 8
+  radius 1.5
+end
+```
+
+### 7.4 Triangle
+
+Two forms are supported: explicit three-point form and box form.
+
+**Three-point form:**
+
+```text
+triangle <id>
+  p1 <x> <y>
+  p2 <x> <y>
+  p3 <x> <y>
+  [layer <layer_name>]
+end
+```
+
+**Box form** (creates `Triangle.from_box`):
+
+```text
+triangle <id>
+  at <x> <y>
+  size <width> <height>
+  [layer <layer_name>]
+end
+```
+
+In the box form `p1` is the midpoint of the top edge, `p2` is the bottom-right corner, `p3` is the bottom-left corner.
+
+Compiler mapping:
+
+```python
+Triangle(Point(p1x, p1y), Point(p2x, p2y), Point(p3x, p3y))
+doc.add_shape(shape, layer="cut")
+```
+
+Triangle edge indices (for numeric `edges` values):
+
+- `0` = p1 → p2
+- `1` = p2 → p3
+- `2` = p3 → p1
+
+Example with partial edges using numeric indices:
+
+```text
+triangle flap
+  p1 60 10
+  p2 110 80
+  p3 10 80
+end
+
+stitches
+  source flap
+  edges 0 2
+  margin 6
+  spacing 8
+  length 3.5
+end
+```
+
+### 7.5 Rounded Triangle
+
+Same as `triangle` but with an additional `radius` field.
+
+**Three-point form:**
+
+```text
+rounded_triangle <id>
+  p1 <x> <y>
+  p2 <x> <y>
+  p3 <x> <y>
+  radius <r>
+  [layer <layer_name>]
+end
+```
+
+**Box form:**
+
+```text
+rounded_triangle <id>
+  at <x> <y>
+  size <width> <height>
+  radius <r>
+  [layer <layer_name>]
+end
+```
+
+Compiler mapping:
+
+```python
+RoundedTriangle(Point(p1x, p1y), Point(p2x, p2y), Point(p3x, p3y), radius=r)
+doc.add_shape(shape, layer="cut")
+```
+
+`radius` must be greater than 0.
+
+The `rounded_path` flag (see section 9) applies specifically to `RoundedTriangle` and makes stitch marks or holes follow the smooth rounded corners instead of the straight inset.
+
+### 7.6 Outer Freeform Shape
 
 For irregular leather patterns, use `outer`.
 
@@ -386,7 +517,7 @@ end
 
 ## 8. Edges
 
-For rectangle-like shapes, supported edge names:
+### Named edges (rectangle and rounded rectangle)
 
 ```text
 top
@@ -396,13 +527,13 @@ left
 all
 ```
 
-Aliases may be supported:
+Aliases:
 
 ```text
-except_top = left bottom right
-sides = left right
+except_top = right bottom left
+sides      = left right
 horizontal = top bottom
-vertical = left right
+vertical   = left right
 ```
 
 Example:
@@ -417,13 +548,37 @@ stitches
 end
 ```
 
-The compiler should translate aliases before validation.
+The compiler translates aliases before validation.
+
+### Numeric edge indices (triangle and rounded triangle)
+
+For `triangle` and `rounded_triangle`, edges are selected by their numeric index:
+
+- `0` = p1 → p2
+- `1` = p2 → p3
+- `2` = p3 → p1
+
+```text
+stitches
+  source flap
+  edges 0 2
+  margin 6
+  spacing 8
+  length 3.5
+end
+```
+
+Using `edges all` on a triangle selects all three edges.
+
+### Circle
+
+The `edges` parameter is accepted but has no effect on circles — holes and stitches are always distributed around the full circumference.
 
 ## 9. Stitches
 
 Stitches describe short laser-cut stitch marks along a shape edge or custom path.
 
-### 9.1 Stitches on Rectangle / Rounded Rectangle
+### 9.1 Stitches on a Shape
 
 ```text
 stitches
@@ -441,12 +596,13 @@ Syntax:
 ```text
 stitches
   source <shape_id>
-  edges <edge_name>...
-  margin <distance>
-  spacing <distance>
-  length <distance>
+  [edges <edge_name_or_index>...]
+  [margin <distance>]
+  [spacing <distance>]
+  [length <distance>]
   [angle <degrees>]
   [layer <layer_name>]
+  [rounded_path]
 end
 ```
 
@@ -459,7 +615,10 @@ spacing 5
 length 3
 angle 0
 layer stitch
+rounded_path false
 ```
+
+The optional `rounded_path` flag (no value) makes stitch marks follow the smooth rounded contour of a `RoundedTriangle`. It is accepted but has no visible effect on other shape types.
 
 Compiler mapping for built-in shapes:
 
@@ -697,13 +856,16 @@ Syntax:
 ```text
 holes
   source <shape_id>
-  edges <edge_name>...
-  margin <distance>
-  spacing <distance>
-  radius <r>
+  [edges <edge_name_or_index>...]
+  [margin <distance>]
+  [spacing <distance>]
+  [radius <r>]
   [layer <layer_name>]
+  [rounded_path]
 end
 ```
+
+The optional `rounded_path` flag makes holes follow the smooth rounded contour of a `RoundedTriangle`.
 
 Compiler mapping:
 
@@ -1001,6 +1163,9 @@ layer
 symmetry
 rectangle
 rounded_rectangle
+circle
+triangle
+rounded_triangle
 outer
 stitches
 holes
@@ -1014,10 +1179,14 @@ spacing
 length
 angle
 radius
+rounded_path
 mirror
 at
 from
 to
+p1
+p2
+p3
 x
 y
 x_from_center
@@ -1029,7 +1198,7 @@ Shape IDs should not use reserved keywords.
 
 ## 16. MVP Scope
 
-For the first implementation, support only:
+The current implementation supports:
 
 ```text
 pattern
@@ -1038,10 +1207,13 @@ layer
 symmetry
 rectangle
 rounded_rectangle
-outer smooth mirrored
-stitches from shape edges
+circle
+triangle (point form and box form)
+rounded_triangle (point form and box form)
+outer smooth/straight mirrored
+stitches from shape edges (with optional rounded_path)
 stitches from custom path
-holes from shape edges
+holes from shape edges (with optional rounded_path)
 single hole
 mirrored hole
 export

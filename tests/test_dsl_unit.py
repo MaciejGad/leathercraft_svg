@@ -722,3 +722,492 @@ end
         assert "<path" in output
         assert "<line" in output
         assert output.count("<circle") == 2
+
+
+# ===========================================================================
+# Parser — Circle
+# ===========================================================================
+
+
+class TestParseCircle:
+    def test_basic(self):
+        doc = _parse("size 100 100\ncircle ring\n  at 50 50\n  radius 30\nend")
+        assert len(doc.shapes) == 1
+        from leathercraft_dsl import CircleDefinition
+        s = doc.shapes[0]
+        assert isinstance(s, CircleDefinition)
+        assert s.id == "ring"
+        assert s.cx == 50.0
+        assert s.cy == 50.0
+        assert s.radius == 30.0
+        assert s.layer == "cut"
+
+    def test_custom_layer(self):
+        doc = _parse("size 100 100\ncircle ring\n  at 50 50\n  radius 30\n  layer guide\nend")
+        assert doc.shapes[0].layer == "guide"
+
+    def test_missing_at_raises(self):
+        with pytest.raises(DslError, match="missing 'at'"):
+            _parse("size 100 100\ncircle ring\n  radius 30\nend")
+
+    def test_missing_radius_raises(self):
+        with pytest.raises(DslError, match="missing 'radius'"):
+            _parse("size 100 100\ncircle ring\n  at 50 50\nend")
+
+    def test_zero_radius_raises(self):
+        with pytest.raises(DslError, match="radius must be greater than 0"):
+            _parse("size 100 100\ncircle ring\n  at 50 50\n  radius 0\nend")
+
+    def test_circle_registered_as_source(self):
+        doc = _parse(
+            "size 100 100\ncircle ring\n  at 50 50\n  radius 30\nend\n"
+            "holes\n  source ring\n  margin 5\n  spacing 8\n  radius 1.2\nend"
+        )
+        assert len(doc.operations) == 1
+
+
+# ===========================================================================
+# Parser — Triangle
+# ===========================================================================
+
+
+class TestParseTriangle:
+    def test_point_form(self):
+        doc = _parse(
+            "size 120 90\ntriangle tri\n"
+            "  p1 60 10\n  p2 110 80\n  p3 10 80\nend"
+        )
+        from leathercraft_dsl import TriangleDefinition
+        s = doc.shapes[0]
+        assert isinstance(s, TriangleDefinition)
+        assert s.id == "tri"
+        assert s.p1 == (60.0, 10.0)
+        assert s.p2 == (110.0, 80.0)
+        assert s.p3 == (10.0, 80.0)
+
+    def test_box_form(self):
+        doc = _parse("size 120 90\ntriangle tri\n  at 10 10\n  size 80 60\nend")
+        from leathercraft_dsl import TriangleDefinition
+        s = doc.shapes[0]
+        assert isinstance(s, TriangleDefinition)
+        # from_box: p1=top-center, p2=bottom-right, p3=bottom-left
+        assert s.p1 == pytest.approx((50.0, 10.0))
+        assert s.p2 == pytest.approx((90.0, 70.0))
+        assert s.p3 == pytest.approx((10.0, 70.0))
+
+    def test_custom_layer(self):
+        doc = _parse(
+            "size 120 90\ntriangle tri\n"
+            "  p1 60 10\n  p2 110 80\n  p3 10 80\n  layer guide\nend"
+        )
+        assert doc.shapes[0].layer == "guide"
+
+    def test_missing_points_and_box_raises(self):
+        with pytest.raises(DslError, match="p1/p2/p3.*at.*size"):
+            _parse("size 120 90\ntriangle tri\n  p1 60 10\nend")
+
+    def test_registered_as_source(self):
+        doc = _parse(
+            "size 120 90\ntriangle tri\n  at 10 10\n  size 80 60\nend\n"
+            "stitches\n  source tri\n  margin 5\n  spacing 8\n  length 3\nend"
+        )
+        assert doc.operations[0].source == "tri"
+
+
+# ===========================================================================
+# Parser — RoundedTriangle
+# ===========================================================================
+
+
+class TestParseRoundedTriangle:
+    def test_point_form(self):
+        doc = _parse(
+            "size 130 100\nrounded_triangle rtri\n"
+            "  p1 65 10\n  p2 120 90\n  p3 10 90\n  radius 12\nend"
+        )
+        from leathercraft_dsl import RoundedTriangleDefinition
+        s = doc.shapes[0]
+        assert isinstance(s, RoundedTriangleDefinition)
+        assert s.radius == 12.0
+
+    def test_box_form(self):
+        doc = _parse(
+            "size 130 100\nrounded_triangle rtri\n"
+            "  at 10 10\n  size 100 80\n  radius 10\nend"
+        )
+        from leathercraft_dsl import RoundedTriangleDefinition
+        s = doc.shapes[0]
+        assert isinstance(s, RoundedTriangleDefinition)
+        assert s.p1 == pytest.approx((60.0, 10.0))
+
+    def test_missing_radius_raises(self):
+        with pytest.raises(DslError, match="missing 'radius'"):
+            _parse(
+                "size 130 100\nrounded_triangle rtri\n"
+                "  p1 65 10\n  p2 120 90\n  p3 10 90\nend"
+            )
+
+    def test_zero_radius_raises(self):
+        with pytest.raises(DslError, match="radius must be greater than 0"):
+            _parse(
+                "size 130 100\nrounded_triangle rtri\n"
+                "  p1 65 10\n  p2 120 90\n  p3 10 90\n  radius 0\nend"
+            )
+
+
+# ===========================================================================
+# Parser — numeric edge indices
+# ===========================================================================
+
+
+class TestNumericEdgeIndices:
+    def test_numeric_indices_accepted(self):
+        from leathercraft_dsl import _resolve_edges
+        edges = _resolve_edges(["0", "2"], lineno=1)
+        assert edges == ["0", "2"]
+
+    def test_numeric_and_all_separately(self):
+        doc = _parse(
+            "size 120 90\ntriangle tri\n  at 10 10\n  size 80 60\nend\n"
+            "holes\n  source tri\n  edges 0 2\n  margin 5\n  spacing 8\n  radius 1.2\nend"
+        )
+        from leathercraft_dsl import HolesOperation
+        op = doc.operations[0]
+        assert op.edges == ["0", "2"]
+
+    def test_edges_to_indices_numeric(self):
+        from leathercraft_dsl import _edges_to_indices
+        assert _edges_to_indices(["0", "2"]) == [0, 2]
+
+    def test_edges_to_indices_all_numeric(self):
+        from leathercraft_dsl import _edges_to_indices
+        assert _edges_to_indices(["0", "1", "2"]) == [0, 1, 2]
+
+    def test_invalid_non_numeric_non_named_raises(self):
+        with pytest.raises(DslError, match="unknown edge"):
+            _parse(
+                "size 120 90\ntriangle tri\n  at 10 10\n  size 80 60\nend\n"
+                "holes\n  source tri\n  edges lower\n  margin 5\n  spacing 8\n  radius 1.2\nend"
+            )
+
+
+# ===========================================================================
+# Parser — rounded_path flag
+# ===========================================================================
+
+
+class TestRoundedPathFlag:
+    def _rtri_base(self) -> str:
+        return (
+            "size 130 100\n"
+            "rounded_triangle rtri\n"
+            "  p1 65 10\n  p2 120 90\n  p3 10 90\n  radius 12\nend\n"
+        )
+
+    def test_rounded_path_in_stitches(self):
+        doc = _parse(
+            self._rtri_base()
+            + "stitches\n  source rtri\n  rounded_path\n  margin 6\n  spacing 8\n  length 3\nend"
+        )
+        assert doc.operations[0].rounded_path is True
+
+    def test_rounded_path_default_false_stitches(self):
+        doc = _parse(
+            self._rtri_base()
+            + "stitches\n  source rtri\n  margin 6\n  spacing 8\n  length 3\nend"
+        )
+        assert doc.operations[0].rounded_path is False
+
+    def test_rounded_path_in_holes(self):
+        doc = _parse(
+            self._rtri_base()
+            + "holes\n  source rtri\n  rounded_path\n  margin 6\n  spacing 8\n  radius 1.5\nend"
+        )
+        assert doc.operations[0].rounded_path is True
+
+    def test_rounded_path_default_false_holes(self):
+        doc = _parse(
+            self._rtri_base()
+            + "holes\n  source rtri\n  margin 6\n  spacing 8\n  radius 1.5\nend"
+        )
+        assert doc.operations[0].rounded_path is False
+
+
+# ===========================================================================
+# Compiler — new shapes produce correct SVG
+# ===========================================================================
+
+
+class TestCompileCircle:
+    def test_produces_path(self):
+        doc = _parse("size 100 100\ncircle ring\n  at 50 50\n  radius 30\nend")
+        output = compile_document(doc).to_svg()
+        assert "<path" in output   # Circle rendered as arc path
+
+    def test_holes_produce_circles(self):
+        doc = _parse(
+            "size 100 100\ncircle ring\n  at 50 50\n  radius 30\nend\n"
+            "holes\n  source ring\n  margin 7\n  spacing 8\n  radius 1.5\nend"
+        )
+        output = compile_document(doc).to_svg()
+        assert "<circle" in output
+
+    def test_stitches_produce_lines(self):
+        doc = _parse(
+            "size 100 100\ncircle ring\n  at 50 50\n  radius 30\nend\n"
+            "stitches\n  source ring\n  margin 7\n  spacing 8\n  length 3.5\nend"
+        )
+        output = compile_document(doc).to_svg()
+        assert "<line" in output
+
+
+class TestCompileTriangle:
+    def test_point_form_produces_path(self):
+        doc = _parse(
+            "size 120 90\ntriangle tri\n"
+            "  p1 60 10\n  p2 110 80\n  p3 10 80\nend"
+        )
+        output = compile_document(doc).to_svg()
+        assert "<path" in output
+
+    def test_box_form_produces_path(self):
+        doc = _parse("size 120 90\ntriangle tri\n  at 10 10\n  size 80 60\nend")
+        output = compile_document(doc).to_svg()
+        assert "<path" in output
+
+    def test_holes_all_edges(self):
+        doc = _parse(
+            "size 120 90\ntriangle tri\n  at 10 10\n  size 80 60\nend\n"
+            "holes\n  source tri\n  edges all\n  margin 6\n  spacing 8\n  radius 1.2\nend"
+        )
+        output = compile_document(doc).to_svg()
+        assert "<circle" in output
+
+    def test_holes_numeric_edges(self):
+        doc = _parse(
+            "size 120 90\ntriangle tri\n  at 10 10\n  size 80 60\nend\n"
+            "holes\n  source tri\n  edges 0 2\n  margin 6\n  spacing 8\n  radius 1.2\nend"
+        )
+        output = compile_document(doc).to_svg()
+        assert "<circle" in output
+
+    def test_stitches_numeric_edges(self):
+        doc = _parse(
+            "size 120 90\ntriangle tri\n  at 10 10\n  size 80 60\nend\n"
+            "stitches\n  source tri\n  edges 0 1\n  margin 6\n  spacing 8\n  length 3\nend"
+        )
+        output = compile_document(doc).to_svg()
+        assert "<line" in output
+
+
+class TestCompileRoundedTriangle:
+    def test_produces_path(self):
+        doc = _parse(
+            "size 130 100\nrounded_triangle rtri\n"
+            "  p1 65 10\n  p2 120 90\n  p3 10 90\n  radius 12\nend"
+        )
+        output = compile_document(doc).to_svg()
+        assert "<path" in output
+
+    def test_holes_with_rounded_path(self):
+        doc = _parse(
+            "size 130 100\nrounded_triangle rtri\n"
+            "  p1 65 10\n  p2 120 90\n  p3 10 90\n  radius 12\nend\n"
+            "holes\n  source rtri\n  rounded_path\n  margin 6\n  spacing 8\n  radius 1.5\nend"
+        )
+        output = compile_document(doc).to_svg()
+        assert "<circle" in output
+
+    def test_stitches_with_rounded_path(self):
+        doc = _parse(
+            "size 130 100\nrounded_triangle rtri\n"
+            "  p1 65 10\n  p2 120 90\n  p3 10 90\n  radius 12\nend\n"
+            "stitches\n  source rtri\n  rounded_path\n  margin 6\n  spacing 8\n  length 3.5\nend"
+        )
+        output = compile_document(doc).to_svg()
+        assert "<line" in output
+
+    def test_stitches_numeric_edges(self):
+        doc = _parse(
+            "size 130 100\nrounded_triangle rtri\n"
+            "  p1 65 10\n  p2 120 90\n  p3 10 90\n  radius 12\nend\n"
+            "stitches\n  source rtri\n  edges 0 2\n  margin 6\n  spacing 8\n  length 3\nend"
+        )
+        output = compile_document(doc).to_svg()
+        assert "<line" in output
+
+
+# ===========================================================================
+# Full round-trip — new shapes
+# ===========================================================================
+
+
+class TestFullRoundTripNewShapes:
+    def test_circle_with_holes(self):
+        text = """
+size 100 100
+
+circle ring
+  at 50 50
+  radius 35
+end
+
+holes
+  source ring
+  margin 7
+  spacing 8
+  radius 1.5
+end
+"""
+        svg = compile_document(_parse(text))
+        output = svg.to_svg()
+        assert "<path" in output
+        assert "<circle" in output
+
+    def test_triangle_stitch_all_edges(self):
+        text = """
+size 120 90
+
+triangle tri
+  p1 60 10
+  p2 110 80
+  p3 10 80
+end
+
+stitches
+  source tri
+  edges all
+  margin 6
+  spacing 8
+  length 3.5
+  angle 45
+end
+"""
+        svg = compile_document(_parse(text))
+        output = svg.to_svg()
+        assert "<path" in output
+        assert "<line" in output
+
+    def test_triangle_holes_partial_edges(self):
+        text = """
+size 120 90
+
+triangle tri
+  at 10 10
+  size 80 60
+end
+
+holes
+  source tri
+  edges 0 2
+  margin 6
+  spacing 8
+  radius 1.2
+end
+"""
+        svg = compile_document(_parse(text))
+        assert "<circle" in svg.to_svg()
+
+    def test_rounded_triangle_rounded_path_holes(self):
+        text = """
+size 130 100
+
+rounded_triangle rtri
+  p1 65 10
+  p2 120 90
+  p3 10 90
+  radius 12
+end
+
+holes
+  source rtri
+  rounded_path
+  margin 6
+  spacing 8
+  radius 1.5
+end
+"""
+        svg = compile_document(_parse(text))
+        assert "<circle" in svg.to_svg()
+
+    def test_rounded_triangle_rounded_path_stitch(self):
+        text = """
+size 130 100
+
+rounded_triangle rtri
+  p1 65 10
+  p2 120 90
+  p3 10 90
+  radius 12
+end
+
+stitches
+  source rtri
+  rounded_path
+  margin 6
+  spacing 8
+  length 3.5
+end
+"""
+        svg = compile_document(_parse(text))
+        assert "<line" in svg.to_svg()
+
+    def test_multiple_shapes_in_one_document(self):
+        text = """
+size 300 120
+
+rectangle rect
+  at 10 10
+  size 60 40
+end
+
+circle ring
+  at 120 30
+  radius 25
+end
+
+triangle tri
+  at 170 10
+  size 60 40
+end
+
+rounded_triangle rtri
+  at 250 10
+  size 60 40
+  radius 8
+end
+
+holes
+  source rect
+  margin 4
+  spacing 8
+  radius 1.0
+end
+
+holes
+  source ring
+  margin 6
+  spacing 8
+  radius 1.5
+end
+
+holes
+  source tri
+  edges 0 1
+  margin 5
+  spacing 8
+  radius 1.2
+end
+
+holes
+  source rtri
+  rounded_path
+  margin 5
+  spacing 8
+  radius 1.2
+end
+"""
+        svg = compile_document(_parse(text))
+        output = svg.to_svg()
+        assert "<path" in output
+        assert "<circle" in output

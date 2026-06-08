@@ -636,6 +636,67 @@ end
 
 Compiles to `RoundedRectangle(x, y, width, height, radius)`. `radius` must be > 0.
 
+#### `circle`
+
+```text
+circle <id>
+  at <cx> <cy>
+  radius <r>
+  [layer <layer_name>]
+end
+```
+
+Compiles to `Circle(cx, cy, radius)`. The `edges` parameter in `stitches`/`holes` is accepted but has no effect — the full circumference is always used.
+
+#### `triangle`
+
+Two forms are supported.
+
+**Three-point form:**
+
+```text
+triangle <id>
+  p1 <x> <y>
+  p2 <x> <y>
+  p3 <x> <y>
+  [layer <layer_name>]
+end
+```
+
+**Box form** (equivalent to `Triangle.from_box`):
+
+```text
+triangle <id>
+  at <x> <y>
+  size <width> <height>
+  [layer <layer_name>]
+end
+```
+
+Box form sets p1 = top-center, p2 = bottom-right, p3 = bottom-left.
+
+Compiles to `Triangle(Point(p1x, p1y), Point(p2x, p2y), Point(p3x, p3y))`.
+
+Triangle edge indices for the `edges` field: `0` = p1→p2, `1` = p2→p3, `2` = p3→p1.
+
+#### `rounded_triangle`
+
+Same as `triangle`, with an additional required `radius` field (same two forms supported).
+
+```text
+rounded_triangle <id>
+  p1 <x> <y>
+  p2 <x> <y>
+  p3 <x> <y>
+  radius <r>
+  [layer <layer_name>]
+end
+```
+
+Compiles to `RoundedTriangle(Point(p1x, p1y), Point(p2x, p2y), Point(p3x, p3y), radius=r)`.
+
+Supports the `rounded_path` flag in `stitches`/`holes` (see below).
+
 #### `outer` — freeform shape
 
 ```text
@@ -661,18 +722,21 @@ Compiles to `Polygon(points)` or `Polygon.from_mirror(points, center_x)`.
 ```text
 stitches
   source <shape_id>
-  [edges <edge_name>...]
+  [edges <edge_name_or_index>...]
   [margin <mm>]
   [spacing <mm>]
   [length <mm>]
   [angle <degrees>]
   [layer <layer_name>]
+  [rounded_path]
 end
 ```
 
-Compiles to `doc.add_stitch_pattern(shape, edges=..., inset=margin, ...)`.
+Compiles to `doc.add_stitch_pattern(shape, edges=..., inset=margin, rounded_path=..., ...)`.
 
-Default values: `edges all`, `margin 4`, `spacing 5`, `length 3`, `angle 0`, `layer stitch`.
+Default values: `edges all`, `margin 4`, `spacing 5`, `length 3`, `angle 0`, `layer stitch`, `rounded_path false`.
+
+The `rounded_path` flag (no value) makes stitches follow the smooth curved contour of a `RoundedTriangle`. It is safe to use on other shapes but has no visible effect.
 
 #### `stitches` — along a custom path
 
@@ -704,17 +768,20 @@ Compiles to `offset_polyline(path_points, distance=margin, side=side)` then `doc
 ```text
 holes
   source <shape_id>
-  [edges <edge_name>...]
+  [edges <edge_name_or_index>...]
   [margin <mm>]
   [spacing <mm>]
   [radius <mm>]
   [layer <layer_name>]
+  [rounded_path]
 end
 ```
 
-Compiles to `doc.add_holes(shape, edges=..., inset=margin, hole_radius=radius, ...)`.
+Compiles to `doc.add_holes(shape, edges=..., inset=margin, hole_radius=radius, rounded_path=..., ...)`.
 
-Default values: `edges all`, `margin 4`, `spacing 6`, `radius 1.2`, `layer cut`.
+Default values: `edges all`, `margin 4`, `spacing 6`, `radius 1.2`, `layer cut`, `rounded_path false`.
+
+The `rounded_path` flag applies to `RoundedTriangle` (follows smooth corners); safe but no-op on other shapes.
 
 #### `hole` — single or mirrored circle
 
@@ -748,7 +815,7 @@ Places circles at `(axis_x − distance, y)` and `(axis_x + distance, y)`.
 
 ### Edges
 
-Named edge tokens for rectangle-like shapes:
+**Rectangle / RoundedRectangle** — named tokens:
 
 | Token | Equivalent indices |
 |-------|--------------------|
@@ -763,6 +830,18 @@ Named edge tokens for rectangle-like shapes:
 | `vertical` | `[1, 3]` |
 
 Multiple names can be combined: `edges left bottom right`.
+
+**Triangle / RoundedTriangle** — numeric indices:
+
+| Index | Edge |
+|-------|------|
+| `0` | p1 → p2 |
+| `1` | p2 → p3 |
+| `2` | p3 → p1 |
+
+Example: `edges 0 2` selects the first and third edge. `edges all` selects all three.
+
+**Circle** — `edges` is accepted but ignored; holes/stitches always use the full circumference.
 
 ---
 
@@ -937,7 +1016,12 @@ export lighter_sleeve
 | Referencing a shape before it is declared | Shape blocks must appear before the `stitches`/`holes` that reference them |
 | `hole` with `mirror` but missing `x_from_center` or `y` | Both fields are required for mirrored holes |
 | `outer` half-points don't start/end on the axis | First and last point must have `x == symmetry_axis_x` |
-| Using a reserved keyword as a shape id | Avoid names like `path`, `end`, `source`, `layer`, etc. |
+| Using a reserved keyword as a shape id | Avoid names like `path`, `end`, `source`, `layer`, `p1`, etc. |
+| Using named edge tokens (`top`, `left`) for a `triangle` | Triangles use numeric indices: `edges 0 1 2` or `edges all` |
+| Using numeric edge indices for a `rectangle` | Rectangles use named tokens: `top`, `right`, `bottom`, `left`, or aliases |
+| `rounded_path` on a `rectangle` or `circle` | Safe to write but has no visible effect; only meaningful for `rounded_triangle` |
+| `triangle` block with neither `p1/p2/p3` nor `at + size` | Provide all three points, or use box form with both `at` and `size` |
+| `rounded_triangle` without `radius` | `radius` is required and must be > 0 |
 
 ---
 

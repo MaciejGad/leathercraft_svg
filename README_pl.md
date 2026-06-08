@@ -557,6 +557,67 @@ end
 export rounded_pocket
 ```
 
+### Okrąg
+
+```text
+circle medalion
+  at 60 60
+  radius 40
+end
+
+holes
+  source medalion
+  margin 7
+  spacing 8
+  radius 1.5
+end
+```
+
+### Trójkąt
+
+Dostępne są dwie formy: trzy jawne punkty lub forma pudełkowa (`at + size`).
+
+```text
+triangle klapa
+  p1 60 10
+  p2 110 80
+  p3 10 80
+end
+
+stitches
+  source klapa
+  edges 0 2
+  margin 6
+  spacing 8
+  length 3.5
+end
+```
+
+Krawędzie trójkąta są wybierane przez indeks numeryczny: `0` = p1→p2, `1` = p2→p3, `2` = p3→p1.
+
+Forma pudełkowa: `at x y` + `size w h` — punkt p1 jest na środku górnej krawędzi, p2 w prawym dolnym rogu, p3 w lewym dolnym rogu.
+
+### Zaokrąglony trójkąt
+
+```text
+rounded_triangle klapa
+  p1 65 10
+  p2 120 90
+  p3 10 90
+  radius 12
+end
+
+stitches
+  source klapa
+  rounded_path
+  margin 6
+  spacing 8
+  length 3.5
+end
+```
+
+Flaga `rounded_path` sprawia, że ściegi i dziurki są prowadzone wzdłuż zaokrąglonych narożników. Działa zarówno w bloku `stitches`, jak i `holes`.
+
 ### Dziurki wzdłuż krawędzi figury
 
 ```text
@@ -575,9 +636,11 @@ Nie stosuj przyrostków jednostek takich jak `mm` ani `cm`. Każda liczba jest j
 
 ### Obsługiwane słowa kluczowe
 
-`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `outer`, `stitches`, `holes`, `hole`, `export`
+`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `circle`, `triangle`, `rounded_triangle`, `outer`, `stitches`, `holes`, `hole`, `export`
 
-Nazwy krawędzi: `top`, `right`, `bottom`, `left`, `all`, `except_top`, `sides`, `horizontal`, `vertical`
+Nazwy krawędzi prostokąta: `top`, `right`, `bottom`, `left`, `all`, `except_top`, `sides`, `horizontal`, `vertical`
+
+Indeksy krawędzi trójkąta: `0`, `1`, `2`
 
 Przykładowe pliki `.lcraft` znajdują się w katalogu `examples/dsl/`.
 

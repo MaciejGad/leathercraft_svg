@@ -2,10 +2,11 @@
 leathercraft_dsl — DSL compiler for the leathercraft_svg library.
 
 Usage:
-    python -m leathercraft_dsl build pattern.lcraft
+    python leathercraft_dsl.py build pattern.lcraft
 
 Supported constructs: pattern, size, layer, symmetry, rectangle,
-rounded_rectangle, outer, stitches, holes, hole, export.
+rounded_rectangle, circle, triangle, rounded_triangle, outer,
+stitches, holes, hole, export.
 """
 
 from __future__ import annotations
@@ -17,11 +18,15 @@ from pathlib import Path
 from typing import Union
 
 from leathercraft_svg import (
+    Circle,
+    Point,
     Polygon,
     Rectangle,
     RoundedRectangle,
+    RoundedTriangle,
     StrokeStyle,
     SvgDocument,
+    Triangle,
     mirror_polyline,
     offset_polyline,
 )
@@ -41,7 +46,7 @@ _NAMED_COLORS: dict[str, str] = {
 }
 
 # ---------------------------------------------------------------------------
-# Edge aliases
+# Edge aliases (rectangle-centric; triangle edges use numeric indices)
 # ---------------------------------------------------------------------------
 
 _RECT_EDGE_NAMES: dict[str, int] = {
@@ -93,6 +98,34 @@ class RoundedRectangleDefinition:
 
 
 @dataclass
+class CircleDefinition:
+    id: str
+    cx: float
+    cy: float
+    radius: float
+    layer: str = "cut"
+
+
+@dataclass
+class TriangleDefinition:
+    id: str
+    p1: tuple[float, float]
+    p2: tuple[float, float]
+    p3: tuple[float, float]
+    layer: str = "cut"
+
+
+@dataclass
+class RoundedTriangleDefinition:
+    id: str
+    p1: tuple[float, float]
+    p2: tuple[float, float]
+    p3: tuple[float, float]
+    radius: float
+    layer: str = "cut"
+
+
+@dataclass
 class OuterPathDefinition:
     smooth: bool
     mirrored: bool
@@ -103,8 +136,8 @@ class OuterPathDefinition:
 
 @dataclass
 class StitchesOperation:
-    source: str | None  # shape id — None means custom path
-    edges: list[str]  # resolved edge names or ["all"]
+    source: str | None          # shape id — None means custom path
+    edges: list[str]            # canonical names, numeric strings, or ["all"]
     margin: float
     spacing: float
     length: float
@@ -113,6 +146,7 @@ class StitchesOperation:
     mirror: bool
     side: str
     path_points: list[tuple[float, float]]  # empty if source-based
+    rounded_path: bool = False
 
 
 @dataclass
@@ -123,12 +157,13 @@ class HolesOperation:
     spacing: float
     radius: float
     layer: str
+    rounded_path: bool = False
 
 
 @dataclass
 class SingleHoleDefinition:
     id: str
-    x: float | None  # None when mirror mode
+    x: float | None             # None when mirror mode
     y: float
     radius: float
     mirror: bool
@@ -138,7 +173,7 @@ class SingleHoleDefinition:
 
 @dataclass
 class ExportDefinition:
-    format: str | None  # None = default (svg + png)
+    format: str | None          # None = default (svg + png)
     filename: str
 
 
@@ -149,8 +184,8 @@ class PatternDocument:
     height_mm: float | None
     layers: dict[str, LayerStyle]
     symmetry_axis_x: float | None
-    shapes: list[Union[RectangleDefinition, RoundedRectangleDefinition, OuterPathDefinition]]
-    operations: list[Union[StitchesOperation, HolesOperation, SingleHoleDefinition]]
+    shapes: list
+    operations: list
     exports: list[ExportDefinition]
 
 
@@ -171,17 +206,14 @@ class DslError(ValueError):
 def _strip_comments(text: str) -> list[tuple[int, str]]:
     """Return (lineno, stripped_line) for non-empty, non-comment lines.
 
-    Only strips a '#' as a comment when it appears at the start of a token
-    (i.e. preceded by whitespace or at the very beginning of the line).
-    This avoids stripping '#' inside hex colour values like '#ff0000'.
+    Only strips '#' as a comment when preceded by whitespace and NOT followed
+    by 3-8 hex digits (preserving hex colour values like #ff0000).
     """
     result = []
     for i, raw in enumerate(text.splitlines(), start=1):
         line = raw.strip()
         if line.startswith("#"):
             continue
-        # inline comment: # preceded by whitespace and NOT followed by hex digits
-        # This preserves hex colour values like #ff0000 while stripping comments.
         line = re.sub(r"\s+#(?![0-9a-fA-F]{3,8}(\s|$)).*$", "", line).strip()
         if line:
             result.append((i, line))
@@ -217,26 +249,28 @@ def _resolve_color(token: str) -> str:
 # Block splitter
 # ---------------------------------------------------------------------------
 
+_BLOCK_STARTERS = {
+    "rectangle", "rounded_rectangle",
+    "circle",
+    "triangle", "rounded_triangle",
+    "outer",
+    "stitches", "holes", "hole",
+    "path", "points",
+}
+
 
 def _split_blocks(lines: list[tuple[int, str]]) -> list[tuple[int, str, list[tuple[int, str]]]]:
     """
     Split the flat line list into:
       - Top-level single-line commands: (lineno, line, [])
       - Blocks: (start_lineno, header_line, body_lines)
-
-    Block keywords require a matching 'end'.
     """
-    _BLOCK_STARTERS = {
-        "rectangle", "rounded_rectangle", "outer", "stitches", "holes", "hole",
-        "path", "points",
-    }
     result = []
     i = 0
     while i < len(lines):
         lineno, line = lines[i]
         first_token = line.split()[0]
         if first_token in _BLOCK_STARTERS:
-            # collect until matching 'end'
             header_lineno = lineno
             body: list[tuple[int, str]] = []
             i += 1
@@ -265,22 +299,25 @@ def _split_blocks(lines: list[tuple[int, str]]) -> list[tuple[int, str, list[tup
 
 
 # ---------------------------------------------------------------------------
-# Parser
+# Parser helpers
 # ---------------------------------------------------------------------------
 
 
 def _resolve_edges(edge_tokens: list[str], lineno: int) -> list[str]:
-    """Expand aliases and return a list of canonical edge names."""
+    """Expand aliases; accept named rect edges, numeric indices, or 'all'."""
     result: list[str] = []
     for tok in edge_tokens:
         if tok in _EDGE_ALIASES:
             result.extend(_EDGE_ALIASES[tok])
         elif tok in _RECT_EDGE_NAMES:
             result.append(tok)
+        elif re.fullmatch(r"\d+", tok):
+            result.append(tok)          # numeric index — kept as string
         else:
             raise DslError(
                 f"Line {lineno}: unknown edge '{tok}'. "
-                f"Use: top, right, bottom, left, all, except_top, sides, horizontal, vertical."
+                f"Use: top, right, bottom, left, all, except_top, sides, "
+                f"horizontal, vertical, or a numeric index (0, 1, 2, ...)."
             )
     # deduplicate preserving order
     seen: set[str] = set()
@@ -293,10 +330,7 @@ def _resolve_edges(edge_tokens: list[str], lineno: int) -> list[str]:
 
 
 def _parse_block_body(body: list[tuple[int, str]]) -> dict:
-    """
-    Flatten block body lines into a key→value or key→list_of_lines dict.
-    Sub-blocks (path/points) are preserved as lists.
-    """
+    """Flatten block body lines into key→value dict; preserve path/points sub-blocks."""
     data: dict = {}
     i = 0
     while i < len(body):
@@ -304,7 +338,6 @@ def _parse_block_body(body: list[tuple[int, str]]) -> dict:
         tokens = line.split()
         key = tokens[0]
         if key in ("path", "points"):
-            # collect sub-block
             sub: list[tuple[int, str]] = []
             i += 1
             while i < len(body):
@@ -336,6 +369,43 @@ def _parse_xy_list(lines: list[tuple[int, str]]) -> list[tuple[float, float]]:
     return pts
 
 
+def _parse_triangle_points(
+    data: dict,
+    shape_id: str,
+    lineno: int,
+) -> tuple[tuple[float, float], tuple[float, float], tuple[float, float]]:
+    """Extract p1/p2/p3 from block body; support both point form and at+size box form."""
+    if "p1" in data and "p2" in data and "p3" in data:
+        p1_ln, p1v = data["p1"]
+        p2_ln, p2v = data["p2"]
+        p3_ln, p3v = data["p3"]
+        p1 = (_parse_float(p1v[0], p1_ln, "p1 x"), _parse_float(p1v[1], p1_ln, "p1 y"))
+        p2 = (_parse_float(p2v[0], p2_ln, "p2 x"), _parse_float(p2v[1], p2_ln, "p2 y"))
+        p3 = (_parse_float(p3v[0], p3_ln, "p3 x"), _parse_float(p3v[1], p3_ln, "p3 y"))
+    elif "at" in data and "size" in data:
+        at_ln, at_v = data["at"]
+        sz_ln, sz_v = data["size"]
+        x = _parse_float(at_v[0], at_ln, "at x")
+        y = _parse_float(at_v[1], at_ln, "at y")
+        w = _parse_float(sz_v[0], sz_ln, "size width")
+        h = _parse_float(sz_v[1], sz_ln, "size height")
+        # Triangle.from_box layout: top-center, bottom-right, bottom-left
+        p1 = (x + w / 2, y)
+        p2 = (x + w, y + h)
+        p3 = (x, y + h)
+    else:
+        raise DslError(
+            f"Line {lineno}: '{shape_id}' needs either "
+            f"'p1/p2/p3' coordinates or 'at + size' (box form)."
+        )
+    return p1, p2, p3
+
+
+# ---------------------------------------------------------------------------
+# Main parser
+# ---------------------------------------------------------------------------
+
+
 def parse(text: str) -> PatternDocument:
     """Parse DSL text and return a PatternDocument."""
     raw_lines = _strip_comments(text)
@@ -350,7 +420,6 @@ def parse(text: str) -> PatternDocument:
     operations: list = []
     exports: list[ExportDefinition] = []
 
-    # track shape ids for validation
     shape_ids: set[str] = set()
 
     for lineno, line, body in blocks:
@@ -372,7 +441,6 @@ def parse(text: str) -> PatternDocument:
 
         # ------------------------------------------------------------------
         elif keyword == "layer":
-            # layer <name> <color> <stroke_width> [dashed]
             if len(tokens) < 4:
                 raise DslError(f"Line {lineno}: 'layer' requires name, color, stroke_width")
             lname = tokens[1]
@@ -383,12 +451,10 @@ def parse(text: str) -> PatternDocument:
 
         # ------------------------------------------------------------------
         elif keyword == "symmetry":
-            # symmetry <x>  OR  symmetry vertical x=<x>
             rest = tokens[1:]
             if not rest:
                 raise DslError(f"Line {lineno}: 'symmetry' requires a value")
             if rest[0] == "vertical":
-                # x=75
                 xpart = rest[1] if len(rest) > 1 else ""
                 if xpart.startswith("x="):
                     symmetry_axis_x = _parse_float(xpart[2:], lineno, "symmetry x")
@@ -404,9 +470,9 @@ def parse(text: str) -> PatternDocument:
             shape_id = tokens[1]
             data = _parse_block_body(body)
 
-            def _req(k: str) -> tuple[int, list[str]]:
+            def _req(k: str, sid=shape_id, ln=lineno) -> tuple[int, list[str]]:
                 if k not in data:
-                    raise DslError(f"Line {lineno}: rectangle '{shape_id}' is missing '{k}'")
+                    raise DslError(f"Line {ln}: rectangle '{sid}' is missing '{k}'")
                 return data[k]
 
             at_lineno, at_vals = _req("at")
@@ -428,9 +494,9 @@ def parse(text: str) -> PatternDocument:
             shape_id = tokens[1]
             data = _parse_block_body(body)
 
-            def _req(k: str) -> tuple[int, list[str]]:
+            def _req(k: str, sid=shape_id, ln=lineno) -> tuple[int, list[str]]:
                 if k not in data:
-                    raise DslError(f"Line {lineno}: rounded_rectangle '{shape_id}' is missing '{k}'")
+                    raise DslError(f"Line {ln}: rounded_rectangle '{sid}' is missing '{k}'")
                 return data[k]
 
             at_lineno, at_vals = _req("at")
@@ -452,8 +518,66 @@ def parse(text: str) -> PatternDocument:
             shape_ids.add(shape_id)
 
         # ------------------------------------------------------------------
+        elif keyword == "circle":
+            if len(tokens) < 2:
+                raise DslError(f"Line {lineno}: 'circle' requires an id")
+            shape_id = tokens[1]
+            data = _parse_block_body(body)
+
+            def _req(k: str, sid=shape_id, ln=lineno) -> tuple[int, list[str]]:
+                if k not in data:
+                    raise DslError(f"Line {ln}: circle '{sid}' is missing '{k}'")
+                return data[k]
+
+            at_lineno, at_vals = _req("at")
+            r_lineno, r_vals = _req("radius")
+            cx = _parse_float(at_vals[0], at_lineno, "at cx")
+            cy = _parse_float(at_vals[1], at_lineno, "at cy")
+            r = _parse_float(r_vals[0], r_lineno, "radius")
+            if r <= 0:
+                raise DslError(f"Line {r_lineno}: radius must be greater than 0")
+            layer_name = "cut"
+            if "layer" in data:
+                layer_name = data["layer"][1][0]
+            shapes.append(CircleDefinition(id=shape_id, cx=cx, cy=cy, radius=r, layer=layer_name))
+            shape_ids.add(shape_id)
+
+        # ------------------------------------------------------------------
+        elif keyword == "triangle":
+            if len(tokens) < 2:
+                raise DslError(f"Line {lineno}: 'triangle' requires an id")
+            shape_id = tokens[1]
+            data = _parse_block_body(body)
+            p1, p2, p3 = _parse_triangle_points(data, shape_id, lineno)
+            layer_name = "cut"
+            if "layer" in data:
+                layer_name = data["layer"][1][0]
+            shapes.append(TriangleDefinition(id=shape_id, p1=p1, p2=p2, p3=p3, layer=layer_name))
+            shape_ids.add(shape_id)
+
+        # ------------------------------------------------------------------
+        elif keyword == "rounded_triangle":
+            if len(tokens) < 2:
+                raise DslError(f"Line {lineno}: 'rounded_triangle' requires an id")
+            shape_id = tokens[1]
+            data = _parse_block_body(body)
+            p1, p2, p3 = _parse_triangle_points(data, shape_id, lineno)
+            if "radius" not in data:
+                raise DslError(f"Line {lineno}: rounded_triangle '{shape_id}' is missing 'radius'")
+            r_lineno, r_vals = data["radius"]
+            r = _parse_float(r_vals[0], r_lineno, "radius")
+            if r <= 0:
+                raise DslError(f"Line {r_lineno}: radius must be greater than 0")
+            layer_name = "cut"
+            if "layer" in data:
+                layer_name = data["layer"][1][0]
+            shapes.append(RoundedTriangleDefinition(
+                id=shape_id, p1=p1, p2=p2, p3=p3, radius=r, layer=layer_name
+            ))
+            shape_ids.add(shape_id)
+
+        # ------------------------------------------------------------------
         elif keyword == "outer":
-            # outer [smooth|straight] [mirrored]
             rest = tokens[1:]
             smooth = False
             mirrored = False
@@ -474,7 +598,6 @@ def parse(text: str) -> PatternDocument:
         elif keyword == "stitches":
             data = _parse_block_body(body)
 
-            # defaults
             source = None
             edges_raw: list[str] = ["all"]
             margin = 4.0
@@ -485,6 +608,7 @@ def parse(text: str) -> PatternDocument:
             mirror_flag = False
             side = "right"
             path_pts: list[tuple[float, float]] = []
+            rounded_path = False
 
             if "source" in data:
                 src_ln, src_vals = data["source"]
@@ -516,6 +640,8 @@ def parse(text: str) -> PatternDocument:
                 side = data["side"][1][0]
             if "path" in data:
                 path_pts = _parse_xy_list(data["path"])
+            if "rounded_path" in data:
+                rounded_path = True
 
             operations.append(StitchesOperation(
                 source=source,
@@ -528,15 +654,16 @@ def parse(text: str) -> PatternDocument:
                 mirror=mirror_flag,
                 side=side,
                 path_points=path_pts,
+                rounded_path=rounded_path,
             ))
 
         # ------------------------------------------------------------------
         elif keyword == "holes":
             data = _parse_block_body(body)
 
-            def _req(k: str) -> tuple[int, list[str]]:
+            def _req(k: str, ln=lineno) -> tuple[int, list[str]]:
                 if k not in data:
-                    raise DslError(f"Line {lineno}: 'holes' block is missing '{k}'")
+                    raise DslError(f"Line {ln}: 'holes' block is missing '{k}'")
                 return data[k]
 
             src_ln, src_vals = _req("source")
@@ -551,6 +678,7 @@ def parse(text: str) -> PatternDocument:
             spacing = 6.0
             radius = 1.2
             layer_name = "cut"
+            rounded_path = False
 
             if "edges" in data:
                 e_ln, e_vals = data["edges"]
@@ -568,6 +696,8 @@ def parse(text: str) -> PatternDocument:
                     raise DslError(f"Line {ln}: radius must be greater than 0")
             if "layer" in data:
                 layer_name = data["layer"][1][0]
+            if "rounded_path" in data:
+                rounded_path = True
 
             operations.append(HolesOperation(
                 source=source,
@@ -576,6 +706,7 @@ def parse(text: str) -> PatternDocument:
                 spacing=spacing,
                 radius=radius,
                 layer=layer_name,
+                rounded_path=rounded_path,
             ))
 
         # ------------------------------------------------------------------
@@ -591,10 +722,9 @@ def parse(text: str) -> PatternDocument:
                 layer_name = data["layer"][1][0]
 
             if mirror_flag:
-                # mirrored hole: x_from_center + y + radius
-                def _req_field(k: str) -> tuple[int, list[str]]:
+                def _req_field(k: str, hid=hole_id, ln=lineno) -> tuple[int, list[str]]:
                     if k not in data:
-                        raise DslError(f"Line {lineno}: mirrored hole '{hole_id}' is missing '{k}'")
+                        raise DslError(f"Line {ln}: mirrored hole '{hid}' is missing '{k}'")
                     return data[k]
 
                 xfc_ln, xfc_vals = _req_field("x_from_center")
@@ -608,19 +738,13 @@ def parse(text: str) -> PatternDocument:
                     raise DslError(f"Line {r_ln}: radius must be greater than 0")
 
                 operations.append(SingleHoleDefinition(
-                    id=hole_id,
-                    x=None,
-                    y=hole_y,
-                    radius=r,
-                    mirror=True,
-                    x_from_center=xfc,
-                    layer=layer_name,
+                    id=hole_id, x=None, y=hole_y, radius=r,
+                    mirror=True, x_from_center=xfc, layer=layer_name,
                 ))
             else:
-                # single hole: at + radius
-                def _req_field(k: str) -> tuple[int, list[str]]:
+                def _req_field(k: str, hid=hole_id, ln=lineno) -> tuple[int, list[str]]:
                     if k not in data:
-                        raise DslError(f"Line {lineno}: hole '{hole_id}' is missing '{k}'")
+                        raise DslError(f"Line {ln}: hole '{hid}' is missing '{k}'")
                     return data[k]
 
                 at_ln, at_vals = _req_field("at")
@@ -633,13 +757,8 @@ def parse(text: str) -> PatternDocument:
                     raise DslError(f"Line {r_ln}: radius must be greater than 0")
 
                 operations.append(SingleHoleDefinition(
-                    id=hole_id,
-                    x=hole_x,
-                    y=hole_y,
-                    radius=r,
-                    mirror=False,
-                    x_from_center=None,
-                    layer=layer_name,
+                    id=hole_id, x=hole_x, y=hole_y, radius=r,
+                    mirror=False, x_from_center=None, layer=layer_name,
                 ))
 
         # ------------------------------------------------------------------
@@ -648,10 +767,8 @@ def parse(text: str) -> PatternDocument:
             if not rest:
                 raise DslError(f"Line {lineno}: 'export' requires at least a name")
             if len(rest) == 1:
-                # simple export: export <name>
                 exports.append(ExportDefinition(format=None, filename=rest[0]))
             else:
-                # explicit: export <format> <filename>
                 fmt = rest[0].lower()
                 if fmt not in ("svg", "png", "pdf"):
                     raise DslError(
@@ -694,48 +811,52 @@ def _layer_style(ls: LayerStyle) -> StrokeStyle:
 
 
 def _edges_to_indices(edges: list[str]) -> str | list[int]:
-    """Convert a list of canonical edge names to the library's format.
+    """Convert stored edge tokens to the format the library expects.
 
-    Accepts already-resolved canonical names (top/right/bottom/left) as well
-    as the single-token shorthand ``["all"]``.
+    Accepts:
+    - Named rect edges (top/right/bottom/left) and their aliases
+    - Numeric strings ("0", "1", "2", ...)
+    - The alias "all" (or its expansion)
+
+    Returns "all" when all four rectangle named edges are present,
+    otherwise a list of ints.
     """
-    # Expand any remaining aliases (e.g. the default ["all"])
+    # Expand any named aliases first (leaves numeric strings unchanged)
     expanded: list[str] = []
     for e in edges:
         if e in _EDGE_ALIASES:
             expanded.extend(_EDGE_ALIASES[e])
         else:
             expanded.append(e)
+
+    # All four rect named edges → "all"
     if set(expanded) == {"top", "right", "bottom", "left"}:
         return "all"
+
+    # All numeric strings → list of ints (triangle / polygon / circle edges)
+    if all(re.fullmatch(r"\d+", e) for e in expanded):
+        return [int(e) for e in expanded]
+
+    # Mixed named rect edges → indices
     return [_RECT_EDGE_NAMES[e] for e in expanded]
 
 
 def compile_document(doc: PatternDocument) -> SvgDocument:
     """Convert a PatternDocument into a fully rendered SvgDocument."""
 
-    # --- validation --------------------------------------------------
     if doc.width_mm is None or doc.height_mm is None:
         raise DslError("missing required command 'size'")
 
-    # --- styles ------------------------------------------------------
     if doc.layers:
-        styles = {name: _layer_style(ls) for name, ls in doc.layers.items()}
-        # merge with defaults so any omitted layer still works
         merged = _default_layers()
-        merged.update(styles)
+        merged.update({name: _layer_style(ls) for name, ls in doc.layers.items()})
         styles = merged
     else:
         styles = _default_layers()
 
-    svg = SvgDocument(
-        width_mm=doc.width_mm,
-        height_mm=doc.height_mm,
-        styles=styles,
-    )
+    svg = SvgDocument(width_mm=doc.width_mm, height_mm=doc.height_mm, styles=styles)
 
     # --- build shape registry ----------------------------------------
-    # id → (shape_object, SvgDocument-added)
     shape_objects: dict[str, object] = {}
 
     for shape_def in doc.shapes:
@@ -748,6 +869,30 @@ def compile_document(doc: PatternDocument) -> SvgDocument:
             s = RoundedRectangle(
                 shape_def.x, shape_def.y,
                 shape_def.width, shape_def.height,
+                radius=shape_def.radius,
+            )
+            svg.add_shape(s, layer=shape_def.layer)
+            shape_objects[shape_def.id] = s
+
+        elif isinstance(shape_def, CircleDefinition):
+            s = Circle(shape_def.cx, shape_def.cy, shape_def.radius)
+            svg.add_shape(s, layer=shape_def.layer)
+            shape_objects[shape_def.id] = s
+
+        elif isinstance(shape_def, TriangleDefinition):
+            s = Triangle(
+                Point(*shape_def.p1),
+                Point(*shape_def.p2),
+                Point(*shape_def.p3),
+            )
+            svg.add_shape(s, layer=shape_def.layer)
+            shape_objects[shape_def.id] = s
+
+        elif isinstance(shape_def, RoundedTriangleDefinition):
+            s = RoundedTriangle(
+                Point(*shape_def.p1),
+                Point(*shape_def.p2),
+                Point(*shape_def.p3),
                 radius=shape_def.radius,
             )
             svg.add_shape(s, layer=shape_def.layer)
@@ -774,7 +919,6 @@ def compile_document(doc: PatternDocument) -> SvgDocument:
 
         if isinstance(op, StitchesOperation):
             if op.source is not None:
-                # stitches on built-in shape
                 shape = shape_objects[op.source]
                 edges_arg = _edges_to_indices(op.edges)
                 svg.add_stitch_pattern(
@@ -785,14 +929,12 @@ def compile_document(doc: PatternDocument) -> SvgDocument:
                     inset=op.margin,
                     layer=op.layer,
                     stitch_angle_deg=op.angle,
+                    rounded_path=op.rounded_path,
                 )
             else:
-                # stitches along custom path
                 if not op.path_points:
                     raise DslError("stitches block with no 'source' must have a 'path' sub-block")
-                pts = op.path_points
-                # offset by margin on the specified side
-                seam = offset_polyline(pts, distance=op.margin, side=op.side)
+                seam = offset_polyline(op.path_points, distance=op.margin, side=op.side)
                 svg.add_stitch_on_polyline(
                     seam,
                     spacing=op.spacing,
@@ -824,6 +966,7 @@ def compile_document(doc: PatternDocument) -> SvgDocument:
                 hole_radius=op.radius,
                 inset=op.margin,
                 layer=op.layer,
+                rounded_path=op.rounded_path,
             )
 
         elif isinstance(op, SingleHoleDefinition):
@@ -834,10 +977,8 @@ def compile_document(doc: PatternDocument) -> SvgDocument:
                     )
                 cx = doc.symmetry_axis_x
                 assert op.x_from_center is not None
-                x_left = cx - op.x_from_center
-                x_right = cx + op.x_from_center
-                svg.add_circle(x_left, op.y, op.radius, layer=op.layer)
-                svg.add_circle(x_right, op.y, op.radius, layer=op.layer)
+                svg.add_circle(cx - op.x_from_center, op.y, op.radius, layer=op.layer)
+                svg.add_circle(cx + op.x_from_center, op.y, op.radius, layer=op.layer)
             else:
                 assert op.x is not None
                 svg.add_circle(op.x, op.y, op.radius, layer=op.layer)
@@ -851,14 +992,12 @@ def compile_document(doc: PatternDocument) -> SvgDocument:
 
 
 def _export(svg: SvgDocument, exp: ExportDefinition, default_name: str) -> None:
-    """Write one export to disk."""
     if exp.format is None:
-        # default: write svg and png
         stem = exp.filename
         svg.save(f"{stem}.svg")
         try:
             svg.save_png(f"{stem}.png", background_color="white")
-        except Exception as exc:  # cairosvg not installed
+        except Exception as exc:
             print(f"  PNG skipped: {exc}", file=sys.stderr)
     elif exp.format == "svg":
         svg.save(exp.filename)
@@ -867,26 +1006,20 @@ def _export(svg: SvgDocument, exp: ExportDefinition, default_name: str) -> None:
     elif exp.format == "pdf":
         try:
             import cairosvg
-            svg_str = svg.to_svg()
-            cairosvg.svg2pdf(bytestring=svg_str.encode(), write_to=exp.filename)
+            cairosvg.svg2pdf(bytestring=svg.to_svg().encode(), write_to=exp.filename)
         except Exception as exc:
             raise DslError(f"PDF export failed: {exc}") from exc
 
 
 def build_file(path: str | Path) -> SvgDocument:
-    """
-    Parse, compile, and export a .lcraft file.
-    Returns the compiled SvgDocument.
-    """
+    """Parse, compile, and export a .lcraft file. Returns the SvgDocument."""
     path = Path(path)
     text = path.read_text(encoding="utf-8")
     doc = parse(text)
     svg = compile_document(doc)
 
     default_name = doc.name or path.stem
-
     if not doc.exports:
-        # default: export svg and png next to the source file
         stem = path.parent / default_name
         svg.save(str(stem) + ".svg")
         try:
@@ -910,7 +1043,7 @@ def main(argv: list[str] | None = None) -> int:
         argv = sys.argv[1:]
 
     if len(argv) < 2 or argv[0] != "build":
-        print("Usage: python -m leathercraft_dsl build <file.lcraft>", file=sys.stderr)
+        print("Usage: python leathercraft_dsl.py build <file.lcraft>", file=sys.stderr)
         return 1
 
     lcraft_file = argv[1]

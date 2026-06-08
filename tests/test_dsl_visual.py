@@ -339,6 +339,205 @@ end
 """)
 
 
+def _dsl_circle_holes() -> bytes:
+    return _compile_dsl("""
+size 100 100
+
+circle ring
+  at 50 50
+  radius 35
+end
+
+holes
+  source ring
+  margin 7
+  spacing 8
+  radius 1.5
+end
+""")
+
+
+def _dsl_circle_stitch_0deg() -> bytes:
+    return _compile_dsl("""
+size 100 100
+
+circle ring
+  at 50 50
+  radius 35
+end
+
+stitches
+  source ring
+  margin 7
+  spacing 8
+  length 3.5
+  angle 0
+end
+""")
+
+
+def _dsl_circle_stitch_45deg() -> bytes:
+    return _compile_dsl("""
+size 100 100
+
+circle ring
+  at 50 50
+  radius 35
+end
+
+stitches
+  source ring
+  margin 7
+  spacing 8
+  length 3.5
+  angle 45
+end
+""")
+
+
+def _dsl_triangle_holes_all_edges() -> bytes:
+    return _compile_dsl("""
+size 120 90
+
+triangle tri
+  p1 60 10
+  p2 110 80
+  p3 10 80
+end
+
+holes
+  source tri
+  edges all
+  margin 6
+  spacing 8
+  radius 1.2
+end
+""")
+
+
+def _dsl_triangle_holes_partial_edges() -> bytes:
+    return _compile_dsl("""
+size 120 90
+
+triangle tri
+  p1 60 10
+  p2 110 80
+  p3 10 80
+end
+
+holes
+  source tri
+  edges 0 2
+  margin 6
+  spacing 8
+  radius 1.2
+end
+""")
+
+
+def _dsl_triangle_stitch_45deg() -> bytes:
+    return _compile_dsl("""
+size 120 90
+
+triangle tri
+  p1 60 10
+  p2 110 80
+  p3 10 80
+end
+
+stitches
+  source tri
+  edges all
+  margin 6
+  spacing 8
+  length 3.5
+  angle 45
+end
+""")
+
+
+def _dsl_triangle_box_form() -> bytes:
+    return _compile_dsl("""
+size 120 90
+
+triangle tri
+  at 10 10
+  size 100 70
+end
+
+holes
+  source tri
+  edges 0 1
+  margin 6
+  spacing 8
+  radius 1.2
+end
+""")
+
+
+def _dsl_rounded_triangle_holes_straight() -> bytes:
+    return _compile_dsl("""
+size 130 100
+
+rounded_triangle rtri
+  p1 65 10
+  p2 120 90
+  p3 10 90
+  radius 12
+end
+
+holes
+  source rtri
+  margin 6
+  spacing 8
+  radius 1.5
+end
+""")
+
+
+def _dsl_rounded_triangle_holes_rounded_path() -> bytes:
+    return _compile_dsl("""
+size 130 100
+
+rounded_triangle rtri
+  p1 65 10
+  p2 120 90
+  p3 10 90
+  radius 12
+end
+
+holes
+  source rtri
+  rounded_path
+  margin 6
+  spacing 8
+  radius 1.5
+end
+""")
+
+
+def _dsl_rounded_triangle_stitch_rounded_path() -> bytes:
+    return _compile_dsl("""
+size 130 100
+
+rounded_triangle rtri
+  p1 65 10
+  p2 120 90
+  p3 10 90
+  radius 12
+end
+
+stitches
+  source rtri
+  rounded_path
+  margin 6
+  spacing 8
+  length 3.5
+  angle 0
+end
+""")
+
+
 # ---------------------------------------------------------------------------
 # Scenario registry  name → builder
 # ---------------------------------------------------------------------------
@@ -357,6 +556,17 @@ SCENARIOS: dict[str, callable] = {
     "dsl_outer_straight.png": _dsl_outer_straight,
     "dsl_outer_smooth_mirrored.png": _dsl_outer_smooth_mirrored,
     "dsl_custom_path_stitches_mirror.png": _dsl_custom_path_stitches_mirror,
+    # --- new shapes ---
+    "dsl_circle_holes.png": _dsl_circle_holes,
+    "dsl_circle_stitch_0deg.png": _dsl_circle_stitch_0deg,
+    "dsl_circle_stitch_45deg.png": _dsl_circle_stitch_45deg,
+    "dsl_triangle_holes_all_edges.png": _dsl_triangle_holes_all_edges,
+    "dsl_triangle_holes_partial_edges.png": _dsl_triangle_holes_partial_edges,
+    "dsl_triangle_stitch_45deg.png": _dsl_triangle_stitch_45deg,
+    "dsl_triangle_box_form.png": _dsl_triangle_box_form,
+    "dsl_rounded_triangle_holes_straight.png": _dsl_rounded_triangle_holes_straight,
+    "dsl_rounded_triangle_holes_rounded_path.png": _dsl_rounded_triangle_holes_rounded_path,
+    "dsl_rounded_triangle_stitch_rounded_path.png": _dsl_rounded_triangle_stitch_rounded_path,
 }
 
 

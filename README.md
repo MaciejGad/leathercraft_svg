@@ -557,6 +557,67 @@ end
 export rounded_pocket
 ```
 
+### Circle
+
+```text
+circle medallion
+  at 60 60
+  radius 40
+end
+
+holes
+  source medallion
+  margin 7
+  spacing 8
+  radius 1.5
+end
+```
+
+### Triangle
+
+Two forms: explicit points or `at + size` (box form).
+
+```text
+triangle flap
+  p1 60 10
+  p2 110 80
+  p3 10 80
+end
+
+stitches
+  source flap
+  edges 0 2
+  margin 6
+  spacing 8
+  length 3.5
+end
+```
+
+Triangle edges use numeric indices: `0` = p1→p2, `1` = p2→p3, `2` = p3→p1.
+
+Box form: `at x y` + `size w h` places p1 at the top-center, p2 at the bottom-right, p3 at the bottom-left.
+
+### Rounded triangle
+
+```text
+rounded_triangle flap
+  p1 65 10
+  p2 120 90
+  p3 10 90
+  radius 12
+end
+
+stitches
+  source flap
+  rounded_path
+  margin 6
+  spacing 8
+  length 3.5
+end
+```
+
+The `rounded_path` flag makes stitches and holes follow the smooth curved corners. It works for both `stitches` and `holes` blocks.
+
 ### Holes along shape edges
 
 ```text
@@ -575,9 +636,11 @@ Do not write unit suffixes such as `mm` or `cm`. Every numeric value is already 
 
 ### Supported keywords
 
-`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `outer`, `stitches`, `holes`, `hole`, `export`
+`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `circle`, `triangle`, `rounded_triangle`, `outer`, `stitches`, `holes`, `hole`, `export`
 
-Edge names: `top`, `right`, `bottom`, `left`, `all`, `except_top`, `sides`, `horizontal`, `vertical`
+Edge names for rectangles: `top`, `right`, `bottom`, `left`, `all`, `except_top`, `sides`, `horizontal`, `vertical`
+
+Edge indices for triangles: `0`, `1`, `2`
 
 Example files are in `examples/dsl/`.
 

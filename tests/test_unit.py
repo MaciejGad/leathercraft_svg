@@ -14,12 +14,16 @@ import unittest
 from leathercraft_svg import (
     Circle,
     Point,
+    Polygon,
     Rectangle,
     RoundedRectangle,
     RoundedTriangle,
     StrokeStyle,
     SvgDocument,
     Triangle,
+    _offset_closed_polygon,
+    _smooth_path_d,
+    _straight_path_d,
     adjust_positions_near_corners,
     adjust_stitch_positions_and_lengths,
     deduplicate_points,
@@ -27,7 +31,9 @@ from leathercraft_svg import (
     inset_triangle_vertices,
     inward_unit_normal,
     line_intersection,
+    mirror_polyline,
     move_towards,
+    offset_polyline,
     point_on_edge,
     points_on_closed_polyline,
     positions_on_closed_length,
@@ -39,6 +45,7 @@ from leathercraft_svg import (
     segment_on_edge,
     signed_double_area,
     stitch_segments_on_closed_polyline,
+    stitch_segments_on_open_polyline,
 )
 
 APPROX = 1e-6
@@ -733,3 +740,363 @@ class TestSvgDocumentOutput(unittest.TestCase):
         svg = doc.to_svg()
         self.assertIn("<path", svg)
         self.assertIn("<circle", svg)
+
+    def test_add_stitch_on_polyline_adds_lines(self):
+        doc = self._doc()
+        pts = [(10, 10), (50, 10), (90, 10)]
+        doc.add_stitch_on_polyline(pts, spacing=10, stitch_length=3)
+        self.assertGreater(len(doc.elements), 0)
+        self.assertIn("<line", doc.to_svg())
+
+    def test_add_stitch_on_polyline_thickness_override(self):
+        doc = self._doc()
+        pts = [(10, 10), (90, 10)]
+        doc.add_stitch_on_polyline(pts, spacing=10, stitch_length=3, stitch_thickness=0.6)
+        self.assertIn('stroke-width="0.6"', doc.to_svg())
+
+
+# ===========================================================================
+# Path helpers
+# ===========================================================================
+
+class TestPathHelpers(unittest.TestCase):
+    def test_straight_path_d_starts_with_M(self):
+        d = _straight_path_d([(0, 0), (10, 0), (10, 10)])
+        self.assertTrue(d.startswith("M"))
+
+    def test_straight_path_d_ends_with_Z(self):
+        d = _straight_path_d([(0, 0), (10, 0), (10, 10)])
+        self.assertTrue(d.endswith("Z"))
+
+    def test_straight_path_d_contains_all_coords(self):
+        d = _straight_path_d([(1.0, 2.0), (3.0, 4.0)])
+        self.assertIn("1.000", d)
+        self.assertIn("4.000", d)
+
+    def test_smooth_path_d_contains_Q(self):
+        d = _smooth_path_d([(0, 0), (5, 10), (10, 0)])
+        self.assertIn("Q", d)
+
+    def test_smooth_path_d_fallback_for_two_points(self):
+        # < 3 points → falls back to straight
+        d = _smooth_path_d([(0, 0), (10, 0)])
+        self.assertNotIn("Q", d)
+        self.assertTrue(d.endswith("Z"))
+
+    def test_smooth_path_d_starts_with_M(self):
+        d = _smooth_path_d([(0, 0), (5, 10), (10, 0)])
+        self.assertTrue(d.startswith("M"))
+
+
+# ===========================================================================
+# offset_polyline
+# ===========================================================================
+
+class TestOffsetPolyline(unittest.TestCase):
+    def test_too_short_returns_copy(self):
+        pts = [(5.0, 5.0)]
+        result = offset_polyline(pts, 3)
+        self.assertEqual(result, pts)
+
+    def test_horizontal_line_offset_right(self):
+        # Line going right → "right" is the right-hand side of travel direction.
+        # In SVG (Y down), rightward travel has right-hand = UPWARD = negative Y.
+        pts = [(0.0, 0.0), (10.0, 0.0)]
+        result = offset_polyline(pts, 3, side="right")
+        self.assertEqual(len(result), 2)
+        self.assertAlmostEqual(result[0][1], -3.0)
+        self.assertAlmostEqual(result[1][1], -3.0)
+
+    def test_horizontal_line_offset_left(self):
+        # Left-hand side of rightward travel = DOWNWARD = positive Y.
+        pts = [(0.0, 0.0), (10.0, 0.0)]
+        result = offset_polyline(pts, 3, side="left")
+        self.assertAlmostEqual(result[0][1], 3.0)
+        self.assertAlmostEqual(result[1][1], 3.0)
+
+    def test_invalid_side_raises(self):
+        with self.assertRaises(ValueError):
+            offset_polyline([(0, 0), (1, 0)], 1, side="up")
+
+    def test_length_preserved(self):
+        pts = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0)]
+        result = offset_polyline(pts, 2, side="right")
+        self.assertEqual(len(result), len(pts))
+
+    def test_preserves_direction(self):
+        # Offset of a vertical downward line on the right should move right (+x)
+        pts = [(0.0, 0.0), (0.0, 10.0)]
+        result = offset_polyline(pts, 3, side="right")
+        self.assertAlmostEqual(result[0][0], 3.0)
+        self.assertAlmostEqual(result[1][0], 3.0)
+
+    def test_miter_join_at_right_angle(self):
+        # L-shape: right then down. side="right" offsets to the right-hand side.
+        # Segment 1 right: right-hand = upward (y=-2).
+        # Segment 2 down:  right-hand = rightward (x=+12).
+        # Miter intersection: (12, -2).
+        pts = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0)]
+        result = offset_polyline(pts, 2, side="right")
+        mx, my = result[1]
+        self.assertAlmostEqual(mx, 12.0, places=3)
+        self.assertAlmostEqual(my, -2.0, places=3)
+
+    def test_zero_length_segment_no_crash(self):
+        pts = [(0.0, 0.0), (0.0, 0.0), (10.0, 0.0)]
+        result = offset_polyline(pts, 2, side="right")
+        self.assertEqual(len(result), 3)
+
+
+# ===========================================================================
+# mirror_polyline
+# ===========================================================================
+
+class TestMirrorPolyline(unittest.TestCase):
+    def test_mirrors_x_around_center(self):
+        pts = [(10.0, 5.0), (30.0, 5.0)]
+        result = mirror_polyline(pts, center_x=20.0)
+        self.assertAlmostEqual(result[0][0], 30.0)
+        self.assertAlmostEqual(result[1][0], 10.0)
+
+    def test_y_unchanged(self):
+        pts = [(5.0, 7.0), (15.0, 13.0)]
+        result = mirror_polyline(pts, center_x=10.0)
+        self.assertAlmostEqual(result[0][1], 7.0)
+        self.assertAlmostEqual(result[1][1], 13.0)
+
+    def test_point_on_axis_unchanged(self):
+        pts = [(10.0, 5.0)]
+        result = mirror_polyline(pts, center_x=10.0)
+        self.assertAlmostEqual(result[0][0], 10.0)
+
+    def test_double_mirror_roundtrips(self):
+        pts = [(3.0, 9.0), (7.0, 2.0)]
+        once = mirror_polyline(pts, 10.0)
+        twice = mirror_polyline(once, 10.0)
+        for (x1, y1), (x2, y2) in zip(pts, twice):
+            self.assertAlmostEqual(x1, x2)
+            self.assertAlmostEqual(y1, y2)
+
+
+# ===========================================================================
+# _offset_closed_polygon
+# ===========================================================================
+
+class TestOffsetClosedPolygon(unittest.TestCase):
+    def test_square_shrinks(self):
+        # A CW square (in SVG Y-down) should shrink inward
+        pts = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)]
+        result = _offset_closed_polygon(pts, 2.0)
+        self.assertEqual(len(result), 4)
+        xs = [p[0] for p in result]
+        ys = [p[1] for p in result]
+        self.assertGreater(min(xs), 0.0)
+        self.assertLess(max(xs), 10.0)
+        self.assertGreater(min(ys), 0.0)
+        self.assertLess(max(ys), 10.0)
+
+    def test_too_few_points_returns_copy(self):
+        pts = [(0.0, 0.0), (5.0, 5.0)]
+        result = _offset_closed_polygon(pts, 2.0)
+        self.assertEqual(result, pts)
+
+    def test_returns_same_count(self):
+        pts = [(0.0, 0.0), (20.0, 0.0), (20.0, 15.0), (0.0, 15.0)]
+        result = _offset_closed_polygon(pts, 3.0)
+        self.assertEqual(len(result), len(pts))
+
+
+# ===========================================================================
+# stitch_segments_on_open_polyline
+# ===========================================================================
+
+class TestStitchSegmentsOnOpenPolyline(unittest.TestCase):
+    def test_returns_point_pairs(self):
+        pts = [(0.0, 0.0), (100.0, 0.0)]
+        segs = stitch_segments_on_open_polyline(pts, spacing=10, stitch_length=3)
+        for a, b in segs:
+            self.assertIsInstance(a, Point)
+            self.assertIsInstance(b, Point)
+
+    def test_spacing_respected(self):
+        pts = [(0.0, 0.0), (100.0, 0.0)]
+        segs = stitch_segments_on_open_polyline(pts, spacing=10, stitch_length=3)
+        # First stitch centre should be at x=10
+        cx0 = (segs[0][0].x + segs[0][1].x) / 2
+        self.assertAlmostEqual(cx0, 10.0, places=5)
+
+    def test_stitch_length_respected(self):
+        pts = [(0.0, 0.0), (100.0, 0.0)]
+        segs = stitch_segments_on_open_polyline(pts, spacing=10, stitch_length=3)
+        for a, b in segs:
+            self.assertAlmostEqual(distance(a, b), 3.0, places=5)
+
+    def test_angle_0_parallel_to_path(self):
+        pts = [(0.0, 0.0), (100.0, 0.0)]
+        segs = stitch_segments_on_open_polyline(pts, spacing=10, stitch_length=3, stitch_angle_deg=0)
+        for a, b in segs:
+            self.assertAlmostEqual(a.y, b.y, places=5)   # same Y → horizontal
+
+    def test_angle_90_perpendicular_to_path(self):
+        pts = [(0.0, 0.0), (100.0, 0.0)]
+        segs = stitch_segments_on_open_polyline(pts, spacing=10, stitch_length=3, stitch_angle_deg=90)
+        for a, b in segs:
+            self.assertAlmostEqual(a.x, b.x, places=4)   # same X → vertical
+
+    def test_empty_polyline_returns_empty(self):
+        segs = stitch_segments_on_open_polyline([], spacing=10, stitch_length=3)
+        self.assertEqual(segs, [])
+
+    def test_zero_length_segment_skipped(self):
+        pts = [(0.0, 0.0), (0.0, 0.0), (50.0, 0.0)]
+        segs = stitch_segments_on_open_polyline(pts, spacing=10, stitch_length=3)
+        self.assertGreater(len(segs), 0)
+
+    def test_count_scales_with_path_length(self):
+        short = stitch_segments_on_open_polyline([(0, 0), (30, 0)], spacing=10, stitch_length=2)
+        long_ = stitch_segments_on_open_polyline([(0, 0), (60, 0)], spacing=10, stitch_length=2)
+        self.assertGreater(len(long_), len(short))
+
+
+# ===========================================================================
+# Polygon — construction
+# ===========================================================================
+
+class TestPolygonConstruction(unittest.TestCase):
+    def _diamond(self):
+        return Polygon([(50, 0), (100, 50), (50, 100), (0, 50)])
+
+    def test_stores_points(self):
+        pts = [(0, 0), (10, 0), (10, 10)]
+        p = Polygon(pts)
+        self.assertEqual(p.points, pts)
+
+    def test_smooth_default_false(self):
+        self.assertFalse(Polygon([(0, 0), (1, 0), (1, 1)]).smooth)
+
+    def test_from_mirror_doubles_interior_points(self):
+        half = [(50, 0), (20, 50), (50, 100)]
+        p = Polygon.from_mirror(half, center_x=50)
+        # 3 points in left half; endpoints shared → full polygon has 3+(3-2)=4 points
+        self.assertEqual(len(p.points), 4)
+
+    def test_from_mirror_symmetry(self):
+        half = [(50, 0), (20, 30), (50, 60)]
+        p = Polygon.from_mirror(half, center_x=50)
+        xs = [pt[0] for pt in p.points]
+        # Leftmost and rightmost should be equidistant from center
+        self.assertAlmostEqual(min(xs) + max(xs), 100.0, places=5)
+
+    def test_from_mirror_smooth_flag_propagated(self):
+        half = [(50, 0), (20, 50), (50, 100)]
+        self.assertTrue(Polygon.from_mirror(half, 50, smooth=True).smooth)
+        self.assertFalse(Polygon.from_mirror(half, 50, smooth=False).smooth)
+
+
+# ===========================================================================
+# Polygon — path_d
+# ===========================================================================
+
+class TestPolygonPathD(unittest.TestCase):
+    def test_straight_starts_with_M_ends_with_Z(self):
+        p = Polygon([(0, 0), (10, 0), (10, 10)], smooth=False)
+        d = p.path_d()
+        self.assertTrue(d.startswith("M"))
+        self.assertTrue(d.endswith("Z"))
+
+    def test_smooth_contains_Q(self):
+        p = Polygon([(0, 0), (10, 0), (10, 10), (0, 10)], smooth=True)
+        self.assertIn("Q", p.path_d())
+
+    def test_smooth_false_no_Q(self):
+        p = Polygon([(0, 0), (10, 0), (10, 10)], smooth=False)
+        self.assertNotIn("Q", p.path_d())
+
+    def test_coordinates_present_in_path(self):
+        p = Polygon([(3.0, 7.0), (13.0, 7.0), (8.0, 17.0)], smooth=False)
+        d = p.path_d()
+        self.assertIn("3.000", d)
+        self.assertIn("17.000", d)
+
+
+# ===========================================================================
+# Polygon — hole_points
+# ===========================================================================
+
+class TestPolygonHolePoints(unittest.TestCase):
+    def _square(self):
+        # CW square in SVG (Y-down)
+        return Polygon([(0, 0), (60, 0), (60, 60), (0, 60)])
+
+    def test_returns_points(self):
+        pts = self._square().hole_points(spacing=10, inset=5)
+        self.assertGreater(len(pts), 0)
+        for p in pts:
+            self.assertIsInstance(p, Point)
+
+    def test_inset_moves_points_inward(self):
+        pts = self._square().hole_points(spacing=10, inset=5)
+        for p in pts:
+            self.assertGreater(p.x, -0.1)
+            self.assertGreater(p.y, -0.1)
+            self.assertLess(p.x, 60.1)
+            self.assertLess(p.y, 60.1)
+
+    def test_zero_inset_still_works(self):
+        pts = self._square().hole_points(spacing=10, inset=0)
+        self.assertGreater(len(pts), 0)
+
+    def test_no_duplicates(self):
+        pts = self._square().hole_points(spacing=10, inset=5)
+        keys = [(round(p.x, 3), round(p.y, 3)) for p in pts]
+        self.assertEqual(len(keys), len(set(keys)))
+
+    def test_from_mirror_shape_has_holes(self):
+        half = [(50, 5), (20, 40), (50, 75)]
+        shape = Polygon.from_mirror(half, center_x=50)
+        pts = shape.hole_points(spacing=8, inset=4)
+        self.assertGreater(len(pts), 0)
+
+
+# ===========================================================================
+# Polygon — stitch_segments
+# ===========================================================================
+
+class TestPolygonStitchSegments(unittest.TestCase):
+    def _square(self):
+        return Polygon([(0, 0), (60, 0), (60, 60), (0, 60)])
+
+    def test_returns_point_pairs(self):
+        segs = self._square().stitch_segments(spacing=10, inset=5, stitch_length=3)
+        for a, b in segs:
+            self.assertIsInstance(a, Point)
+            self.assertIsInstance(b, Point)
+
+    def test_nonempty(self):
+        segs = self._square().stitch_segments(spacing=10, inset=5, stitch_length=3)
+        self.assertGreater(len(segs), 0)
+
+    def test_stitch_length_respected(self):
+        segs = self._square().stitch_segments(spacing=10, inset=5, stitch_length=3)
+        for a, b in segs:
+            self.assertLessEqual(distance(a, b), 3.0 + APPROX)
+
+    def test_angle_changes_orientation(self):
+        segs_0  = self._square().stitch_segments(spacing=10, inset=5, stitch_length=3, stitch_angle_deg=0)
+        segs_45 = self._square().stitch_segments(spacing=10, inset=5, stitch_length=3, stitch_angle_deg=45)
+        coords_0  = [(round(a.x,2), round(a.y,2)) for a,b in segs_0]
+        coords_45 = [(round(a.x,2), round(a.y,2)) for a,b in segs_45]
+        self.assertNotEqual(coords_0, coords_45)
+
+    def test_smooth_polygon_same_count_as_straight(self):
+        pts = [(0, 0), (60, 0), (60, 60), (0, 60)]
+        straight = Polygon(pts, smooth=False).stitch_segments(spacing=10, inset=5, stitch_length=3)
+        smooth   = Polygon(pts, smooth=True ).stitch_segments(spacing=10, inset=5, stitch_length=3)
+        # Both use the same inset polygon → same count
+        self.assertEqual(len(straight), len(smooth))
+
+    def test_from_mirror_stitch_segments(self):
+        half = [(50, 5), (20, 40), (50, 75)]
+        shape = Polygon.from_mirror(half, center_x=50)
+        segs = shape.stitch_segments(spacing=8, inset=4, stitch_length=3)
+        self.assertGreater(len(segs), 0)

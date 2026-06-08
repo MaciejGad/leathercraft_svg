@@ -197,6 +197,79 @@ def _rounded_triangle_stitch_rounded_path() -> bytes:
     return render(doc)
 
 
+def _polygon_straight_holes() -> bytes:
+    from leathercraft_svg import Polygon, SvgDocument
+    doc = SvgDocument(130, 90)
+    shape = Polygon(
+        [(10, 5), (120, 5), (120, 85), (10, 85)],
+        smooth=False,
+    )
+    doc.add_shape(shape, layer="cut")
+    doc.add_holes(shape, spacing=8.0, hole_radius=1.2, inset=6.0, layer="stitch")
+    return render(doc)
+
+
+def _polygon_smooth_holes() -> bytes:
+    from leathercraft_svg import Polygon, SvgDocument
+    doc = SvgDocument(130, 90)
+    shape = Polygon(
+        [(10, 5), (65, 5), (120, 5), (120, 85), (65, 85), (10, 85)],
+        smooth=True,
+    )
+    doc.add_shape(shape, layer="cut")
+    doc.add_holes(shape, spacing=8.0, hole_radius=1.2, inset=6.0, layer="stitch")
+    return render(doc)
+
+
+def _polygon_from_mirror_holes() -> bytes:
+    from leathercraft_svg import Polygon, SvgDocument
+    doc = SvgDocument(150, 100)
+    left_half = [
+        (75, 5),
+        (40, 10),
+        (20, 50),
+        (40, 90),
+        (75, 95),
+    ]
+    shape = Polygon.from_mirror(left_half, center_x=75, smooth=True)
+    doc.add_shape(shape, layer="cut")
+    doc.add_holes(shape, spacing=8.0, hole_radius=1.2, inset=5.0, layer="stitch")
+    return render(doc)
+
+
+def _polygon_from_mirror_stitch() -> bytes:
+    from leathercraft_svg import Polygon, SvgDocument
+    doc = SvgDocument(150, 100)
+    left_half = [
+        (75, 5),
+        (40, 10),
+        (20, 50),
+        (40, 90),
+        (75, 95),
+    ]
+    shape = Polygon.from_mirror(left_half, center_x=75, smooth=True)
+    doc.add_shape(shape, layer="cut")
+    doc.add_stitch_pattern(
+        shape, spacing=8.0, stitch_length=3.5, stitch_angle_deg=45.0,
+        inset=5.0, layer="stitch", stitch_thickness=0.8,
+    )
+    return render(doc)
+
+
+def _polyline_offset_stitch() -> bytes:
+    from leathercraft_svg import SvgDocument, StrokeStyle, offset_polyline, mirror_polyline
+    doc = SvgDocument(150, 100, styles={
+        "cut":    StrokeStyle("#ff0000", 0.12),
+        "stitch": StrokeStyle("#0000ff", 0.35),
+    })
+    left_edge = [(30, 10), (15, 50), (30, 90)]
+    left_seam  = offset_polyline(left_edge, distance=4.0, side="right")
+    right_seam = mirror_polyline(left_seam, center_x=75)
+    doc.add_stitch_on_polyline(left_seam,  spacing=6, stitch_length=2.4, layer="stitch")
+    doc.add_stitch_on_polyline(right_seam, spacing=6, stitch_length=2.4, layer="stitch")
+    return render(doc)
+
+
 def _all_shapes_gallery() -> bytes:
     """Mirrors the layout produced by all_shapes.py."""
     from leathercraft_svg import (
@@ -262,6 +335,11 @@ SCENARIOS: list[tuple[str, object]] = [
     ("rounded_triangle_holes_rounded_path.png",  _rounded_triangle_holes_rounded_path),
     ("rounded_triangle_stitch_rounded_path.png", _rounded_triangle_stitch_rounded_path),
     ("all_shapes_gallery.png",                   _all_shapes_gallery),
+    ("polygon_straight_holes.png",               _polygon_straight_holes),
+    ("polygon_smooth_holes.png",                 _polygon_smooth_holes),
+    ("polygon_from_mirror_holes.png",            _polygon_from_mirror_holes),
+    ("polygon_from_mirror_stitch.png",           _polygon_from_mirror_stitch),
+    ("polyline_offset_stitch.png",               _polyline_offset_stitch),
 ]
 
 

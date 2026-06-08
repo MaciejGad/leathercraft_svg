@@ -210,6 +210,19 @@ Parameters:
 - `stitch_thickness` - optional per-pattern stroke width override (if `None`, the layer default is used).
 - `stitch_angle_deg` - stitch tilt angle in degrees (default `0.0` = flat, custom values allowed, e.g. `45`).
 
+### `doc.add_stitch_on_polyline(points, spacing=5.0, stitch_length=2.0, stitch_angle_deg=0.0, layer="stitch", stitch_thickness=None)`
+
+Adds stitch marks distributed along an open polyline.
+
+Parameters:
+
+- `points` - list of `(x, y)` tuples,
+- `spacing` - distance between stitch centres,
+- `stitch_length` - length of each stitch,
+- `stitch_angle_deg` - tilt relative to the path direction,
+- `layer` - style layer,
+- `stitch_thickness` - optional stroke width override.
+
 ### `doc.save(path)`
 
 Saves the SVG to a file.
@@ -309,6 +322,65 @@ Parameters:
 - `p1`, `p2`, `p3` - vertices,
 - `radius` - corner rounding radius.
 
+### `Polygon(points, smooth=False)`
+
+Shape defined by an explicit list of `(x, y)` tuples.
+
+Parameters:
+
+- `points` - ordered list of `(x, y)` tuples forming a closed polygon,
+- `smooth` - if `True`, the outline is drawn with quadratic Bézier curves instead of straight lines.
+
+`hole_points(...)` and `stitch_segments(...)` offset the polygon boundary inward by `inset` automatically.
+
+#### `Polygon.from_mirror(half_points, center_x, smooth=False)`
+
+Builds a symmetric closed polygon from one half of the outline.
+
+`half_points` should start and end on the mirror axis (`x == center_x`). The mirrored right half is appended in reverse so the result forms one continuous closed loop.
+
+```python
+from leathercraft_svg import Polygon, SvgDocument
+
+doc = SvgDocument(150, 80)
+
+left_half = [
+    (75, 5),
+    (40, 5),
+    (20, 40),
+    (40, 75),
+    (75, 75),
+]
+
+shape = Polygon.from_mirror(left_half, center_x=75, smooth=True)
+doc.add_shape(shape, layer="cut")
+doc.add_holes(shape, spacing=8.0, hole_radius=1.2, inset=5.0, layer="stitch")
+doc.save("polygon.svg")
+```
+
+### `offset_polyline(points, distance, side="right", miter_limit=8.0)`
+
+Offsets an open polyline by `distance` mm.
+
+Parameters:
+
+- `points` - list of `(x, y)` tuples,
+- `distance` - offset distance in mm,
+- `side` - `"right"` or `"left"` relative to the path direction,
+- `miter_limit` - corners sharper than `distance × miter_limit` are bevelled.
+
+Returns a new `list[tuple[float, float]]`.
+
+### `mirror_polyline(points, center_x)`
+
+Mirrors a list of `(x, y)` tuples horizontally around `center_x`.
+
+Useful for generating the right-hand stitch seam from a left-hand one.
+
+### `stitch_segments_on_open_polyline(points, spacing, stitch_length, stitch_angle_deg=0.0)`
+
+Returns stitch segments (`list[tuple[Point, Point]]`) placed every `spacing` mm along an open polyline. The first stitch is placed `spacing` mm from the path start.
+
 ## Shared `hole_points(...)` Parameters
 
 All shapes implement the method:
@@ -365,6 +437,46 @@ doc.save("triangle.svg")
 doc.save_png("output.png", background_color="white")
 ```
 
+### Symmetric Polygon with stitch holes
+
+```python
+from leathercraft_svg import Polygon, SvgDocument
+
+doc = SvgDocument(150, 80)
+
+left_half = [
+    (75, 5),
+    (40, 5),
+    (20, 40),
+    (40, 75),
+    (75, 75),
+]
+
+shape = Polygon.from_mirror(left_half, center_x=75, smooth=True)
+doc.add_shape(shape, layer="cut")
+doc.add_holes(shape, spacing=8.0, hole_radius=1.2, inset=5.0, layer="stitch")
+doc.save("polygon.svg")
+```
+
+### Open polyline with offset stitch seam
+
+```python
+from leathercraft_svg import SvgDocument, StrokeStyle, offset_polyline, mirror_polyline
+
+doc = SvgDocument(150, 100, styles={
+    "cut":    StrokeStyle("#ff0000", 0.12),
+    "stitch": StrokeStyle("#0000ff", 0.35),
+})
+
+left_edge = [(30, 10), (20, 50), (30, 90)]
+left_seam  = offset_polyline(left_edge, distance=4.0, side="right")
+right_seam = mirror_polyline(left_seam, center_x=75)
+
+doc.add_stitch_on_polyline(left_seam,  spacing=6, stitch_length=2.4, layer="stitch")
+doc.add_stitch_on_polyline(right_seam, spacing=6, stitch_length=2.4, layer="stitch")
+doc.save("seam.svg")
+```
+
 ### Laser stitch pattern instead of holes
 
 ```python
@@ -397,6 +509,7 @@ If you use an external rasterizer, prefer tools with strong inline SVG support, 
 - `leathercraft_svg.py` - library and geometry models,
 - `sample.py` - focused rounded rectangle stitch example,
 - `all_shapes.py` - overview example that renders all shape variants,
+- `lighter_sleeve.py` - symmetric leather pattern using `Polygon.from_mirror`,
 - `README.md` - documentation.
 
 ## Practical Notes

@@ -59,6 +59,7 @@ SvgDocument(width_mm: float, height_mm: float, styles: dict[str, StrokeStyle] | 
 | `save(path)` | Write SVG file |
 | `save_png(path, background_color="white")` | Write PNG via CairoSVG |
 | `to_svg()` | Return SVG as a string |
+| `add_stitch_on_polyline(points, ...)` | Add stitch marks along an open `(x,y)` polyline |
 
 ### `add_holes` signature
 
@@ -72,6 +73,19 @@ doc.add_holes(
     layer="cut",
     include_corners=False,
     rounded_path=False,   # follow rounded contour (RoundedTriangle only)
+)
+```
+
+### `add_stitch_on_polyline` signature
+
+```python
+doc.add_stitch_on_polyline(
+    points,                  # list of (x, y) tuples — open polyline
+    spacing=5.0,             # mm between stitch centres
+    stitch_length=2.0,       # mm length of each stitch
+    stitch_angle_deg=0.0,    # 0 = parallel to path, 45 = diagonal
+    layer="stitch",
+    stitch_thickness=None,   # overrides layer stroke width
 )
 ```
 
@@ -250,6 +264,92 @@ doc.add_holes(shape, spacing=8.0, hole_radius=1.5, inset=6.0, rounded_path=True)
 
 ---
 
+### Polygon
+
+```python
+Polygon(points: list[tuple[float, float]], smooth: bool = False)
+```
+
+Shape defined by an explicit `(x, y)` list. `smooth=True` draws the outline
+with quadratic Bézier curves (each point becomes a control point; midpoints
+are the anchor points). `hole_points` and `stitch_segments` offset the
+boundary inward by `inset` automatically — no manual offset needed.
+
+**The `edges` parameter is ignored** — Polygon always uses the whole boundary.
+
+```python
+from leathercraft_svg import Polygon, SvgDocument
+
+doc = SvgDocument(150, 80)
+shape = Polygon(
+    points=[(10,5), (75,5), (140,5), (140,75), (75,75), (10,75)],
+    smooth=False,
+)
+doc.add_shape(shape, layer="cut")
+doc.add_holes(shape, spacing=8.0, hole_radius=1.2, inset=5.0, layer="stitch")
+```
+
+#### `Polygon.from_mirror(half_points, center_x, smooth=False)`
+
+Builds a symmetric shape from one half. `half_points` must start **and** end
+on the mirror axis (`x == center_x`). The mirrored right half is appended in
+reverse to form one continuous closed loop.
+
+```python
+from leathercraft_svg import Polygon, SvgDocument
+
+doc = SvgDocument(150, 80)
+
+left_half = [
+    (75, 5),    # top-centre — on the mirror axis
+    (40, 5),
+    (20, 40),
+    (40, 75),
+    (75, 75),   # bottom-centre — on the mirror axis
+]
+
+shape = Polygon.from_mirror(left_half, center_x=75, smooth=True)
+doc.add_shape(shape, layer="cut")
+doc.add_holes(shape, spacing=8.0, hole_radius=1.2, inset=5.0, layer="stitch")
+doc.save("polygon.svg")
+```
+
+---
+
+### Polyline utilities
+
+These functions work with plain `list[tuple[float, float]]` point lists and
+are independent of any shape class.
+
+#### `offset_polyline(points, distance, side="right", miter_limit=8.0)`
+
+Offsets an **open** polyline. `side` is the **right-hand or left-hand side relative to
+the direction of travel** (not the screen). In SVG (Y grows downward):
+- A segment going **right** → `side="right"` offsets **upward** (−Y).
+- A segment going **down** → `side="right"` offsets **rightward** (+X).
+
+For a left-edge polyline running top→bottom, `side="right"` offsets inward (toward the centre).
+
+```python
+from leathercraft_svg import offset_polyline, mirror_polyline
+
+left_edge = [(30, 10), (20, 50), (30, 90)]
+left_seam  = offset_polyline(left_edge, distance=4.0, side="right")
+right_seam = mirror_polyline(left_seam, center_x=75)
+```
+
+#### `mirror_polyline(points, center_x)`
+
+Mirrors every point horizontally around `center_x`. Returns a new list.
+
+#### `stitch_segments_on_open_polyline(points, spacing, stitch_length, stitch_angle_deg=0.0)`
+
+Returns `list[tuple[Point, Point]]` — stitch segments placed every `spacing`
+mm along an open polyline. First stitch at `1×spacing` from the path start.
+Use `doc.add_stitch_on_polyline` to render the result directly.
+
+---
+
 ## Key parameters — rules of thumb
 
 | Parameter | Typical range | Effect |
@@ -370,6 +470,46 @@ doc.add_holes(shape, spacing=8.0, hole_radius=1.2, inset=5.0, layer="stitch")
 doc.save("custom_styles.svg")
 ```
 
+### 8. Symmetric Polygon with stitch holes
+
+```python
+from leathercraft_svg import Polygon, SvgDocument
+
+doc = SvgDocument(150, 80)
+
+left_half = [
+    (75, 5),
+    (40, 5),
+    (20, 40),
+    (40, 75),
+    (75, 75),
+]
+
+shape = Polygon.from_mirror(left_half, center_x=75, smooth=True)
+doc.add_shape(shape, layer="cut")
+doc.add_holes(shape, spacing=8.0, hole_radius=1.2, inset=5.0, layer="stitch")
+doc.save("polygon_mirror.svg")
+```
+
+### 9. Open polyline stitch seam (e.g. sleeve side edges)
+
+```python
+from leathercraft_svg import SvgDocument, StrokeStyle, offset_polyline, mirror_polyline
+
+doc = SvgDocument(150, 100, styles={
+    "cut":    StrokeStyle("#ff0000", 0.12),
+    "stitch": StrokeStyle("#0000ff", 0.35),
+})
+
+left_edge = [(30, 10), (20, 50), (30, 90)]
+left_seam  = offset_polyline(left_edge, distance=4.0, side="right")
+right_seam = mirror_polyline(left_seam, center_x=75)
+
+doc.add_stitch_on_polyline(left_seam,  spacing=6, stitch_length=2.4, layer="stitch")
+doc.add_stitch_on_polyline(right_seam, spacing=6, stitch_length=2.4, layer="stitch")
+doc.save("seam.svg")
+```
+
 ### 7. Mix holes and raw geometry
 
 ```python
@@ -400,6 +540,9 @@ doc.save("mixed.svg")
 | Forgetting `layer="stitch"` for holes | Default is `"cut"` (red); use `"stitch"` (blue) for stitching guides |
 | `radius` too large on RoundedRectangle | Automatically clamped — no error, but visual result may surprise you |
 | Edge index out of range | Rectangle/RoundedRectangle: 0–3; Triangle/RoundedTriangle: 0–2 |
+| `Polygon.from_mirror` half doesn't start/end on axis | Both endpoints must have `x == center_x`; otherwise the seam won't close |
+| `offset_polyline` side="right" goes outward | For a left edge going top→bottom, "right" is inward. Swap to "left" if offset goes the wrong way |
+| `smooth=True` on a polygon with few/collinear points | Works but may produce unexpected curves; preview the SVG before cutting |
 
 ---
 

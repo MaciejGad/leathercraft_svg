@@ -1248,9 +1248,15 @@ def offset_polyline(
     """
     Offset an open polyline by ``distance`` mm on the given ``side``.
 
-    In SVG coordinates Y grows downward. For a polyline running left-to-right
-    along the top, ``side="right"`` moves the offset downward (toward the
-    inside of a typical shape), and ``side="left"`` moves it upward.
+    ``side`` means the right-hand or left-hand side relative to the direction
+    of travel along the polyline (independent of screen orientation).
+
+    In SVG (Y grows downward):
+    - A segment going **right** → ``side="right"`` offsets **upward** (−Y).
+    - A segment going **down**  → ``side="right"`` offsets **rightward** (+X).
+
+    For the lighter-sleeve left edge (running top→bottom), ``side="right"``
+    therefore moves the seam inward (toward the centre).
 
     Sharp corners are mitered up to ``miter_limit × distance``. Beyond that
     limit the corner is bevel-cut (averaged normals are used instead).
@@ -1337,13 +1343,14 @@ def _offset_closed_polygon(
         return list(points)
 
     # Signed area via the Shoelace formula.
-    # Positive → CW winding in SVG (Y down); inward is to the right of each edge.
-    # Negative → CCW winding; inward is to the left.
+    # Positive → CW winding in SVG (Y down) = CCW in standard math coords.
+    # For a CW polygon the interior lies to the LEFT of each edge, so use
+    # side="left" to offset inward.  For CCW use side="right".
     area2 = sum(
         points[i][0] * points[(i + 1) % n][1] - points[(i + 1) % n][0] * points[i][1]
         for i in range(n)
     )
-    side = "right" if area2 > 0 else "left"
+    side = "left" if area2 > 0 else "right"
 
     offset_segs: list[tuple[tuple, tuple, tuple]] = []
     for i in range(n):

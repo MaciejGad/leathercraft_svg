@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leathercraft Editor</title>
+
+  <!-- CodeMirror 5 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/theme/dracula.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/addon/hint/show-hint.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/addon/hint/show-hint.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/addon/edit/closebrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/addon/comment/comment.min.js"></script>
+
+  <style>
+    /* ── Reset & base ──────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: system-ui, -apple-system, sans-serif; }
+    body { display: flex; flex-direction: column; background: #1e1e2e; color: #cdd6f4; overflow: hidden; }
+
+    /* ── Toolbar ───────────────────────────────────────────────── */
+    #toolbar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 8px 16px; background: #181825; border-bottom: 1px solid #313244;
+      flex-shrink: 0; height: 48px;
+    }
+    #toolbar .logo { font-weight: 700; font-size: 15px; letter-spacing: .5px; color: #cba6f7; }
+    #toolbar .logo span { color: #89b4fa; }
+    #status {
+      font-size: 12px; padding: 3px 10px; border-radius: 12px;
+      background: #313244; color: #a6adc8; transition: background .2s, color .2s;
+      white-space: nowrap;
+    }
+    #status.ok  { background: #1e3a2e; color: #a6e3a1; }
+    #status.err { background: #3a1e2e; color: #f38ba8; }
+    #status.busy { background: #2e2e1e; color: #f9e2af; }
+
+    .spacer { flex: 1; }
+
+    .btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 6px; border: 1px solid #45475a;
+      background: #313244; color: #cdd6f4; font-size: 12px; font-weight: 500;
+      cursor: pointer; transition: background .15s, border-color .15s; white-space: nowrap;
+    }
+    .btn:hover  { background: #45475a; border-color: #585b70; }
+    .btn:active { background: #585b70; }
+    .btn.primary { background: #4c4f69; border-color: #6c6f85; }
+    .btn svg { width: 13px; height: 13px; }
+
+    /* ── Split layout ──────────────────────────────────────────── */
+    #split { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Editor panel ──────────────────────────────────────────── */
+    #editor-panel {
+      display: flex; flex-direction: column; flex: 0 0 50%; min-width: 200px;
+      overflow: hidden; border-right: 1px solid #313244;
+    }
+    .panel-header {
+      padding: 5px 12px; font-size: 11px; font-weight: 600; letter-spacing: .8px;
+      text-transform: uppercase; color: #6c6f85; background: #1e1e2e;
+      border-bottom: 1px solid #313244; flex-shrink: 0;
+    }
+    .CodeMirror { height: 100% !important; font-size: 13px; font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace; line-height: 1.6; }
+    .CodeMirror-scroll { padding-bottom: 0; }
+
+    /* lcraft syntax colors (overriding Dracula where needed) */
+    .cm-keyword     { color: #cba6f7 !important; font-weight: 600; }
+    .cm-property    { color: #89b4fa !important; }
+    .cm-atom        { color: #a6e3a1 !important; }
+    .cm-number      { color: #fab387 !important; }
+    .cm-comment     { color: #6272a4 !important; font-style: italic; }
+    .cm-variable    { color: #f5c2e7 !important; }   /* shape id */
+    .cm-def         { color: #f5c2e7 !important; font-weight: 600; }
+
+    #error-bar {
+      padding: 6px 12px; font-size: 12px; font-family: monospace;
+      background: #2a1020; color: #f38ba8; border-top: 1px solid #5a1030;
+      white-space: pre-wrap; word-break: break-word; max-height: 100px;
+      overflow-y: auto; flex-shrink: 0; display: none;
+    }
+    #error-bar.visible { display: block; }
+
+    /* ── Resize handle ─────────────────────────────────────────── */
+    #resizer {
+      width: 5px; background: #313244; cursor: col-resize; flex-shrink: 0;
+      transition: background .15s;
+    }
+    #resizer:hover, #resizer.active { background: #cba6f7; }
+
+    /* ── Preview panel ─────────────────────────────────────────── */
+    #preview-panel {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden;
+      background: #181825;
+    }
+    #preview-scroll {
+      flex: 1; overflow: auto; display: flex; align-items: center;
+      justify-content: center; padding: 24px;
+    }
+    #svg-container {
+      background: white; box-shadow: 0 4px 24px rgba(0,0,0,.5);
+      border-radius: 4px; display: inline-flex;
+      align-items: center; justify-content: center;
+      max-width: 100%; max-height: 100%;
+    }
+    #svg-container svg { display: block; max-width: 100%; max-height: calc(100vh - 140px); }
+    #preview-placeholder {
+      color: #45475a; font-size: 14px; text-align: center; line-height: 2;
+    }
+    #preview-placeholder code { font-size: 12px; color: #585b70; }
+
+    /* ── Autocomplete dropdown tweaks ──────────────────────────── */
+    .CodeMirror-hints {
+      background: #1e1e2e !important; border: 1px solid #45475a !important;
+      border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,.5);
+    }
+    .CodeMirror-hint { color: #cdd6f4 !important; padding: 3px 12px !important; font-size: 12px; }
+    .CodeMirror-hint-active { background: #313244 !important; color: #cba6f7 !important; }
+  </style>
+</head>
+<body>
+
+<!-- ── Toolbar ──────────────────────────────────────────────────── -->
+<div id="toolbar">
+  <div class="logo">leather<span>craft</span></div>
+  <div id="status">ready</div>
+  <div class="spacer"></div>
+
+  <button class="btn" id="btn-lcraft" title="Download .lcraft source">
+    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/><rect x="2" y="13" width="12" height="1.5" rx=".75"/></svg>
+    .lcraft
+  </button>
+  <button class="btn" id="btn-svg" title="Download compiled SVG">
+    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/><rect x="2" y="13" width="12" height="1.5" rx=".75"/></svg>
+    .svg
+  </button>
+  <button class="btn primary" id="btn-png" title="Download PNG (rendered on server)">
+    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/><rect x="2" y="13" width="12" height="1.5" rx=".75"/></svg>
+    .png
+  </button>
+</div>
+
+<!-- ── Split pane ───────────────────────────────────────────────── -->
+<div id="split">
+
+  <!-- Editor -->
+  <div id="editor-panel">
+    <div class="panel-header">editor — .lcraft</div>
+    <textarea id="editor"></textarea>
+    <div id="error-bar"></div>
+  </div>
+
+  <!-- Resize handle -->
+  <div id="resizer"></div>
+
+  <!-- Preview -->
+  <div id="preview-panel">
+    <div class="panel-header">preview</div>
+    <div id="preview-scroll">
+      <div id="svg-container">
+        <div id="preview-placeholder">
+          Type a pattern in the editor.<br>
+          <code>Ctrl+Space</code> for autocomplete &nbsp;·&nbsp; <code>Ctrl+/</code> to comment
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  1.  lcraft CodeMirror mode
+// ═══════════════════════════════════════════════════════════════════
+
+const BLOCK_STARTERS = new Set([
+  "rectangle","rounded_rectangle","circle","triangle","rounded_triangle",
+  "polygon","outer","stitches","holes","hole","path"
+]);
+const TOP_KEYWORDS = new Set(["pattern","size","export","end"]);
+const ALL_KEYWORDS = new Set([...BLOCK_STARTERS, ...TOP_KEYWORDS]);
+
+const PROPERTY_NAMES = new Set([
+  "at","radius","layer","edges","margin","spacing","length","angle",
+  "source","mirror","side","rounded_path","p1","p2","p3","smooth","step","count","from","to"
+]);
+
+const VALUE_ATOMS = new Set([
+  "all","top","bottom","left","right",
+  "cut","stitch","crease","guide",
+  "svg","png","pdf"
+]);
+
+CodeMirror.defineMode("lcraft", function() {
+  return {
+    startState: () => ({}),
+    token(stream) {
+      if (stream.eatSpace()) return null;
+
+      // Comment: # not followed by a hex colour
+      if (stream.peek() === "#") {
+        const rest = stream.string.slice(stream.pos + 1);
+        if (!/^[0-9a-fA-F]{3,8}(\s|$)/.test(rest)) {
+          stream.skipToEnd();
+          return "comment";
+        }
+      }
+
+      // Number (including negatives)
+      if (stream.match(/^-?[0-9]+(\.[0-9]+)?/)) return "number";
+
+      // Hex colour literal (e.g. #aa0000)
+      if (stream.match(/^#[0-9a-fA-F]{3,8}/)) return "atom";
+
+      // Identifier / keyword
+      if (stream.match(/^[a-zA-Z_][a-zA-Z0-9_]*/)) {
+        const word = stream.current();
+        if (ALL_KEYWORDS.has(word)) return "keyword";
+        if (PROPERTY_NAMES.has(word)) return "property";
+        if (VALUE_ATOMS.has(word)) return "atom";
+        return "variable";   // shape id
+      }
+
+      stream.next();
+      return null;
+    }
+  };
+});
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  2.  Autocomplete hint function
+// ═══════════════════════════════════════════════════════════════════
+
+// Properties valid inside each block type
+const BLOCK_PROPS = {
+  rectangle:          ["at","size","layer","end"],
+  rounded_rectangle:  ["at","size","radius","layer","end"],
+  circle:             ["at","radius","layer","end"],
+  triangle:           ["p1","p2","p3","at","size","layer","end"],
+  rounded_triangle:   ["p1","p2","p3","at","size","radius","layer","end"],
+  polygon:            ["layer","end"],
+  outer:              ["smooth","mirror","end"],
+  stitches:           ["source","edges","margin","spacing","length","angle","layer","mirror","side","rounded_path","path","end"],
+  holes:              ["source","edges","margin","spacing","radius","layer","rounded_path","end"],
+  hole:               ["at","radius","layer","mirror","from","to","step","count","end"],
+  path:               ["end"],
+};
+
+// Values suggested after specific properties
+const PROP_VALUES = {
+  layer:  ["cut","stitch","crease","guide"],
+  edges:  ["all","top","right","bottom","left","0","1","2"],
+  side:   ["right","left"],
+};
+
+// Find the innermost open block at the cursor, scanning backward
+function findCurrentBlock(editor, cursor) {
+  const depth = [];
+  for (let i = 0; i <= cursor.line; i++) {
+    const line = editor.getLine(i);
+    const maxCh = (i === cursor.line) ? cursor.ch : line.length;
+    const text = line.slice(0, maxCh).trim();
+    const first = text.split(/\s+/)[0];
+    if (!first) continue;
+    if (BLOCK_STARTERS.has(first)) {
+      depth.push(first);
+    } else if (first === "end") {
+      depth.pop();
+    }
+  }
+  return depth.length > 0 ? depth[depth.length - 1] : null;
+}
+
+function lcraft_hint(editor) {
+  const cursor = editor.getCursor();
+  const line   = editor.getLine(cursor.line);
+  const before = line.slice(0, cursor.ch);
+
+  // Find the word being typed
+  const wordMatch = before.match(/[a-zA-Z0-9_#]*$/);
+  const typed = wordMatch ? wordMatch[0] : "";
+  const from  = CodeMirror.Pos(cursor.line, cursor.ch - typed.length);
+
+  // What property are we providing a value for?
+  const propMatch = before.trimStart().match(/^([a-z_]+)\s+[a-zA-Z0-9_#]*$/);
+  const leadingProp = propMatch ? propMatch[1] : null;
+
+  let candidates = [];
+
+  if (leadingProp && PROP_VALUES[leadingProp]) {
+    // We're typing a value after a known property
+    candidates = PROP_VALUES[leadingProp];
+  } else {
+    const block = findCurrentBlock(editor, cursor);
+    if (block) {
+      candidates = BLOCK_PROPS[block] || [];
+    } else {
+      // Top level
+      candidates = [
+        "pattern","size","rectangle","rounded_rectangle","circle",
+        "triangle","rounded_triangle","polygon","stitches","holes","hole","export"
+      ];
+    }
+  }
+
+  const list = candidates.filter(c => c.startsWith(typed) && c !== typed);
+
+  if (!list.length) return null;
+
+  return { list, from, to: CodeMirror.Pos(cursor.line, cursor.ch) };
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  3.  Editor initialisation
+// ═══════════════════════════════════════════════════════════════════
+
+const DEFAULT_SOURCE = `pattern rectangle_panel
+size 120 80
+
+rectangle panel
+  at 10 10
+  size 100 60
+end
+
+stitches
+  source panel
+  edges all
+  margin 4
+  spacing 5
+  length 3
+end
+
+export rectangle_panel
+`;
+
+const editor = CodeMirror.fromTextArea(document.getElementById("editor"), {
+  mode: "lcraft",
+  theme: "dracula",
+  lineNumbers: true,
+  indentUnit: 2,
+  tabSize: 2,
+  indentWithTabs: false,
+  lineWrapping: false,
+  autofocus: true,
+  extraKeys: {
+    "Ctrl-Space": cm => cm.showHint({ hint: lcraft_hint, completeSingle: false }),
+    "Ctrl-/":     cm => cm.toggleComment(),
+    Tab: cm => {
+      if (cm.somethingSelected()) cm.indentSelection("add");
+      else cm.replaceSelection("  ");
+    },
+  },
+  hintOptions: { hint: lcraft_hint, completeSingle: false },
+});
+
+// Fill the editor to its container height
+editor.setSize("100%", "100%");
+editor.setValue(DEFAULT_SOURCE);
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  4.  Live compile (debounced)
+// ═══════════════════════════════════════════════════════════════════
+
+const statusEl  = document.getElementById("status");
+const errorBar  = document.getElementById("error-bar");
+const svgCont   = document.getElementById("svg-container");
+const placeholder = document.getElementById("preview-placeholder");
+
+let lastGoodSvg   = null;  // keep last valid SVG so it stays visible on error
+let compileTimer  = null;
+let currentSource = "";
+
+function setStatus(state, text) {
+  statusEl.className = state;
+  statusEl.textContent = text;
+}
+
+async function compile(source) {
+  setStatus("busy", "compiling…");
+  try {
+    const res = await fetch("/api/compile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source }),
+    });
+    const data = await res.json();
+
+    if (data.svg) {
+      // Success
+      lastGoodSvg = data.svg;
+      renderSvg(data.svg);
+      errorBar.classList.remove("visible");
+      setStatus("ok", "compiled ✓");
+    } else {
+      // DSL error — show old SVG greyed out
+      if (lastGoodSvg) renderSvg(lastGoodSvg, true);
+      showError(data.error || "Unknown error");
+      setStatus("err", "error");
+    }
+  } catch (e) {
+    showError("Server unreachable: " + e.message);
+    setStatus("err", "error");
+  }
+}
+
+function renderSvg(svgStr, dimmed = false) {
+  if (placeholder.parentNode) placeholder.remove();
+
+  // Strip the <?xml …?> PI — it becomes a bogus comment via innerHTML
+  // and can confuse querySelector in some browsers.
+  const clean = svgStr.replace(/^<\?xml[^?]*\?>\s*/m, '');
+  svgCont.innerHTML = clean;
+
+  const svgEl = svgCont.querySelector("svg");
+  if (!svgEl) return;
+
+  // Scale SVG to fit the available preview area using viewBox dimensions.
+  // Without explicit px sizes the inline SVG collapses when the container
+  // has no defined size (the mm attribute values are removed by removeAttribute).
+  const vb = svgEl.viewBox.baseVal;
+  if (vb && vb.width > 0 && vb.height > 0) {
+    const scroll = document.getElementById("preview-scroll");
+    const avW    = Math.max(100, scroll.clientWidth  - 48);
+    const avH    = Math.max(100, scroll.clientHeight - 48);
+    const scale  = Math.min(avW / vb.width, avH / vb.height);
+    svgEl.setAttribute("width",  Math.round(vb.width  * scale) + "px");
+    svgEl.setAttribute("height", Math.round(vb.height * scale) + "px");
+  } else {
+    // Fallback for SVGs without viewBox
+    svgEl.style.maxWidth  = "calc(100vw - 80px)";
+    svgEl.style.maxHeight = "calc(100vh - 140px)";
+  }
+
+  svgEl.style.display    = "block";
+  svgEl.style.opacity    = dimmed ? "0.4" : "1";
+  svgEl.style.transition = "opacity .2s";
+}
+
+function showError(msg) {
+  errorBar.textContent = msg;
+  errorBar.classList.add("visible");
+}
+
+editor.on("change", () => {
+  clearTimeout(compileTimer);
+  const source = editor.getValue();
+  currentSource = source;
+  setStatus("busy", "…");
+  compileTimer = setTimeout(() => compile(source), 450);
+
+  // Trigger autocomplete while typing (only for word chars)
+  const cur = editor.getCursor();
+  const line = editor.getLine(cur.line).slice(0, cur.ch);
+  if (/[a-zA-Z_]$/.test(line)) {
+    editor.showHint({ hint: lcraft_hint, completeSingle: false });
+  }
+});
+
+// Initial compile
+compile(DEFAULT_SOURCE);
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  5.  Download buttons
+// ═══════════════════════════════════════════════════════════════════
+
+function patternName() {
+  const m = editor.getValue().match(/^pattern\s+(\S+)/m);
+  return m ? m[1] : "pattern";
+}
+
+function clientDownload(content, mimeType, filename) {
+  const blob = new Blob([content], { type: mimeType });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement("a"), { href: url, download: filename });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById("btn-lcraft").addEventListener("click", () => {
+  clientDownload(editor.getValue(), "text/plain", patternName() + ".lcraft");
+});
+
+document.getElementById("btn-svg").addEventListener("click", async () => {
+  if (!lastGoodSvg) return alert("Compile successfully first.");
+  clientDownload(lastGoodSvg, "image/svg+xml", patternName() + ".svg");
+});
+
+document.getElementById("btn-png").addEventListener("click", async () => {
+  const source = editor.getValue();
+  setStatus("busy", "exporting PNG…");
+  try {
+    const res = await fetch("/api/export/png", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source, filename: patternName() }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert("PNG export failed: " + (err.error || res.statusText));
+      setStatus("err", "error");
+      return;
+    }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement("a"),
+                   { href: url, download: patternName() + ".png" });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setStatus("ok", "compiled ✓");
+  } catch (e) {
+    alert("Server error: " + e.message);
+    setStatus("err", "error");
+  }
+});
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  6.  Resizable split pane
+// ═══════════════════════════════════════════════════════════════════
+
+const resizer     = document.getElementById("resizer");
+const editorPanel = document.getElementById("editor-panel");
+const splitEl     = document.getElementById("split");
+
+let isResizing = false;
+
+resizer.addEventListener("mousedown", e => {
+  isResizing = true;
+  resizer.classList.add("active");
+  document.body.style.cursor    = "col-resize";
+  document.body.style.userSelect = "none";
+  e.preventDefault();
+});
+
+document.addEventListener("mousemove", e => {
+  if (!isResizing) return;
+  const rect    = splitEl.getBoundingClientRect();
+  const newWidth = Math.max(200, Math.min(e.clientX - rect.left, rect.width - 200));
+  editorPanel.style.flex  = "none";
+  editorPanel.style.width = newWidth + "px";
+  editor.refresh();
+});
+
+document.addEventListener("mouseup", () => {
+  if (!isResizing) return;
+  isResizing = false;
+  resizer.classList.remove("active");
+  document.body.style.cursor     = "";
+  document.body.style.userSelect = "";
+  editor.refresh();
+});
+</script>
+</body>
+</html>

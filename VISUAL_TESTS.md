@@ -371,6 +371,47 @@ doc.add_stitch_pattern(
 
 ![Ellipse stitches](tests/baselines/ellipse_stitches.png)
 
+## Arc Wedge Stitch Pattern
+
+Tests stitches following the closed contour of a half-circle wedge (arc + straight edge).
+
+```python
+doc = SvgDocument(130, 80)
+shape = Arc(65, 70, 55, start_angle=180, end_angle=360)
+
+doc.add_shape(shape, layer="cut")
+doc.add_stitch_pattern(
+    shape,
+    spacing=6.0,
+    stitch_length=3.0,
+    inset=5.0,
+    layer="stitch",
+    stitch_thickness=0.8,
+)
+```
+
+![Arc wedge stitches](tests/baselines/arc_wedge_stitches.png)
+
+## Arc Ring Segment Hole Pattern
+
+Tests holes on a ring segment (annulus slice) — outer arc, inner arc, and both end caps.
+
+```python
+doc = SvgDocument(130, 80)
+shape = Arc(65, 70, 55, start_angle=180, end_angle=360, inner_radius=30)
+
+doc.add_shape(shape, layer="cut")
+doc.add_holes(
+    shape,
+    spacing=8.0,
+    hole_radius=1.4,
+    inset=5.0,
+    layer="stitch",
+)
+```
+
+![Arc ring segment holes](tests/baselines/arc_ring_segment_holes.png)
+
 ## Triangle Hole Pattern On All Edges
 
 Tests holes around a triangle created from explicit points.

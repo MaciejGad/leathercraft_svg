@@ -12,6 +12,7 @@ import math
 import unittest
 
 from leathercraft_svg import (
+    Arc,
     Circle,
     Ellipse,
     Point,
@@ -1319,6 +1320,91 @@ class TestPerCornerRoundedRectangle(unittest.TestCase):
         doc.add_shape(s, layer="cut")
         doc.add_stitch_pattern(s, spacing=6, stitch_length=3, inset=5)
         doc.add_holes(s, spacing=10, hole_radius=1.2, inset=5)
+        out = doc.to_svg()
+        self.assertIn("<path", out)
+        self.assertIn("<line", out)
+        self.assertIn("<circle", out)
+
+
+class TestArcPathD(unittest.TestCase):
+    def test_wedge_starts_at_center(self):
+        d = Arc(60, 60, 50, start_angle=-90, end_angle=0).path_d()
+        self.assertTrue(d.startswith("M 60.000 60.000"))
+        self.assertEqual(d.count("A"), 1)
+        self.assertTrue(d.rstrip().endswith("Z"))
+
+    def test_ring_segment_has_two_arcs(self):
+        d = Arc(60, 60, 50, start_angle=180, end_angle=360, inner_radius=30).path_d()
+        self.assertEqual(d.count("A 50.000 50.000"), 1)
+        self.assertEqual(d.count("A 30.000 30.000"), 1)
+
+    def test_large_arc_flag_set_above_180(self):
+        d = Arc(60, 60, 50, start_angle=0, end_angle=270).path_d()
+        self.assertIn("A 50.000 50.000 0 1 1", d)
+
+    def test_small_arc_flag_below_180(self):
+        d = Arc(60, 60, 50, start_angle=0, end_angle=90).path_d()
+        self.assertIn("A 50.000 50.000 0 0 1", d)
+
+    def test_wraparound_span(self):
+        a = Arc(60, 60, 40, start_angle=300, end_angle=60)
+        start, span = a._span_rad()
+        self.assertAlmostEqual(span, 120 * math.pi / 180, places=5)
+
+
+class TestArcHolePoints(unittest.TestCase):
+    def test_wedge_holes_inside_shape(self):
+        a = Arc(60, 60, 50, start_angle=-90, end_angle=0)
+        pts = a.hole_points(spacing=6, inset=4)
+        self.assertGreater(len(pts), 0)
+        for p in pts:
+            dist = math.hypot(p.x - 60, p.y - 60)
+            self.assertLessEqual(dist, 50.01)
+            # wedge spans up-right quadrant: x >= cx, y <= cy (with tolerance)
+            self.assertGreaterEqual(p.x, 59.0)
+            self.assertLessEqual(p.y, 61.0)
+
+    def test_ring_holes_between_radii(self):
+        a = Arc(60, 60, 50, start_angle=180, end_angle=360, inner_radius=30)
+        pts = a.hole_points(spacing=6, inset=4)
+        self.assertGreater(len(pts), 0)
+        for p in pts:
+            dist = math.hypot(p.x - 60, p.y - 60)
+            self.assertGreaterEqual(dist, 29.9)
+            self.assertLessEqual(dist, 50.1)
+
+    def test_smaller_spacing_gives_more_holes(self):
+        a = Arc(60, 60, 50, start_angle=0, end_angle=180)
+        self.assertGreater(len(a.hole_points(spacing=4, inset=4)),
+                           len(a.hole_points(spacing=10, inset=4)))
+
+    def test_zero_inset_works(self):
+        a = Arc(60, 60, 50, start_angle=0, end_angle=90)
+        self.assertGreater(len(a.hole_points(spacing=6, inset=0)), 0)
+
+
+class TestArcStitchSegments(unittest.TestCase):
+    def test_segments_generated(self):
+        segs = Arc(60, 60, 50, start_angle=-90, end_angle=90).stitch_segments(
+            spacing=6, inset=4, stitch_length=3)
+        self.assertGreater(len(segs), 0)
+
+    def test_stitch_length_respected(self):
+        for a, b in Arc(60, 60, 50, start_angle=0, end_angle=180).stitch_segments(
+                spacing=8, inset=4, stitch_length=3):
+            self.assertAlmostEqual(distance(a, b), 3.0, places=1)
+
+    def test_ring_segment_stitches(self):
+        segs = Arc(60, 60, 50, start_angle=180, end_angle=360,
+                   inner_radius=30).stitch_segments(spacing=6, inset=4, stitch_length=3)
+        self.assertGreater(len(segs), 0)
+
+    def test_document_integration(self):
+        doc = SvgDocument(width_mm=130, height_mm=80)
+        a = Arc(65, 70, 55, start_angle=180, end_angle=360, inner_radius=30)
+        doc.add_shape(a, layer="cut")
+        doc.add_stitch_pattern(a, spacing=6, stitch_length=3, inset=5)
+        doc.add_holes(a, spacing=10, hole_radius=1.2, inset=5)
         out = doc.to_svg()
         self.assertIn("<path", out)
         self.assertIn("<line", out)

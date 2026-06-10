@@ -1457,3 +1457,113 @@ class TestCompilePerCornerRoundedRectangle:
             "holes\n  source card\n  margin 5\n  spacing 8\n  radius 1.2\nend"
         )
         assert "<circle" in compile_document(doc).to_svg()
+
+
+# ===========================================================================
+# Parser — Arc
+# ===========================================================================
+
+
+class TestParseArc:
+    def test_wedge(self):
+        doc = _parse(
+            "size 130 80\narc fan\n  at 65 70\n  radius 55\n"
+            "  from_angle 180\n  to_angle 360\nend"
+        )
+        from leathercraft_dsl import ArcDefinition
+        s = doc.shapes[0]
+        assert isinstance(s, ArcDefinition)
+        assert s.id == "fan"
+        assert s.cx == 65.0
+        assert s.cy == 70.0
+        assert s.radius == 55.0
+        assert s.start_angle == 180.0
+        assert s.end_angle == 360.0
+        assert s.inner_radius == 0.0
+        assert s.layer == "cut"
+
+    def test_ring_segment(self):
+        doc = _parse(
+            "size 130 80\narc ring\n  at 65 70\n  radius 55\n  inner_radius 30\n"
+            "  from_angle 180\n  to_angle 360\nend"
+        )
+        assert doc.shapes[0].inner_radius == 30.0
+
+    def test_custom_layer(self):
+        doc = _parse(
+            "size 130 80\narc fan\n  at 65 70\n  radius 55\n"
+            "  from_angle 0\n  to_angle 90\n  layer guide\nend"
+        )
+        assert doc.shapes[0].layer == "guide"
+
+    def test_missing_at_raises(self):
+        with pytest.raises(DslError, match="missing 'at'"):
+            _parse("size 130 80\narc fan\n  radius 55\n  from_angle 0\n  to_angle 90\nend")
+
+    def test_missing_from_angle_raises(self):
+        with pytest.raises(DslError, match="missing 'from_angle'"):
+            _parse("size 130 80\narc fan\n  at 65 70\n  radius 55\n  to_angle 90\nend")
+
+    def test_missing_to_angle_raises(self):
+        with pytest.raises(DslError, match="missing 'to_angle'"):
+            _parse("size 130 80\narc fan\n  at 65 70\n  radius 55\n  from_angle 0\nend")
+
+    def test_zero_radius_raises(self):
+        with pytest.raises(DslError, match="radius must be greater than 0"):
+            _parse("size 130 80\narc fan\n  at 65 70\n  radius 0\n  from_angle 0\n  to_angle 90\nend")
+
+    def test_inner_radius_too_large_raises(self):
+        with pytest.raises(DslError, match="inner_radius must be smaller than radius"):
+            _parse(
+                "size 130 80\narc fan\n  at 65 70\n  radius 30\n  inner_radius 40\n"
+                "  from_angle 0\n  to_angle 90\nend"
+            )
+
+    def test_missing_id_raises(self):
+        with pytest.raises(DslError, match="requires an id"):
+            _parse("size 130 80\narc\n  at 65 70\n  radius 55\n  from_angle 0\n  to_angle 90\nend")
+
+    def test_registered_as_source(self):
+        doc = _parse(
+            "size 130 80\narc fan\n  at 65 70\n  radius 55\n  from_angle 180\n  to_angle 360\nend\n"
+            "stitches\n  source fan\n  margin 5\n  spacing 6\n  length 3\nend"
+        )
+        assert len(doc.operations) == 1
+
+
+# ===========================================================================
+# Compiler — Arc
+# ===========================================================================
+
+
+class TestCompileArc:
+    def test_wedge_produces_arc_path(self):
+        doc = _parse(
+            "size 130 80\narc fan\n  at 65 70\n  radius 55\n  from_angle 180\n  to_angle 360\nend"
+        )
+        output = compile_document(doc).to_svg()
+        assert "A 55.000 55.000" in output
+
+    def test_ring_segment_has_two_arcs(self):
+        doc = _parse(
+            "size 130 80\narc ring\n  at 65 70\n  radius 55\n  inner_radius 30\n"
+            "  from_angle 180\n  to_angle 360\nend"
+        )
+        output = compile_document(doc).to_svg()
+        assert "A 55.000 55.000" in output
+        assert "A 30.000 30.000" in output
+
+    def test_stitches_produce_lines(self):
+        doc = _parse(
+            "size 130 80\narc fan\n  at 65 70\n  radius 55\n  from_angle 180\n  to_angle 360\nend\n"
+            "stitches\n  source fan\n  margin 5\n  spacing 6\n  length 3\nend"
+        )
+        assert "<line" in compile_document(doc).to_svg()
+
+    def test_holes_produce_circles(self):
+        doc = _parse(
+            "size 130 80\narc fan\n  at 65 70\n  radius 55\n  inner_radius 30\n"
+            "  from_angle 180\n  to_angle 360\nend\n"
+            "holes\n  source fan\n  margin 6\n  spacing 8\n  radius 1.2\nend"
+        )
+        assert "<circle" in compile_document(doc).to_svg()

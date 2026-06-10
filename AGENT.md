@@ -12,7 +12,7 @@ from leathercraft_svg import (
     SvgDocument, StrokeStyle,
     Point,
     Rectangle, RoundedRectangle, Stadium,
-    Circle, Ellipse,
+    Circle, Ellipse, Arc,
     Triangle, RoundedTriangle,
 )
 ```
@@ -248,6 +248,23 @@ Oval with two independent radii — identical to `Circle` when `rx == ry`. `hole
 
 ```python
 shape = Ellipse(65, 45, 55, 35)
+doc.add_shape(shape, layer="cut")
+doc.add_stitch_pattern(shape, spacing=6.0, stitch_length=3.0, inset=5.0)
+```
+
+---
+
+### Arc
+
+```python
+Arc(cx, cy, radius, start_angle, end_angle, inner_radius=0.0)
+# angles in degrees: 0 = right (3 o'clock), increasing clockwise (SVG Y-down)
+```
+
+Circular sector (pie wedge) or — with `inner_radius > 0` — a ring segment (annulus slice). If `end_angle <= start_angle`, a full turn is added, so `start=300, end=60` spans 120° across 3 o'clock. `hole_points` and `stitch_segments` follow the full closed contour (outer arc, straight edges, inner arc if present), inset using the same polygon-offset machinery as `Polygon`. The `edges` parameter is accepted but ignored.
+
+```python
+shape = Arc(65, 75, 55, start_angle=180, end_angle=360, inner_radius=30)
 doc.add_shape(shape, layer="cut")
 doc.add_stitch_pattern(shape, spacing=6.0, stitch_length=3.0, inset=5.0)
 ```
@@ -716,6 +733,21 @@ end
 ```
 
 Compiles to `Circle(cx, cy, radius)`. The `edges` parameter in `stitches`/`holes` is accepted but has no effect — the full circumference is always used.
+
+#### `arc`
+
+```text
+arc <id>
+  at <cx> <cy>            # centre
+  radius <r>              # outer radius (> 0)
+  [inner_radius <r>]      # > 0 → ring segment instead of wedge; must be < radius
+  from_angle <deg>        # 0 = right (3 o'clock), increasing clockwise
+  to_angle <deg>          # if <= from_angle, a full turn is added
+  [layer <layer_name>]
+end
+```
+
+Compiles to `Arc(cx, cy, radius, start_angle, end_angle, inner_radius)`. The `edges` parameter in `stitches`/`holes` is accepted but has no effect — the full closed contour is always used.
 
 #### `ellipse`
 

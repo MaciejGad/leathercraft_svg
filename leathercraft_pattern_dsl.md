@@ -485,7 +485,55 @@ end
 export oval_coaster
 ```
 
-### 7.6 Triangle
+### 7.6 Arc / Sector
+
+A circular sector (pie wedge) or — with `inner_radius` — a ring segment (annulus slice). Angles are in degrees: `0` = right (3 o'clock), increasing clockwise on screen. If `to_angle <= from_angle`, a full turn is added, so `from_angle 300` + `to_angle 60` spans 120° across 3 o'clock.
+
+```text
+arc <id>
+  at <cx> <cy>            # centre
+  radius <r>              # outer radius (> 0)
+  [inner_radius <r>]      # > 0 → ring segment; must be < radius
+  from_angle <deg>
+  to_angle <deg>
+  [layer <layer_name>]
+end
+```
+
+Compiler mapping:
+
+```python
+Arc(cx, cy, radius, start_angle, end_angle, inner_radius)
+doc.add_shape(shape, layer="cut")
+```
+
+Default layer: `cut`. Stitches and holes follow the full closed contour (outer arc, straight edges, and the inner arc for ring segments); the `edges` parameter is accepted but ignored.
+
+Example — curved strap-end reinforcement:
+
+```text
+pattern strap_end
+size 130 85
+
+arc reinforcement
+  at 65 75
+  radius 55
+  inner_radius 30
+  from_angle 180
+  to_angle 360
+end
+
+stitches
+  source reinforcement
+  margin 5
+  spacing 6
+  length 3
+end
+
+export strap_end
+```
+
+### 7.7 Triangle
 
 Two forms are supported: explicit three-point form and box form.
 
@@ -543,7 +591,7 @@ stitches
 end
 ```
 
-### 7.7 Rounded Triangle
+### 7.8 Rounded Triangle
 
 Same as `triangle` but with an additional `radius` field.
 
@@ -581,7 +629,7 @@ doc.add_shape(shape, layer="cut")
 
 The `rounded_path` flag (see section 9) applies specifically to `RoundedTriangle` and makes stitch marks or holes follow the smooth rounded corners instead of the straight inset.
 
-### 7.8 Outer Freeform Shape
+### 7.9 Outer Freeform Shape
 
 For irregular leather patterns, use `outer`.
 
@@ -1297,6 +1345,7 @@ rounded_rectangle
 stadium
 circle
 ellipse
+arc
 triangle
 rounded_triangle
 outer
@@ -1312,6 +1361,9 @@ spacing
 length
 angle
 radius
+inner_radius
+from_angle
+to_angle
 radius_tl
 radius_tr
 radius_br
@@ -1349,6 +1401,7 @@ rounded_rectangle
 stadium
 circle
 ellipse (rx/ry form and size form)
+arc (wedge and ring segment)
 triangle (point form and box form)
 rounded_triangle (point form and box form)
 outer smooth/straight mirrored

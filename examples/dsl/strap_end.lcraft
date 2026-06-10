@@ -1,0 +1,30 @@
+pattern strap_end
+size 130 85
+
+# Curved strap-end reinforcement: a ring segment (annulus slice)
+# stitched all around, with a guide wedge marking the centre line.
+
+arc reinforcement
+  at 65 75
+  radius 55
+  inner_radius 30
+  from_angle 180
+  to_angle 360
+end
+
+stitches
+  source reinforcement
+  margin 5
+  spacing 6
+  length 3
+end
+
+arc centre_mark
+  at 65 75
+  radius 25
+  from_angle 255
+  to_angle 285
+  layer guide
+end
+
+export strap_end

@@ -314,6 +314,19 @@ Parameters:
 
 Stitches and holes are distributed with even spacing along the contour of a helper ellipse with radii `rx - inset` and `ry - inset`. The `edges` parameter is accepted but ignored — the full contour is always used. If `inset` is greater than or equal to either radius, an empty list is returned.
 
+### `Arc(cx, cy, radius, start_angle, end_angle, inner_radius=0.0)`
+
+Circular sector (pie wedge) or ring segment (annulus slice).
+
+Parameters:
+
+- `cx`, `cy` - center,
+- `radius` - outer radius,
+- `start_angle`, `end_angle` - in degrees; `0` = right (3 o'clock), increasing clockwise. If `end_angle <= start_angle`, a full turn is added (so `start=300, end=60` gives a 120° wedge across 3 o'clock),
+- `inner_radius` - if `> 0`, the center is cut out, producing a ring segment instead of a wedge.
+
+Stitches and holes follow the full closed contour (arc + straight edges, plus the inner arc for ring segments), inset by `inset` like in `Polygon`.
+
 ### `Triangle(p1, p2, p3)`
 
 Triangle defined by three points.
@@ -660,6 +673,29 @@ end
 
 Stitches and holes are spaced evenly along the elliptical contour.
 
+### Arc / sector
+
+A pie wedge, or a ring segment when `inner_radius` is given. Angles are in degrees: `0` = right (3 o'clock), increasing clockwise.
+
+```text
+arc strap_end
+  at 65 75
+  radius 55
+  inner_radius 30
+  from_angle 180
+  to_angle 360
+end
+
+stitches
+  source strap_end
+  margin 5
+  spacing 6
+  length 3
+end
+```
+
+Omit `inner_radius` (or set it to 0) for a solid wedge from the center.
+
 ### Triangle
 
 Two forms: explicit points or `at + size` (box form).
@@ -723,7 +759,7 @@ Do not write unit suffixes such as `mm` or `cm`. Every numeric value is already 
 
 ### Supported keywords
 
-`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `stadium`, `circle`, `ellipse`, `triangle`, `rounded_triangle`, `outer`, `stitches`, `holes`, `hole`, `export`
+`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `stadium`, `circle`, `ellipse`, `arc`, `triangle`, `rounded_triangle`, `outer`, `stitches`, `holes`, `hole`, `export`
 
 Edge names for rectangles: `top`, `right`, `bottom`, `left`, `all`, `except_top`, `sides`, `horizontal`, `vertical`
 

@@ -568,6 +568,108 @@ class Ellipse(Shape):
 
 
 @dataclass
+class Arc(Shape):
+    """
+    Circular sector (pie wedge) or ring segment (annulus slice).
+
+    Angles are in degrees: 0 = right (3 o'clock), increasing clockwise on
+    screen (SVG Y axis points down). The shape spans from ``start_angle`` to
+    ``end_angle``; if ``end_angle <= start_angle`` a full turn is added, so
+    e.g. ``start=300, end=60`` gives a 120-degree wedge across 3 o'clock.
+
+    With ``inner_radius == 0`` the shape is a wedge from the centre point.
+    With ``inner_radius > 0`` the centre is cut out, producing a ring segment.
+    """
+
+    cx: float
+    cy: float
+    radius: float
+    start_angle: float
+    end_angle: float
+    inner_radius: float = 0.0
+
+    def _span_rad(self) -> tuple[float, float]:
+        start = self.start_angle * pi / 180
+        span = (self.end_angle - self.start_angle) % 360 * pi / 180
+        if span == 0:
+            span = 2 * pi
+        return start, span
+
+    def path_d(self) -> str:
+        start, span = self._span_rad()
+        end = start + span
+        large = 1 if span > pi else 0
+        r = self.radius
+        x0 = self.cx + r * cos(start)
+        y0 = self.cy + r * sin(start)
+        x1 = self.cx + r * cos(end)
+        y1 = self.cy + r * sin(end)
+        if self.inner_radius <= 0:
+            return (
+                f"M {self.cx:.3f} {self.cy:.3f} "
+                f"L {x0:.3f} {y0:.3f} "
+                f"A {r:.3f} {r:.3f} 0 {large} 1 {x1:.3f} {y1:.3f} Z"
+            )
+        ri = self.inner_radius
+        xi0 = self.cx + ri * cos(end)
+        yi0 = self.cy + ri * sin(end)
+        xi1 = self.cx + ri * cos(start)
+        yi1 = self.cy + ri * sin(start)
+        return (
+            f"M {x0:.3f} {y0:.3f} "
+            f"A {r:.3f} {r:.3f} 0 {large} 1 {x1:.3f} {y1:.3f} "
+            f"L {xi0:.3f} {yi0:.3f} "
+            f"A {ri:.3f} {ri:.3f} 0 {large} 0 {xi1:.3f} {yi1:.3f} Z"
+        )
+
+    def _contour(self, arc_steps: int = 48) -> list[tuple[float, float]]:
+        start, span = self._span_rad()
+        steps = max(8, int(arc_steps * span / (2 * pi)) * 4)
+        outer = [
+            (self.cx + self.radius * cos(start + span * i / steps),
+             self.cy + self.radius * sin(start + span * i / steps))
+            for i in range(steps + 1)
+        ]
+        if self.inner_radius <= 0:
+            return [(self.cx, self.cy)] + outer
+        inner = [
+            (self.cx + self.inner_radius * cos(start + span * i / steps),
+             self.cy + self.inner_radius * sin(start + span * i / steps))
+            for i in range(steps, -1, -1)
+        ]
+        return outer + inner
+
+    def hole_points(self, edges="all", spacing=5.0, inset=4.0, include_corners=False, rounded_path=False) -> list[Point]:
+        pts = _offset_closed_polygon(self._contour(), inset) if inset > 0 else self._contour()
+        if len(pts) < 3:
+            return []
+        polyline = [Point(x, y) for x, y in pts]
+        return points_on_closed_polyline(polyline, spacing=spacing, include_corners=include_corners)
+
+    def stitch_segments(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=False,
+        stitch_length=2.0,
+        stitch_angle_deg=0.0,
+        rounded_path=False,
+    ) -> list[tuple[Point, Point]]:
+        pts = _offset_closed_polygon(self._contour(), inset) if inset > 0 else self._contour()
+        if len(pts) < 3:
+            return []
+        polyline = [Point(x, y) for x, y in pts]
+        return stitch_segments_on_closed_polyline(
+            polyline,
+            spacing=spacing,
+            stitch_length=stitch_length,
+            stitch_angle_deg=stitch_angle_deg,
+            include_corners=include_corners,
+        )
+
+
+@dataclass
 class Triangle(Shape):
     p1: Point
     p2: Point

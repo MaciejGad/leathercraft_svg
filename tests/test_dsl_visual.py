@@ -562,6 +562,47 @@ end
 """)
 
 
+def _dsl_arc_ring_stitches() -> bytes:
+    return _compile_dsl("""
+size 130 80
+
+arc strap_end
+  at 65 70
+  radius 55
+  inner_radius 30
+  from_angle 180
+  to_angle 360
+end
+
+stitches
+  source strap_end
+  margin 5
+  spacing 6
+  length 3
+end
+""")
+
+
+def _dsl_arc_wedge_holes() -> bytes:
+    return _compile_dsl("""
+size 130 80
+
+arc fan
+  at 65 70
+  radius 55
+  from_angle 180
+  to_angle 360
+end
+
+holes
+  source fan
+  margin 6
+  spacing 8
+  radius 1.2
+end
+""")
+
+
 def _dsl_ellipse_stitches() -> bytes:
     return _compile_dsl("""
 size 130 90
@@ -678,6 +719,9 @@ SCENARIOS: dict[str, callable] = {
     "dsl_rounded_triangle_holes_straight.png": _dsl_rounded_triangle_holes_straight,
     "dsl_rounded_triangle_holes_rounded_path.png": _dsl_rounded_triangle_holes_rounded_path,
     "dsl_rounded_triangle_stitch_rounded_path.png": _dsl_rounded_triangle_stitch_rounded_path,
+    # --- arc / sector ---
+    "dsl_arc_ring_stitches.png": _dsl_arc_ring_stitches,
+    "dsl_arc_wedge_holes.png": _dsl_arc_wedge_holes,
     # --- per-corner rounded rectangle ---
     "dsl_per_corner_rounded_rect.png": _dsl_per_corner_rounded_rect,
     # --- ellipse ---

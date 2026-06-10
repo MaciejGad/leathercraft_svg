@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Union
 
 from leathercraft_svg import (
+    Arc,
     Circle,
     Ellipse,
     Point,
@@ -119,6 +120,18 @@ class CircleDefinition:
     cx: float
     cy: float
     radius: float
+    layer: str = "cut"
+
+
+@dataclass
+class ArcDefinition:
+    id: str
+    cx: float
+    cy: float
+    radius: float
+    start_angle: float
+    end_angle: float
+    inner_radius: float = 0.0
     layer: str = "cut"
 
 
@@ -277,7 +290,7 @@ def _resolve_color(token: str) -> str:
 
 _BLOCK_STARTERS = {
     "rectangle", "rounded_rectangle", "stadium",
-    "circle", "ellipse",
+    "circle", "ellipse", "arc",
     "triangle", "rounded_triangle",
     "outer",
     "stitches", "holes", "hole",
@@ -617,6 +630,47 @@ def parse(text: str) -> PatternDocument:
             if "layer" in data:
                 layer_name = data["layer"][1][0]
             shapes.append(CircleDefinition(id=shape_id, cx=cx, cy=cy, radius=r, layer=layer_name))
+            shape_ids.add(shape_id)
+
+        # ------------------------------------------------------------------
+        elif keyword == "arc":
+            if len(tokens) < 2:
+                raise DslError(f"Line {lineno}: 'arc' requires an id")
+            shape_id = tokens[1]
+            data = _parse_block_body(body)
+
+            def _req(k: str, sid=shape_id, ln=lineno) -> tuple[int, list[str]]:
+                if k not in data:
+                    raise DslError(f"Line {ln}: arc '{sid}' is missing '{k}'")
+                return data[k]
+
+            at_lineno, at_vals = _req("at")
+            r_lineno, r_vals = _req("radius")
+            fa_lineno, fa_vals = _req("from_angle")
+            ta_lineno, ta_vals = _req("to_angle")
+            cx = _parse_float(at_vals[0], at_lineno, "at cx")
+            cy = _parse_float(at_vals[1], at_lineno, "at cy")
+            r = _parse_float(r_vals[0], r_lineno, "radius")
+            if r <= 0:
+                raise DslError(f"Line {r_lineno}: radius must be greater than 0")
+            start_a = _parse_float(fa_vals[0], fa_lineno, "from_angle")
+            end_a = _parse_float(ta_vals[0], ta_lineno, "to_angle")
+            inner_r = 0.0
+            if "inner_radius" in data:
+                ir_lineno, ir_vals = data["inner_radius"]
+                inner_r = _parse_float(ir_vals[0], ir_lineno, "inner_radius")
+                if inner_r < 0:
+                    raise DslError(f"Line {ir_lineno}: inner_radius must be >= 0")
+                if inner_r >= r:
+                    raise DslError(f"Line {ir_lineno}: inner_radius must be smaller than radius")
+            layer_name = "cut"
+            if "layer" in data:
+                layer_name = data["layer"][1][0]
+            shapes.append(ArcDefinition(
+                id=shape_id, cx=cx, cy=cy, radius=r,
+                start_angle=start_a, end_angle=end_a,
+                inner_radius=inner_r, layer=layer_name,
+            ))
             shape_ids.add(shape_id)
 
         # ------------------------------------------------------------------
@@ -1022,6 +1076,16 @@ def compile_document(doc: PatternDocument) -> SvgDocument:
 
         elif isinstance(shape_def, CircleDefinition):
             s = Circle(shape_def.cx, shape_def.cy, shape_def.radius)
+            svg.add_shape(s, layer=shape_def.layer)
+            shape_objects[shape_def.id] = s
+
+        elif isinstance(shape_def, ArcDefinition):
+            s = Arc(
+                shape_def.cx, shape_def.cy, shape_def.radius,
+                start_angle=shape_def.start_angle,
+                end_angle=shape_def.end_angle,
+                inner_radius=shape_def.inner_radius,
+            )
             svg.add_shape(s, layer=shape_def.layer)
             shape_objects[shape_def.id] = s
 

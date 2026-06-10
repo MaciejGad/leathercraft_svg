@@ -18,7 +18,7 @@ in `leathercraft_svg.py` (Python library) and `leathercraft_dsl.py` (DSL).
 | `<polyline>` (open path) | utilities only (`offset_polyline`) | `path` inside `stitches` only | ⚠️ partial |
 | `<polygon>` | `Polygon` | `polygon` (via `outer` block) | ✅ full |
 | `<path>` (raw `d` string) | `add_path(d)` (document-level, not a Shape) | — | ⚠️ partial |
-| Arc / circular sector | — | — | ❌ missing |
+| Arc / circular sector | `Arc` | `arc` | ✅ full |
 | Stadium / oblong | `Stadium` | `stadium` | ✅ full |
 | Regular n-gon | — | — | ❌ missing |
 | Cubic Bézier path | — | — | ❌ missing |
@@ -102,7 +102,12 @@ Currently `RoundedRectangle` applies a **single uniform radius** to all four cor
 
 ---
 
-### 3. Arc / circular sector
+### 3. Arc / circular sector — ✅ IMPLEMENTED
+
+> **Status:** Implemented as `Arc(cx, cy, radius, start_angle, end_angle, inner_radius=0)`
+> in `leathercraft_svg.py` and the `arc` block in the DSL. Supports both the
+> wedge (sector) and ring-segment variants; stitches and holes follow the full
+> closed contour. See `examples/dsl/strap_end.lcraft`.
 
 **SVG primitive:** `<path d="M … A rx ry … Z"/>` (no dedicated element)
 
@@ -282,7 +287,7 @@ fall back to Python code.
 | ✅ Done | **Stadium / oblong** | Implemented — `Stadium` class + `stadium` DSL block |
 | ✅ Done | **Ellipse** | Implemented — `Ellipse` class + `ellipse` DSL block |
 | ✅ Done | **Per-corner rounded rect** | Implemented — `radius_tl/tr/br/bl` on `RoundedRectangle` + DSL keys |
-| 🟡 Medium | **Arc / sector** | Needed for curved strap ends and fan cutouts |
+| ✅ Done | **Arc / sector** | Implemented — `Arc` class + `arc` DSL block (wedge + ring segment) |
 | 🟡 Medium | **Regular n-gon** | Easy to implement as a `Polygon` factory |
 | 🟢 Low | **Open polyline** | Niche use; partial support already exists via `path` in stitches |
 | 🟢 Low | **Raw path DSL block** | Power-user feature; complex stitching support |

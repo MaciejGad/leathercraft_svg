@@ -314,6 +314,19 @@ Parametry:
 
 Szwy i otwory są rozmieszczane w równych odstępach wzdłuż konturu elipsy pomocniczej o promieniach `rx - inset` i `ry - inset`. Parametr `edges` jest akceptowany, ale ignorowany — zawsze używany jest pełny kontur. Jeśli `inset` jest większy lub równy któremukolwiek z promieni, zwracana jest pusta lista.
 
+### `Arc(cx, cy, radius, start_angle, end_angle, inner_radius=0.0)`
+
+Wycinek koła (klin) lub wycinek pierścienia.
+
+Parametry:
+
+- `cx`, `cy` - środek,
+- `radius` - promień zewnętrzny,
+- `start_angle`, `end_angle` - w stopniach; `0` = prawo (godzina 3), rosnąco zgodnie z ruchem wskazówek zegara. Jeśli `end_angle <= start_angle`, dodawany jest pełny obrót (więc `start=300, end=60` daje klin 120° przechodzący przez godzinę 3),
+- `inner_radius` - jeśli `> 0`, środek jest wycięty i powstaje wycinek pierścienia zamiast klina.
+
+Szwy i otwory podążają wzdłuż pełnego zamkniętego konturu (łuk + proste krawędzie, plus łuk wewnętrzny dla wycinków pierścienia), wsuniętego o `inset` jak w `Polygon`.
+
 ### `Triangle(p1, p2, p3)`
 
 Trójkąt z trzema punktami.
@@ -660,6 +673,29 @@ end
 
 Szwy i otwory są rozmieszczane równomiernie wzdłuż konturu elipsy.
 
+### Łuk / wycinek
+
+Klin (wycinek koła) lub wycinek pierścienia, gdy podane jest `inner_radius`. Kąty są w stopniach: `0` = prawo (godzina 3), rosnąco zgodnie z ruchem wskazówek zegara.
+
+```text
+arc koncowka_paska
+  at 65 75
+  radius 55
+  inner_radius 30
+  from_angle 180
+  to_angle 360
+end
+
+stitches
+  source koncowka_paska
+  margin 5
+  spacing 6
+  length 3
+end
+```
+
+Pomiń `inner_radius` (lub ustaw 0), aby otrzymać pełny klin od środka.
+
 ### Trójkąt
 
 Dostępne są dwie formy: trzy jawne punkty lub forma pudełkowa (`at + size`).
@@ -723,7 +759,7 @@ Nie stosuj przyrostków jednostek takich jak `mm` ani `cm`. Każda liczba jest j
 
 ### Obsługiwane słowa kluczowe
 
-`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `stadium`, `circle`, `ellipse`, `triangle`, `rounded_triangle`, `outer`, `stitches`, `holes`, `hole`, `export`
+`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `stadium`, `circle`, `ellipse`, `arc`, `triangle`, `rounded_triangle`, `outer`, `stitches`, `holes`, `hole`, `export`
 
 Nazwy krawędzi prostokąta: `top`, `right`, `bottom`, `left`, `all`, `except_top`, `sides`, `horizontal`, `vertical`
 

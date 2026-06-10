@@ -12,6 +12,7 @@ from leathercraft_dsl import (
     OuterPathDefinition,
     PatternDocument,
     RegularPolygonDefinition,
+    RoundedRegularPolygonDefinition,
     RectangleDefinition,
     RoundedRectangleDefinition,
     SingleHoleDefinition,
@@ -1531,6 +1532,88 @@ class TestCompileRegularPolygon:
         doc = _parse(
             "size 120 120\nregular_polygon oct\n  at 60 60\n  radius 38\n  sides 8\n  rotation 22.5\nend\n"
             "holes\n  source oct\n  edges all\n  margin 5\n  spacing 8\n  radius 1.2\nend"
+        )
+        assert "<circle" in compile_document(doc).to_svg()
+
+
+# ===========================================================================
+# Parser / Compiler — Rounded regular polygon
+# ===========================================================================
+
+
+class TestParseRoundedRegularPolygon:
+    def test_basic_uniform_radius(self):
+        doc = _parse(
+            "size 120 120\nrounded_regular_polygon hex\n  at 60 60\n  radius 40\n  corner_radius 6\n  sides 6\nend"
+        )
+        s = doc.shapes[0]
+        assert isinstance(s, RoundedRegularPolygonDefinition)
+        assert s.radius == 40.0
+        assert s.corner_radius == 6.0
+        assert s.sides == 6
+        assert s.corner_overrides == {}
+
+    def test_selected_corner_overrides(self):
+        doc = _parse(
+            "size 120 120\nrounded_regular_polygon oct\n  at 60 60\n  radius 36\n  sides 8\n"
+            "  corner_radius_0 0\n  corner_radius_1 4\n  corner_radius_5 7\nend"
+        )
+        s = doc.shapes[0]
+        assert s.radius == 36.0
+        assert s.corner_radius == 0.0
+        assert s.corner_overrides == {0: 0.0, 1: 4.0, 5: 7.0}
+
+    def test_rotation_and_layer(self):
+        doc = _parse(
+            "size 120 120\nrounded_regular_polygon oct\n  at 60 60\n  radius 35\n  corner_radius 5\n  sides 8\n"
+            "  rotation 22.5\n  layer guide\nend"
+        )
+        s = doc.shapes[0]
+        assert s.rotation == 22.5
+        assert s.layer == "guide"
+
+    def test_missing_corner_radius_and_overrides_raises(self):
+        with pytest.raises(DslError, match="missing 'corner_radius'"):
+            _parse("size 120 120\nrounded_regular_polygon hex\n  at 60 60\n  radius 40\n  sides 6\nend")
+
+    def test_missing_outer_radius_raises(self):
+        with pytest.raises(DslError, match="missing 'radius'"):
+            _parse("size 120 120\nrounded_regular_polygon hex\n  at 60 60\n  corner_radius 6\n  sides 6\nend")
+
+    def test_negative_override_raises(self):
+        with pytest.raises(DslError, match="corner_radius_2 must be >= 0"):
+            _parse(
+                "size 120 120\nrounded_regular_polygon hex\n  at 60 60\n  radius 40\n  sides 6\n  corner_radius_2 -1\nend"
+            )
+
+    def test_out_of_range_override_raises(self):
+        with pytest.raises(DslError, match="corner_radius_6 is out of range"):
+            _parse(
+                "size 120 120\nrounded_regular_polygon hex\n  at 60 60\n  radius 40\n  corner_radius 5\n  sides 6\n  corner_radius_6 2\nend"
+            )
+
+
+class TestCompileRoundedRegularPolygon:
+    def test_shape_compiles_to_curved_path(self):
+        doc = _parse(
+            "size 120 120\nrounded_regular_polygon hex\n  at 60 60\n  radius 40\n  corner_radius 6\n  sides 6\nend"
+        )
+        output = compile_document(doc).to_svg()
+        assert "<path" in output
+        assert "Q" in output
+
+    def test_stitches_compile(self):
+        doc = _parse(
+            "size 120 120\nrounded_regular_polygon hex\n  at 60 60\n  radius 40\n  corner_radius 6\n  sides 6\nend\n"
+            "stitches\n  source hex\n  margin 5\n  spacing 8\n  length 3\nend"
+        )
+        assert "<line" in compile_document(doc).to_svg()
+
+    def test_holes_compile(self):
+        doc = _parse(
+            "size 120 120\nrounded_regular_polygon oct\n  at 60 60\n  radius 38\n  sides 8\n"
+            "  corner_radius_1 5\n  corner_radius_2 5\n  corner_radius_3 5\nend\n"
+            "holes\n  source oct\n  margin 5\n  spacing 8\n  radius 1.2\nend"
         )
         assert "<circle" in compile_document(doc).to_svg()
 

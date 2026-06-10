@@ -1077,6 +1077,167 @@ class RegularPolygon(Shape):
         )
 
 
+@dataclass
+class RoundedRegularPolygon(Shape):
+    """
+    Regular polygon with rounded corners.
+
+    ``corner_radius`` applies the same corner rounding to every vertex. Individual
+    vertices can be overridden through ``corner_overrides`` where the key is
+    the vertex index (0-based, following the polygon winding order).
+    """
+
+    cx: float
+    cy: float
+    radius: float
+    sides: int
+    corner_radius: float = 5.0
+    rotation_deg: float = -90.0
+    corner_overrides: dict[int, float] | None = None
+
+    def vertices(self) -> list[tuple[float, float]]:
+        if self.sides < 3 or self.radius <= 0:
+            return []
+        offset = self.rotation_deg * pi / 180
+        return [
+            (
+                self.cx + self.radius * cos(2 * pi * i / self.sides + offset),
+                self.cy + self.radius * sin(2 * pi * i / self.sides + offset),
+            )
+            for i in range(self.sides)
+        ]
+
+    def _inner_vertices(self, inset: float) -> list[tuple[float, float]]:
+        if self.sides < 3:
+            return []
+        if inset <= 0:
+            return self.vertices()
+        apothem = self.radius * cos(pi / self.sides)
+        inner_apothem = apothem - inset
+        if inner_apothem <= 0:
+            return []
+        inner_radius = inner_apothem / cos(pi / self.sides)
+        offset = self.rotation_deg * pi / 180
+        return [
+            (
+                self.cx + inner_radius * cos(2 * pi * i / self.sides + offset),
+                self.cy + inner_radius * sin(2 * pi * i / self.sides + offset),
+            )
+            for i in range(self.sides)
+        ]
+
+    def corner_radii(self) -> list[float]:
+        if self.sides < 3:
+            return []
+        overrides = self.corner_overrides or {}
+        radii = [max(0.0, overrides.get(i, self.corner_radius)) for i in range(self.sides)]
+        verts = [Point(x, y) for x, y in self.vertices()]
+        if len(verts) < 3:
+            return radii
+
+        scale = 1.0
+        for i in range(self.sides):
+            edge_len = distance(verts[i], verts[(i + 1) % self.sides])
+            pair_sum = radii[i] + radii[(i + 1) % self.sides]
+            if pair_sum > edge_len > 0:
+                scale = min(scale, edge_len / pair_sum)
+        return [r * scale for r in radii]
+
+    def path_d(self) -> str:
+        vertices = [Point(x, y) for x, y in self.vertices()]
+        radii = self.corner_radii()
+        if len(vertices) < 3:
+            return ""
+        if not any(radii):
+            return _straight_path_d(self.vertices())
+        return rounded_polygon_path_d(vertices, radii)
+
+    def hole_points(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=False,
+        rounded_path=False,
+    ) -> list[Point]:
+        all_edges = edges == "all" or sorted(set(edges)) == list(range(self.sides))
+        radii = self.corner_radii()
+        if not all_edges or not any(radii):
+            vertices = self._inner_vertices(inset)
+            if len(vertices) < 3:
+                return []
+            edge_defs = [
+                (Point(*vertices[i]), Point(*vertices[(i + 1) % len(vertices)]))
+                for i in range(len(vertices))
+            ]
+            selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
+            if selected == list(range(len(edge_defs))):
+                return points_on_closed_edges(edge_defs, spacing, include_corners)
+            return points_on_selected_edges(edge_defs, selected, spacing, include_corners)
+
+        inner_vertices = [Point(x, y) for x, y in self._inner_vertices(inset)]
+        if len(inner_vertices) < 3:
+            return []
+        inner_radii = [max(0.0, r - inset) for r in radii]
+        contour = rounded_polygon_contour(inner_vertices, inner_radii)
+        if len(contour) < 2:
+            return []
+        return points_on_closed_polyline(contour, spacing=spacing, include_corners=include_corners)
+
+    def stitch_segments(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=False,
+        stitch_length=2.0,
+        stitch_angle_deg=0.0,
+        rounded_path=False,
+    ) -> list[tuple[Point, Point]]:
+        all_edges = edges == "all" or sorted(set(edges)) == list(range(self.sides))
+        radii = self.corner_radii()
+        if not all_edges or not any(radii):
+            vertices = self._inner_vertices(inset)
+            if len(vertices) < 3:
+                return []
+            edge_defs = [
+                (Point(*vertices[i]), Point(*vertices[(i + 1) % len(vertices)]))
+                for i in range(len(vertices))
+            ]
+            selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
+            if selected == list(range(len(edge_defs))):
+                return segments_on_closed_edges(
+                    edge_defs,
+                    spacing,
+                    stitch_length,
+                    include_corners,
+                    stitch_angle_deg,
+                )
+            return segments_on_selected_edges(
+                edge_defs,
+                selected,
+                spacing,
+                stitch_length,
+                include_corners,
+                stitch_angle_deg,
+            )
+
+        inner_vertices = [Point(x, y) for x, y in self._inner_vertices(inset)]
+        if len(inner_vertices) < 3:
+            return []
+        inner_radii = [max(0.0, r - inset) for r in radii]
+        contour = rounded_polygon_contour(inner_vertices, inner_radii)
+        if len(contour) < 2:
+            return []
+        return stitch_segments_on_closed_polyline(
+            contour,
+            spacing=spacing,
+            stitch_length=stitch_length,
+            stitch_angle_deg=stitch_angle_deg,
+            include_corners=include_corners,
+        )
+
+
 def points_on_selected_edges(edge_defs, edges, spacing, include_corners) -> list[Point]:
     selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
 
@@ -1429,6 +1590,75 @@ def rounded_triangle_contour(points: list[Point], radius: float, arc_steps: int 
         contour.append(b)
 
     return contour
+
+
+def rounded_polygon_contour(points: list[Point], radii: list[float], arc_steps: int = 12) -> list[Point]:
+    if len(points) < 3 or len(points) != len(radii):
+        return []
+    if not any(radii):
+        return points
+
+    start_points: list[Point] = []
+    end_points: list[Point] = []
+    for i in range(len(points)):
+        prev_p = points[(i - 1) % len(points)]
+        p = points[i]
+        next_p = points[(i + 1) % len(points)]
+        cut = min(
+            max(0.0, radii[i]),
+            distance(p, prev_p) / 2,
+            distance(p, next_p) / 2,
+        )
+        start_points.append(move_towards(p, prev_p, cut))
+        end_points.append(move_towards(p, next_p, cut))
+
+    contour: list[Point] = [end_points[0]]
+    for i in range(1, len(points) + 1):
+        idx = i % len(points)
+        contour.append(start_points[idx])
+        control = points[idx]
+        a = start_points[idx]
+        b = end_points[idx]
+        if distance(a, b) > 1e-9:
+            for step in range(1, arc_steps):
+                t = step / arc_steps
+                contour.append(quadratic_bezier(a, control, b, t))
+        contour.append(b)
+
+    return deduplicate_points(contour)
+
+
+def rounded_polygon_path_d(points: list[Point], radii: list[float]) -> str:
+    if len(points) < 3 or len(points) != len(radii):
+        return ""
+    if not any(radii):
+        return _straight_path_d([(p.x, p.y) for p in points])
+
+    start_points: list[Point] = []
+    end_points: list[Point] = []
+    for i in range(len(points)):
+        prev_p = points[(i - 1) % len(points)]
+        p = points[i]
+        next_p = points[(i + 1) % len(points)]
+        cut = min(
+            max(0.0, radii[i]),
+            distance(p, prev_p) / 2,
+            distance(p, next_p) / 2,
+        )
+        start_points.append(move_towards(p, prev_p, cut))
+        end_points.append(move_towards(p, next_p, cut))
+
+    parts = [f"M {end_points[0].x:.3f} {end_points[0].y:.3f}"]
+    for i in range(1, len(points) + 1):
+        idx = i % len(points)
+        parts.append(f"L {start_points[idx].x:.3f} {start_points[idx].y:.3f}")
+        if distance(start_points[idx], end_points[idx]) <= 1e-9:
+            continue
+        parts.append(
+            f"Q {points[idx].x:.3f} {points[idx].y:.3f} "
+            f"{end_points[idx].x:.3f} {end_points[idx].y:.3f}"
+        )
+    return " ".join(parts) + " Z"
 
 
 def rounded_rectangle_contour(

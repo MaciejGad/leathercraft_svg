@@ -314,6 +314,31 @@ Parameters:
 
 Stitches and holes are distributed with even spacing along the contour of a helper ellipse with radii `rx - inset` and `ry - inset`. The `edges` parameter is accepted but ignored — the full contour is always used. If `inset` is greater than or equal to either radius, an empty list is returned.
 
+### `RegularPolygon(cx, cy, radius, sides, rotation_deg=-90.0)`
+
+Regular n-gon defined by a center point, circumscribed radius, and number of sides.
+
+Parameters:
+
+- `cx`, `cy` - center,
+- `radius` - circumscribed radius (center to vertex),
+- `sides` - side count (`>= 3`),
+- `rotation_deg` - optional rotation; default `-90` puts the first vertex at the top.
+
+Stitches and holes can use the full contour or selected numeric edges.
+
+### `RoundedRegularPolygon(cx, cy, radius, sides, corner_radius=5.0, rotation_deg=-90.0, corner_overrides=None)`
+
+Regular n-gon with rounded corners.
+
+Parameters:
+
+- `cx`, `cy`, `radius`, `sides`, `rotation_deg` - as in `RegularPolygon`,
+- `corner_radius` - uniform corner rounding amount,
+- `corner_overrides` - optional `{index: radius}` overrides for specific vertices. `0` gives a sharp corner; omitted indices fall back to the uniform `corner_radius`.
+
+If two rounded corners on the same edge would overlap, all corner radii are scaled down proportionally. With all edges selected, stitches and holes follow the rounded contour; partial numeric edge selections fall back to straight inset edges.
+
 ### `Arc(cx, cy, radius, start_angle, end_angle, inner_radius=0.0)`
 
 Circular sector (pie wedge) or ring segment (annulus slice).
@@ -694,6 +719,32 @@ end
 
 Regular polygons support stitches and holes around the full contour or on selected numeric edges such as `0 1 2`.
 
+### Rounded regular polygon
+
+A rounded regular n-gon keeps the same center/radius/sides setup, then rounds all corners with `corner_radius` or only selected vertices with `corner_radius_0`, `corner_radius_1`, and so on.
+
+```text
+rounded_regular_polygon charm
+  at 60 60
+  radius 40
+  sides 8
+  rotation 22.5
+  corner_radius_1 5
+  corner_radius_2 5
+  corner_radius_5 5
+  corner_radius_6 5
+end
+
+stitches
+  source charm
+  margin 5
+  spacing 8
+  length 3
+end
+```
+
+With all edges selected, stitches and holes follow the rounded contour automatically. When you select only some edges, the shape falls back to straight inset edge placement, similar to `RoundedRectangle`.
+
 ### Arc / sector
 
 A pie wedge, or a ring segment when `inner_radius` is given. Angles are in degrees: `0` = right (3 o'clock), increasing clockwise.
@@ -780,7 +831,7 @@ Do not write unit suffixes such as `mm` or `cm`. Every numeric value is already 
 
 ### Supported keywords
 
-`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `stadium`, `circle`, `ellipse`, `arc`, `triangle`, `rounded_triangle`, `regular_polygon`, `outer`, `stitches`, `holes`, `hole`, `export`
+`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `stadium`, `circle`, `ellipse`, `arc`, `triangle`, `rounded_triangle`, `regular_polygon`, `rounded_regular_polygon`, `outer`, `stitches`, `holes`, `hole`, `export`
 
 Edge names for rectangles: `top`, `right`, `bottom`, `left`, `all`, `except_top`, `sides`, `horizontal`, `vertical`
 

@@ -9,7 +9,7 @@ This document describes every scenario covered by [tests/test_visual.py](/Users/
 All examples assume:
 
 ```python
-from leathercraft_svg import Circle, Point, Rectangle, RegularPolygon, RoundedRectangle, RoundedTriangle, SvgDocument, Triangle
+from leathercraft_svg import Circle, Point, Rectangle, RegularPolygon, RoundedRectangle, RoundedRegularPolygon, RoundedTriangle, SvgDocument, Triangle
 ```
 
 ## Rectangle Hole Pattern On All Edges
@@ -287,6 +287,52 @@ doc.add_stitch_pattern(
 ```
 
 ![Regular polygon partial stitches](tests/baselines/regular_polygon_stitches_partial.png)
+
+## Rounded Regular Polygon Hole Pattern
+
+Tests holes following the rounded contour of a regular hexagon with uniform corner rounding.
+
+```python
+doc = SvgDocument(120, 120)
+shape = RoundedRegularPolygon(60, 60, 42, 6, corner_radius=6)
+
+doc.add_shape(shape, layer="cut")
+doc.add_holes(
+    shape,
+    spacing=8.0,
+    hole_radius=1.2,
+    inset=6.0,
+    layer="stitch",
+)
+```
+
+![Rounded regular polygon holes](tests/baselines/rounded_regular_polygon_holes.png)
+
+## Rounded Regular Polygon Partial Stitch Pattern
+
+Tests partial-edge stitches on a rounded octagon with only selected rounded corners.
+
+```python
+doc = SvgDocument(120, 120)
+shape = RoundedRegularPolygon(
+    60, 60, 40, 8, corner_radius=0, rotation_deg=22.5,
+    corner_overrides={1: 5, 2: 5, 5: 5, 6: 5},
+)
+
+doc.add_shape(shape, layer="cut")
+doc.add_stitch_pattern(
+    shape,
+    edges=[0, 1, 2, 3],
+    spacing=8.0,
+    stitch_length=3.0,
+    stitch_angle_deg=30.0,
+    inset=5.0,
+    layer="stitch",
+    stitch_thickness=0.8,
+)
+```
+
+![Rounded regular polygon partial stitches](tests/baselines/rounded_regular_polygon_stitches_partial.png)
 
 ## Vertical Stadium Stitch Pattern
 

@@ -21,6 +21,7 @@ in `leathercraft_svg.py` (Python library) and `leathercraft_dsl.py` (DSL).
 | Arc / circular sector | `Arc` | `arc` | ✅ full |
 | Stadium / oblong | `Stadium` | `stadium` | ✅ full |
 | Regular n-gon | `RegularPolygon` | `regular_polygon` | ✅ full |
+| Rounded regular n-gon | `RoundedRegularPolygon` | `rounded_regular_polygon` | ✅ full |
 | Cubic Bézier path | — | — | ❌ missing |
 
 ---
@@ -215,7 +216,27 @@ A regular polygon with N equal sides, defined by a centre point and circumscribe
 
 ---
 
-### 6. Open polyline as a cut/crease shape
+### 6. Rounded regular n-gon — ✅ IMPLEMENTED
+
+> **Status:** Implemented as `RoundedRegularPolygon(cx, cy, radius, sides, corner_radius=..., rotation_deg=-90, corner_overrides=...)`
+> in `leathercraft_svg.py` and the `rounded_regular_polygon` block in the DSL.
+> Supports uniform or per-corner rounding via `corner_radius_0`, `corner_radius_1`, ...
+> Stitches and holes follow the rounded contour when all edges are selected.
+> See `examples/dsl/rounded_regular_polygon.lcraft`.
+
+**SVG primitive:** expressed as a `<path>` built from straight segments and quadratic corner curves.
+
+A regular polygon whose corners can be rounded uniformly or only at selected vertices.
+
+**Implementation notes:**
+- Uses the same center/radius/sides definition as `RegularPolygon`.
+- `corner_radius` rounds all corners uniformly.
+- Per-corner overrides use numeric vertex keys in the DSL, e.g. `corner_radius_0`, `corner_radius_3`.
+- Adjacent rounded corners are scaled down when necessary so they never overlap on one edge.
+
+---
+
+### 7. Open polyline as a cut/crease shape
 
 **SVG primitive:** `<polyline points="…"/>`
 
@@ -252,7 +273,7 @@ in `add_stitch_pattern` / `add_holes`.
 
 ---
 
-### 7. Raw path (DSL access to `add_path`)
+### 8. Raw path (DSL access to `add_path`)
 
 **SVG primitive:** `<path d="…"/>` (full SVG path grammar)
 
@@ -293,6 +314,6 @@ fall back to Python code.
 | ✅ Done | **Ellipse** | Implemented — `Ellipse` class + `ellipse` DSL block |
 | ✅ Done | **Per-corner rounded rect** | Implemented — `radius_tl/tr/br/bl` on `RoundedRectangle` + DSL keys |
 | ✅ Done | **Arc / sector** | Implemented — `Arc` class + `arc` DSL block (wedge + ring segment) |
-| 🟡 Medium | **Regular n-gon** | Easy to implement as a `Polygon` factory |
+| ✅ Done | **Regular n-gon** | Easy to implement as a `Polygon` factory |
 | 🟢 Low | **Open polyline** | Niche use; partial support already exists via `path` in stitches |
 | 🟢 Low | **Raw path DSL block** | Power-user feature; complex stitching support |

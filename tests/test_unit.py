@@ -19,6 +19,7 @@ from leathercraft_svg import (
     Polygon,
     RegularPolygon,
     Rectangle,
+    RoundedRegularPolygon,
     RoundedRectangle,
     RoundedTriangle,
     Stadium,
@@ -45,6 +46,7 @@ from leathercraft_svg import (
     positions_on_side_center,
     quadratic_bezier,
     rounded_rectangle_contour,
+    rounded_polygon_contour,
     rounded_triangle_contour,
     segment_on_edge,
     signed_double_area,
@@ -206,6 +208,41 @@ class TestRegularPolygon(unittest.TestCase):
         full = shape.stitch_segments(edges="all", spacing=8.0, inset=4.0)
         self.assertGreater(len(partial), 0)
         self.assertLess(len(partial), len(full))
+
+
+class TestRoundedRegularPolygon(unittest.TestCase):
+    def test_contour_helper_handles_zero_radii(self):
+        pts = [Point(0, 0), Point(10, 0), Point(10, 10), Point(0, 10)]
+        result = rounded_polygon_contour(pts, [0, 0, 0, 0])
+        self.assertEqual(result, pts)
+
+    def test_corner_radii_uniform(self):
+        shape = RoundedRegularPolygon(50, 50, 20, 6, corner_radius=5)
+        self.assertEqual(shape.corner_radii(), [5.0] * 6)
+
+    def test_corner_override(self):
+        shape = RoundedRegularPolygon(50, 50, 20, 6, corner_radius=0, corner_overrides={1: 4, 4: 6})
+        self.assertEqual(shape.corner_radii(), [0.0, 4.0, 0.0, 0.0, 6.0, 0.0])
+
+    def test_path_contains_quadratic_curves(self):
+        shape = RoundedRegularPolygon(50, 50, 20, 6, corner_radius=5)
+        self.assertIn("Q", shape.path_d())
+
+    def test_holes_follow_rounded_contour_on_all_edges(self):
+        shape = RoundedRegularPolygon(60, 60, 30, 6, corner_radius=6)
+        rounded = shape.hole_points(edges="all", spacing=8.0, inset=4.0)
+        partial = shape.hole_points(edges=[0, 1], spacing=8.0, inset=4.0)
+        self.assertGreater(len(rounded), 0)
+        self.assertGreater(len(partial), 0)
+        self.assertLess(len(partial), len(rounded))
+
+    def test_stitches_follow_rounded_contour_on_all_edges(self):
+        shape = RoundedRegularPolygon(60, 60, 30, 8, corner_radius=5, corner_overrides={0: 0, 4: 0})
+        rounded = shape.stitch_segments(edges="all", spacing=8.0, inset=4.0, stitch_length=3.0)
+        partial = shape.stitch_segments(edges=[0, 1, 2], spacing=8.0, inset=4.0, stitch_length=3.0)
+        self.assertGreater(len(rounded), 0)
+        self.assertGreater(len(partial), 0)
+        self.assertLess(len(partial), len(rounded))
 
 
 class TestLineIntersection(unittest.TestCase):

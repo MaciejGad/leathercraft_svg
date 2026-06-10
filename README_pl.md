@@ -314,6 +314,31 @@ Parametry:
 
 Szwy i otwory są rozmieszczane w równych odstępach wzdłuż konturu elipsy pomocniczej o promieniach `rx - inset` i `ry - inset`. Parametr `edges` jest akceptowany, ale ignorowany — zawsze używany jest pełny kontur. Jeśli `inset` jest większy lub równy któremukolwiek z promieni, zwracana jest pusta lista.
 
+### `RegularPolygon(cx, cy, radius, sides, rotation_deg=-90.0)`
+
+Foremny n-kąt zdefiniowany przez środek, promień okręgu opisanego i liczbę boków.
+
+Parametry:
+
+- `cx`, `cy` - środek,
+- `radius` - promień okręgu opisanego (od środka do wierzchołka),
+- `sides` - liczba boków (`>= 3`),
+- `rotation_deg` - opcjonalny obrót; domyślne `-90` ustawia pierwszy wierzchołek u góry.
+
+Szwy i otwory mogą korzystać z całego konturu albo z wybranych krawędzi numerycznych.
+
+### `RoundedRegularPolygon(cx, cy, radius, sides, corner_radius=5.0, rotation_deg=-90.0, corner_overrides=None)`
+
+Foremny n-kąt z zaokrąglonymi narożnikami.
+
+Parametry:
+
+- `cx`, `cy`, `radius`, `sides`, `rotation_deg` - jak w `RegularPolygon`,
+- `corner_radius` - jednolita wartość zaokrąglenia narożników,
+- `corner_overrides` - opcjonalne nadpisania `{indeks: promień}` dla wybranych wierzchołków. `0` daje ostry narożnik, a pominięte indeksy korzystają z jednolitego `corner_radius`.
+
+Jeśli dwa zaokrąglenia na wspólnej krawędzi nachodziłyby na siebie, wszystkie promienie są proporcjonalnie zmniejszane. Przy zaznaczeniu wszystkich krawędzi ściegi i otwory podążają po zaokrąglonym konturze; przy wyborze tylko części krawędzi układ wraca do prostych, odsuniętych krawędzi.
+
 ### `Arc(cx, cy, radius, start_angle, end_angle, inner_radius=0.0)`
 
 Wycinek koła (klin) lub wycinek pierścienia.
@@ -694,6 +719,32 @@ end
 
 Wielokąty foremne obsługują ściegi i otwory wzdłuż całego konturu albo na wybranych krawędziach wskazanych numerami, np. `0 1 2`.
 
+### Zaokrąglony wielokąt foremny
+
+Zaokrąglony foremny n-kąt korzysta z tego samego układu `środek + promień + liczba boków`, a następnie zaokrągla wszystkie narożniki przez `corner_radius` albo tylko wybrane wierzchołki przez `corner_radius_0`, `corner_radius_1` itd.
+
+```text
+rounded_regular_polygon ozdoba
+  at 60 60
+  radius 40
+  sides 8
+  rotation 22.5
+  corner_radius_1 5
+  corner_radius_2 5
+  corner_radius_5 5
+  corner_radius_6 5
+end
+
+stitches
+  source ozdoba
+  margin 5
+  spacing 8
+  length 3
+end
+```
+
+Gdy zaznaczone są wszystkie krawędzie, ściegi i otwory automatycznie podążają po zaokrąglonym konturze. Gdy wybierzesz tylko część krawędzi, rozmieszczenie wraca do prostych odsuniętych boków, podobnie jak w `RoundedRectangle`.
+
 ### Łuk / wycinek
 
 Klin (wycinek koła) lub wycinek pierścienia, gdy podane jest `inner_radius`. Kąty są w stopniach: `0` = prawo (godzina 3), rosnąco zgodnie z ruchem wskazówek zegara.
@@ -780,7 +831,7 @@ Nie stosuj przyrostków jednostek takich jak `mm` ani `cm`. Każda liczba jest j
 
 ### Obsługiwane słowa kluczowe
 
-`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `stadium`, `circle`, `ellipse`, `arc`, `triangle`, `rounded_triangle`, `regular_polygon`, `outer`, `stitches`, `holes`, `hole`, `export`
+`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `stadium`, `circle`, `ellipse`, `arc`, `triangle`, `rounded_triangle`, `regular_polygon`, `rounded_regular_polygon`, `outer`, `stitches`, `holes`, `hole`, `export`
 
 Nazwy krawędzi prostokąta: `top`, `right`, `bottom`, `left`, `all`, `except_top`, `sides`, `horizontal`, `vertical`
 

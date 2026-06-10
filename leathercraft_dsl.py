@@ -6,7 +6,7 @@ Usage:
 
 Supported constructs: pattern, size, layer, symmetry, rectangle,
 rounded_rectangle, stadium, circle, ellipse, arc, triangle, rounded_triangle,
-regular_polygon, outer,
+regular_polygon, rounded_regular_polygon, outer,
 stitches, holes, hole, export.
 """
 
@@ -26,6 +26,7 @@ from leathercraft_svg import (
     Polygon,
     RegularPolygon,
     Rectangle,
+    RoundedRegularPolygon,
     RoundedRectangle,
     RoundedTriangle,
     Stadium,
@@ -178,6 +179,19 @@ class RegularPolygonDefinition:
 
 
 @dataclass
+class RoundedRegularPolygonDefinition:
+    id: str
+    cx: float
+    cy: float
+    radius: float
+    sides: int
+    corner_radius: float = 0.0
+    rotation: float = -90.0
+    layer: str = "cut"
+    corner_overrides: dict[int, float] = field(default_factory=dict)
+
+
+@dataclass
 class OuterPathDefinition:
     smooth: bool
     mirrored: bool
@@ -304,7 +318,7 @@ def _resolve_color(token: str) -> str:
 _BLOCK_STARTERS = {
     "rectangle", "rounded_rectangle", "stadium",
     "circle", "ellipse", "arc",
-    "triangle", "rounded_triangle", "regular_polygon",
+    "triangle", "rounded_triangle", "regular_polygon", "rounded_regular_polygon",
     "outer",
     "stitches", "holes", "hole",
     "path", "points",
@@ -801,6 +815,87 @@ def parse(text: str) -> PatternDocument:
             shape_ids.add(shape_id)
 
         # ------------------------------------------------------------------
+        elif keyword == "rounded_regular_polygon":
+            if len(tokens) < 2:
+                raise DslError(f"Line {lineno}: 'rounded_regular_polygon' requires an id")
+            shape_id = tokens[1]
+            data = _parse_block_body(body)
+
+            def _req(k: str, sid=shape_id, ln=lineno) -> tuple[int, list[str]]:
+                if k not in data:
+                    raise DslError(f"Line {ln}: rounded_regular_polygon '{sid}' is missing '{k}'")
+                return data[k]
+
+            at_lineno, at_vals = _req("at")
+            radius_lineno, radius_vals = _req("radius")
+            sides_lineno, sides_vals = _req("sides")
+            cx = _parse_float(at_vals[0], at_lineno, "at cx")
+            cy = _parse_float(at_vals[1], at_lineno, "at cy")
+            radius = _parse_float(radius_vals[0], radius_lineno, "radius")
+            sides_value = _parse_float(sides_vals[0], sides_lineno, "sides")
+            sides = int(sides_value)
+            if sides != sides_value:
+                raise DslError(f"Line {sides_lineno}: sides must be a whole number")
+            if radius <= 0:
+                raise DslError(f"Line {radius_lineno}: radius must be greater than 0")
+            if sides < 3:
+                raise DslError(f"Line {sides_lineno}: sides must be at least 3")
+
+            rotation = -90.0
+            if "rotation" in data:
+                rotation_lineno, rotation_vals = data["rotation"]
+                rotation = _parse_float(rotation_vals[0], rotation_lineno, "rotation")
+
+            corner_overrides: dict[int, float] = {}
+            allowed_keys = {"at", "radius", "corner_radius", "sides", "rotation", "layer"}
+            for key, (key_lineno, key_vals) in data.items():
+                if key in allowed_keys:
+                    continue
+                match = re.fullmatch(r"corner_radius_(\d+)", key)
+                if match is None:
+                    raise DslError(
+                        f"Line {key_lineno}: unknown key '{key}' in rounded_regular_polygon block"
+                    )
+                index = int(match.group(1))
+                if index >= sides:
+                    raise DslError(
+                        f"Line {key_lineno}: {key} is out of range for {sides} sides"
+                    )
+                value = _parse_float(key_vals[0], key_lineno, key)
+                if value < 0:
+                    raise DslError(f"Line {key_lineno}: {key} must be >= 0")
+                corner_overrides[index] = value
+
+            if "corner_radius" in data:
+                corner_radius_lineno, corner_radius_vals = data["corner_radius"]
+                corner_radius = _parse_float(corner_radius_vals[0], corner_radius_lineno, "corner_radius")
+                if corner_radius < 0:
+                    raise DslError(f"Line {corner_radius_lineno}: corner_radius must be >= 0")
+            elif corner_overrides:
+                corner_radius = 0.0
+            else:
+                raise DslError(
+                    f"Line {lineno}: rounded_regular_polygon '{shape_id}' is missing 'corner_radius' "
+                    f"(or per-corner corner_radius_0/corner_radius_1/...)"
+                )
+
+            layer_name = "cut"
+            if "layer" in data:
+                layer_name = data["layer"][1][0]
+            shapes.append(RoundedRegularPolygonDefinition(
+                id=shape_id,
+                cx=cx,
+                cy=cy,
+                radius=radius,
+                sides=sides,
+                corner_radius=corner_radius,
+                rotation=rotation,
+                layer=layer_name,
+                corner_overrides=corner_overrides,
+            ))
+            shape_ids.add(shape_id)
+
+        # ------------------------------------------------------------------
         elif keyword == "outer":
             rest = tokens[1:]
             smooth = False
@@ -1177,6 +1272,19 @@ def compile_document(doc: PatternDocument) -> SvgDocument:
                 shape_def.radius,
                 shape_def.sides,
                 rotation_deg=shape_def.rotation,
+            )
+            svg.add_shape(s, layer=shape_def.layer)
+            shape_objects[shape_def.id] = s
+
+        elif isinstance(shape_def, RoundedRegularPolygonDefinition):
+            s = RoundedRegularPolygon(
+                shape_def.cx,
+                shape_def.cy,
+                shape_def.radius,
+                shape_def.sides,
+                corner_radius=shape_def.corner_radius,
+                rotation_deg=shape_def.rotation,
+                corner_overrides=shape_def.corner_overrides,
             )
             svg.add_shape(s, layer=shape_def.layer)
             shape_objects[shape_def.id] = s

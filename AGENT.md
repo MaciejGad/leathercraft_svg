@@ -790,6 +790,24 @@ end
 
 Compiles to `RegularPolygon(cx, cy, radius, sides, rotation_deg=rotation)`. `radius` must be > 0. `sides` must be a whole number >= 3. The default rotation is `-90`, which places the first vertex at the top. Stitches and holes can use the full contour or selected numeric edges such as `0 1 2`.
 
+#### `rounded_regular_polygon`
+
+```text
+rounded_regular_polygon <id>
+  at <cx> <cy>
+  radius <r>                # circumscribed radius (center -> vertex)
+  sides <n>
+  [corner_radius <r>]       # uniform rounding for all corners
+  [rotation <deg>]
+  [corner_radius_0 <r>]     # per-corner overrides by vertex index
+  [corner_radius_1 <r>]
+  ...
+  [layer <layer_name>]
+end
+```
+
+Compiles to `RoundedRegularPolygon(cx, cy, radius, sides, corner_radius=..., rotation_deg=rotation, corner_overrides=...)`. `radius` is the polygon size and must be > 0. `sides` must be a whole number >= 3. Use `corner_radius` for uniform rounding, or omit it and provide only `corner_radius_<index>` keys to round selected vertices while leaving the others sharp. Override values must be >= 0 and must refer to valid vertex indices for the chosen side count. With all edges selected, stitches and holes follow the rounded contour; partial edge selections use straight inset edges.
+
 #### `triangle`
 
 Two forms are supported.
@@ -973,7 +991,7 @@ Places circles at `(axis_x − distance, y)` and `(axis_x + distance, y)`.
 
 Multiple names can be combined: `edges left bottom right`.
 
-**Triangle / RoundedTriangle / RegularPolygon** — numeric indices:
+**Triangle / RoundedTriangle / RegularPolygon / RoundedRegularPolygon** — numeric indices:
 
 | Index | Edge |
 |-------|------|

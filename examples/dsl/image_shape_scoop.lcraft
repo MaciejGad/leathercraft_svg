@@ -1,0 +1,51 @@
+# Approximation traced from the uploaded screenshot.
+# All dimensions are in millimeters.
+# The file uses smooth freeform outlines and one punch hole.
+
+pattern image_shape_scoop
+size 170 205
+
+layer cut red 0.12
+layer guide gray 0.12 dashed
+
+# Main visible cutting outline: handle + rounded paddle/body as one continuous shape.
+# Coordinates were scaled from the screenshot and should be treated as a first draft
+# for visual calibration before laser cutting. 
+outer smooth
+  28 3
+  18 5
+  11 11
+  7 18
+  10 27
+  34 77
+  36 86
+  31 92
+  27 96
+  26 104
+  31 116
+  52 148
+  75 184
+  93 197
+  121 202
+  139 197
+  149 184
+  153 168
+  150 150
+  132 90
+  120 54
+  115 47
+  108 45
+  99 48
+  67 65
+  58 67
+  52 64
+  30 14
+end
+
+# Keyring / hanging hole visible near the top of the handle.
+hole keyring
+  at 20.5 9
+  radius 1.4
+end
+
+export image_shape_scoop

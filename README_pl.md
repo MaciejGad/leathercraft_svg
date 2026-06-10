@@ -418,7 +418,7 @@ lewa_polowa = [
 shape = Polygon.from_mirror(lewa_polowa, center_x=75, smooth=True)
 doc.add_shape(shape, layer="cut")
 doc.add_holes(shape, spacing=8.0, hole_radius=1.2, inset=5.0, layer="stitch")
-doc.save("polygon.svg")
+doc.save("custom_outline.svg")
 ```
 
 ### `offset_polyline(points, distance, side="right", miter_limit=8.0)`
@@ -518,7 +518,7 @@ lewa_polowa = [
 shape = Polygon.from_mirror(lewa_polowa, center_x=75, smooth=True)
 doc.add_shape(shape, layer="cut")
 doc.add_holes(shape, spacing=8.0, hole_radius=1.2, inset=5.0, layer="stitch")
-doc.save("polygon.svg")
+doc.save("custom_outline.svg")
 ```
 
 ### Otwarta polilinia z przesuniętym szwem ściegów

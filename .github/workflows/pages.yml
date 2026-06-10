@@ -31,6 +31,9 @@ jobs:
           mkdir -p _site
           cp static/pyodide_index.html _site/index.html
           cp static/pyodide_editor.js _site/pyodide_editor.js
+          cp static/pyodide_runtime.js _site/pyodide_runtime.js
+          cp static/tutorial.html _site/tutorial.html
+          cp static/tutorial.js _site/tutorial.js
           cp leathercraft_svg.py _site/leathercraft_svg.py
           cp leathercraft_dsl.py _site/leathercraft_dsl.py
           touch _site/.nojekyll

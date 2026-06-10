@@ -179,7 +179,7 @@
 
 const BLOCK_STARTERS = new Set([
   "rectangle","rounded_rectangle","stadium","circle","ellipse","arc","triangle","rounded_triangle","regular_polygon","rounded_regular_polygon",
-  "polygon","outer","stitches","holes","hole","path"
+  "outer","stitches","holes","hole","path"
 ]);
 const TOP_KEYWORDS = new Set(["pattern","size","export","end"]);
 const ALL_KEYWORDS = new Set([...BLOCK_STARTERS, ...TOP_KEYWORDS]);
@@ -256,7 +256,6 @@ const BLOCK_PROPS = {
   rounded_triangle:   ["p1","p2","p3","at","size","radius","layer","end"],
   regular_polygon:    ["at","radius","sides","rotation","layer","end"],
   rounded_regular_polygon: ["at","radius","corner_radius","corner_radius_0","sides","rotation","layer","end"],
-  polygon:            ["layer","end"],
   outer:              ["smooth","mirror","end"],
   stitches:           ["source","edges","margin","spacing","length","angle","layer","mirror","side","rounded_path","path","end"],
   holes:              ["source","edges","margin","spacing","radius","layer","rounded_path","end"],
@@ -316,7 +315,7 @@ function lcraft_hint(editor) {
       // Top level
       candidates = [
         "pattern","size","rectangle","rounded_rectangle","stadium","circle","ellipse","arc",
-        "triangle","rounded_triangle","regular_polygon","rounded_regular_polygon","polygon","stitches","holes","hole","export"
+        "triangle","rounded_triangle","regular_polygon","rounded_regular_polygon","outer","stitches","holes","hole","export"
       ];
     }
   }

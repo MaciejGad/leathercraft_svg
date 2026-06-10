@@ -50,6 +50,22 @@ def pyodide_editor_js() -> Response:
     return send_from_directory("static", "pyodide_editor.js")
 
 
+@app.route("/pyodide_runtime.js")
+def pyodide_runtime_js() -> Response:
+    return send_from_directory("static", "pyodide_runtime.js")
+
+
+@app.route("/tutorial")
+@app.route("/tutorial.html")
+def tutorial_index() -> Response:
+    return send_from_directory("static", "tutorial.html")
+
+
+@app.route("/tutorial.js")
+def tutorial_js() -> Response:
+    return send_from_directory("static", "tutorial.js")
+
+
 @app.route("/leathercraft_svg.py")
 def leathercraft_svg_source() -> Response:
     return send_file(Path(app.root_path) / "leathercraft_svg.py", mimetype="text/x-python")

@@ -91,6 +91,8 @@ There are now two frontend modes:
 
 The Pyodide editor compiles `.lcraft` directly in the browser and supports
 downloading `.lcraft` and `.svg` only. It does not offer PNG/PDF/DXF export.
+It also links to a browser-based tutorial with editable samples that render in place
+and can be opened in the full editor.
 
 Illustration:
 
@@ -439,7 +441,7 @@ left_half = [
 shape = Polygon.from_mirror(left_half, center_x=75, smooth=True)
 doc.add_shape(shape, layer="cut")
 doc.add_holes(shape, spacing=8.0, hole_radius=1.2, inset=5.0, layer="stitch")
-doc.save("polygon.svg")
+doc.save("custom_outline.svg")
 ```
 
 ### `offset_polyline(points, distance, side="right", miter_limit=8.0)`
@@ -539,7 +541,7 @@ left_half = [
 shape = Polygon.from_mirror(left_half, center_x=75, smooth=True)
 doc.add_shape(shape, layer="cut")
 doc.add_holes(shape, spacing=8.0, hole_radius=1.2, inset=5.0, layer="stitch")
-doc.save("polygon.svg")
+doc.save("custom_outline.svg")
 ```
 
 ### Open polyline with offset stitch seam

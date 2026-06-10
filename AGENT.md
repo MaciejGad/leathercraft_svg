@@ -929,6 +929,8 @@ end
 
 Compiles to `Polygon(points)` or `Polygon.from_mirror(points, center_x)`.
 
+There is no separate DSL `polygon` block at the moment. Use `outer` for custom closed outlines.
+
 - `smooth` → quadratic Bézier contour; `straight` → straight segments (default).
 - `mirrored` → requires a global `symmetry` axis; the listed points describe **one half** of the shape (must start and end on the axis).
 - Default layer: `cut`. Shape is registered as id `"outer"`.

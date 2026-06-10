@@ -1,6 +1,6 @@
 # Visual Test Reference
 
-This document describes every scenario covered by [tests/test_visual.py](/Users/bazyl/Code/leatherLaser/laser_svg_library_fixed_holes/tests/test_visual.py). Each section shows:
+This document describes every scenario covered by [tests/test_visual.py](tests/test_visual.py). Each section shows:
 
 - what the test renders,
 - the code needed to build that shape,

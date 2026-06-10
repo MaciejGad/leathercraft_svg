@@ -25,8 +25,9 @@ run_tests() {
   "$PYTHON_BIN" "$@"
 }
 
-run_tests -m pytest tests/test_visual.py
-run_tests -m pytest tests/test_unit.py -v
+PYTEST_ARGS=(tests)
+
+run_tests -m pytest "${PYTEST_ARGS[@]}"
 
 echo
 echo "==> Coverage summary"
@@ -36,7 +37,7 @@ echo "==> Coverage summary"
   --missing \
   --coverdir "$COVER_DIR" \
   --ignore-dir "$IGNORE_DIRS" \
-  --module pytest tests/test_visual.py tests/test_unit.py > "$REPORT_FILE"
+  --module pytest "${PYTEST_ARGS[@]}" > "$REPORT_FILE"
 
 echo
 echo "==> Project coverage focus"

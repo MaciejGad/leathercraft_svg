@@ -1,6 +1,6 @@
 const BLOCK_STARTERS = new Set([
   "rectangle", "rounded_rectangle", "stadium", "circle", "ellipse", "arc", "triangle", "rounded_triangle", "regular_polygon", "rounded_regular_polygon",
-  "polygon", "outer", "stitches", "holes", "hole", "path",
+  "outer", "stitches", "holes", "hole", "path",
 ]);
 const TOP_KEYWORDS = new Set(["pattern", "size", "export", "end"]);
 const ALL_KEYWORDS = new Set([...BLOCK_STARTERS, ...TOP_KEYWORDS]);
@@ -29,7 +29,6 @@ const BLOCK_PROPS = {
   rounded_triangle: ["p1", "p2", "p3", "at", "size", "radius", "layer", "end"],
   regular_polygon: ["at", "radius", "sides", "rotation", "layer", "end"],
   rounded_regular_polygon: ["at", "radius", "corner_radius", "corner_radius_0", "sides", "rotation", "layer", "end"],
-  polygon: ["layer", "end"],
   outer: ["smooth", "mirror", "end"],
   stitches: ["source", "edges", "margin", "spacing", "length", "angle", "layer", "mirror", "side", "rounded_path", "path", "end"],
   holes: ["source", "edges", "margin", "spacing", "radius", "layer", "rounded_path", "end"],
@@ -62,8 +61,7 @@ end
 export rectangle_panel
 `;
 
-let pyodide = null;
-let pyodideReady = false;
+const compiler = window.LeathercraftPyodide.createPyodideCompiler();
 let lastGoodSvg = null;
 let lastCompileError = null;
 let compileTimer = null;
@@ -167,7 +165,7 @@ function lcraftHint(editor) {
     } else {
       candidates = [
         "pattern", "size", "rectangle", "rounded_rectangle", "stadium", "circle", "ellipse", "arc",
-        "triangle", "rounded_triangle", "regular_polygon", "rounded_regular_polygon", "polygon", "stitches", "holes", "hole", "export",
+        "triangle", "rounded_triangle", "regular_polygon", "rounded_regular_polygon", "outer", "stitches", "holes", "hole", "export",
       ];
     }
   }
@@ -197,7 +195,12 @@ const editor = CodeMirror.fromTextArea(document.getElementById("editor"), {
   hintOptions: { hint: lcraftHint, completeSingle: false },
 });
 editor.setSize("100%", "100%");
-editor.setValue(DEFAULT_SOURCE);
+function initialSource() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("source") || DEFAULT_SOURCE;
+}
+
+editor.setValue(initialSource());
 
 function patternName() {
   const match = editor.getValue().match(/^pattern\s+(\S+)/m);
@@ -239,60 +242,12 @@ function renderSvg(svgStr, dimmed = false) {
   svgEl.style.transition = "opacity .2s";
 }
 
-function browserModuleUrl(filename) {
-  return new URL(`./${filename}`, window.location.href).toString();
-}
-
-async function loadProjectModules(pyodideRuntime) {
-  const moduleFiles = ["leathercraft_svg.py", "leathercraft_dsl.py"];
-  for (const filename of moduleFiles) {
-    const response = await fetch(browserModuleUrl(filename));
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ${filename}: ${response.status} ${response.statusText}`);
-    }
-    const source = await response.text();
-    pyodideRuntime.FS.writeFile(`/${filename}`, source);
-  }
-}
-
-async function initializePythonCompiler(pyodideRuntime) {
-  await pyodideRuntime.runPythonAsync(`
-import json
-import sys
-
-if "/" not in sys.path:
-    sys.path.insert(0, "/")
-
-from leathercraft_dsl import DslError, compile_document, parse
-
-def compile_lcraft_to_svg(source: str) -> str:
-    try:
-        doc = parse(source)
-        svg = compile_document(doc).to_svg()
-        return json.dumps({"svg": svg, "error": None})
-    except DslError as exc:
-        return json.dumps({"svg": None, "error": str(exc)})
-    except Exception as exc:
-        return json.dumps({"svg": None, "error": f"Internal error: {exc}"})
-`);
-}
-
-async function compileSource(source) {
-  pyodide.globals.set("browser_source_text", source);
-  try {
-    const result = await pyodide.runPythonAsync("compile_lcraft_to_svg(browser_source_text)");
-    return JSON.parse(result);
-  } finally {
-    pyodide.globals.delete("browser_source_text");
-  }
-}
-
 async function compileAndRender(source) {
   const generation = ++compileGeneration;
-  setStatus("busy", pyodideReady ? "compiling" : "loading pyodide");
+  setStatus("busy", compiler.isReady() ? "compiling" : "loading pyodide");
 
   try {
-    const result = await compileSource(source);
+    const result = await compiler.compile(source);
     if (generation !== compileGeneration) return;
 
     if (result.svg) {
@@ -317,18 +272,7 @@ async function compileAndRender(source) {
 }
 
 async function bootstrapPyodide() {
-  if (typeof loadPyodide !== "function") {
-    throw new Error("Pyodide runtime script is unavailable.");
-  }
-
-  setStatus("busy", "loading pyodide");
-  pyodide = await loadPyodide();
-  setStatus("busy", "loading modules");
-  await loadProjectModules(pyodide);
-  setStatus("busy", "initializing compiler");
-  await initializePythonCompiler(pyodide);
-  await compileSource("pattern smoke_test\nsize 10 10\n");
-  pyodideReady = true;
+  await compiler.ensureReady(setStatus);
   setButtonsEnabled(true);
   clearError();
   setStatus("ready", "ready");
@@ -338,7 +282,7 @@ async function bootstrapPyodide() {
 editor.on("change", () => {
   clearTimeout(compileTimer);
 
-  if (!pyodideReady) return;
+  if (!compiler.isReady()) return;
 
   compileTimer = window.setTimeout(() => {
     compileAndRender(editor.getValue());
@@ -356,7 +300,7 @@ btnLcraft.addEventListener("click", () => {
 });
 
 btnSvg.addEventListener("click", async () => {
-  if (!pyodideReady) {
+  if (!compiler.isReady()) {
     showError("Pyodide is still loading.");
     setStatus("busy", "loading pyodide");
     return;
@@ -404,7 +348,6 @@ setButtonsEnabled(false);
 showError("Loading Pyodide and Python modules...");
 
 bootstrapPyodide().catch(error => {
-  pyodideReady = false;
   setButtonsEnabled(false);
   showError(`Pyodide initialization failed: ${error.message}`);
   setStatus("err", "error");

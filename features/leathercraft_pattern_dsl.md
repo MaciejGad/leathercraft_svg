@@ -4,7 +4,7 @@
 
 The DSL describes leathercraft cutting patterns in a text format without requiring Python code.
 
-A DSL file should allow the user to define document size, layers, outer shapes, rectangles, rounded rectangles, freeform paths, mirrored shapes, stitch patterns, holes, keyring holes, and exports.
+A DSL file should allow the user to define document size, layers, outer shapes, rectangles, rounded rectangles, custom outlines via `outer`, mirrored shapes, stitch patterns, holes, keyring holes, and exports.
 
 The DSL is not meant to expose all internal geometry details. It should describe intent, while the compiler converts it to `leathercraft_svg` calls.
 
@@ -632,6 +632,8 @@ The `rounded_path` flag (see section 9) applies specifically to `RoundedTriangle
 ### 7.9 Outer Freeform Shape
 
 For irregular leather patterns, use `outer`.
+
+There is no separate DSL `polygon` block at the moment. For custom closed outlines, `outer` is the supported form.
 
 ```text
 outer smooth mirrored

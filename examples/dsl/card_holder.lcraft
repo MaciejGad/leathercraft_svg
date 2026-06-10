@@ -1,0 +1,23 @@
+pattern card_holder
+size 120 95
+
+# Card-holder front panel: fully rounded top corners, sharp bottom
+# corners — stitched along the sides and bottom only, so cards can
+# slide in from the open top edge.
+
+rounded_rectangle front
+  at 10 10
+  size 100 75
+  radius_tl 18
+  radius_tr 18
+end
+
+stitches
+  source front
+  edges left bottom right
+  margin 5
+  spacing 5
+  length 3
+end
+
+export card_holder

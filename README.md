@@ -269,14 +269,17 @@ Rectangle edge indices:
 - `2` - bottom,
 - `3` - left.
 
-### `RoundedRectangle(x, y, width, height, radius=5.0)`
+### `RoundedRectangle(x, y, width, height, radius=5.0, radius_tl=None, radius_tr=None, radius_br=None, radius_bl=None)`
 
 Rectangle with rounded corners.
 
 Parameters:
 
 - `x`, `y`, `width`, `height` - as above,
-- `radius` - corner radius.
+- `radius` - uniform corner radius for all four corners,
+- `radius_tl`, `radius_tr`, `radius_br`, `radius_bl` - optional per-corner overrides (top-left, top-right, bottom-right, bottom-left). A value of `0` produces a sharp corner; `None` (default) falls back to the uniform `radius`.
+
+If two radii on a shared edge would overlap, all radii are scaled down proportionally. With `edges="all"`, stitches follow the rounded contour (including asymmetric corners); partial edge selections use straight inset edges.
 
 ### `Stadium(x, y, width, height)`
 
@@ -577,6 +580,27 @@ stitches
 end
 
 export rounded_pocket
+```
+
+### Per-corner rounded rectangle
+
+Each corner can have its own radius using `radius_tl` / `radius_tr` / `radius_br` / `radius_bl` (top-left, top-right, bottom-right, bottom-left). A value of `0` gives a sharp corner. When only per-corner keys are given, unspecified corners are sharp; combined with `radius`, per-corner keys override the uniform value.
+
+```text
+rounded_rectangle card
+  at 10 10
+  size 100 75
+  radius_tl 18
+  radius_tr 18
+end
+
+stitches
+  source card
+  edges left bottom right
+  margin 5
+  spacing 5
+  length 3
+end
 ```
 
 ### Stadium (capsule)

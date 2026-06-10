@@ -1257,3 +1257,69 @@ class TestEllipseStitchSegments(unittest.TestCase):
         self.assertIn("<path", out)
         self.assertIn("<line", out)
         self.assertIn("<circle", out)
+
+
+class TestPerCornerRoundedRectangle(unittest.TestCase):
+    def test_uniform_default_unchanged(self):
+        s = RoundedRectangle(10, 10, 100, 60, radius=8)
+        self.assertEqual(s.corner_radii(), (8.0, 8.0, 8.0, 8.0))
+
+    def test_per_corner_override(self):
+        s = RoundedRectangle(10, 10, 100, 60, radius=8, radius_bl=0, radius_br=0)
+        self.assertEqual(s.corner_radii(), (8.0, 8.0, 0.0, 0.0))
+
+    def test_sharp_corners_skip_q_curves(self):
+        s = RoundedRectangle(10, 10, 100, 60, radius=8, radius_bl=0, radius_br=0)
+        self.assertEqual(s.path_d().count("Q"), 2)
+
+    def test_all_sharp_equals_rectangle_outline(self):
+        s = RoundedRectangle(10, 10, 100, 60, radius=0,
+                             radius_tl=0, radius_tr=0, radius_br=0, radius_bl=0)
+        self.assertEqual(s.path_d().count("Q"), 0)
+
+    def test_overlapping_radii_scaled_down(self):
+        # Two 30mm corners on a 40mm edge → scaled to 20mm each
+        s = RoundedRectangle(0, 0, 40, 100, radius=0,
+                             radius_tl=30, radius_tr=30, radius_br=0, radius_bl=0)
+        tl, tr, br, bl = s.corner_radii()
+        self.assertAlmostEqual(tl, 20.0)
+        self.assertAlmostEqual(tr, 20.0)
+        self.assertEqual((br, bl), (0.0, 0.0))
+
+    def test_negative_radius_clamped_to_zero(self):
+        s = RoundedRectangle(10, 10, 100, 60, radius=8, radius_tl=-5)
+        self.assertEqual(s.corner_radii()[0], 0.0)
+
+    def test_stitches_follow_asymmetric_contour(self):
+        s = RoundedRectangle(10, 10, 100, 60, radius=20, radius_bl=0, radius_br=0)
+        segs = s.stitch_segments(spacing=6, inset=4, stitch_length=3)
+        self.assertGreater(len(segs), 0)
+        ys = [a.y for a, b in segs] + [b.y for a, b in segs]
+        # Bottom edge is straight at y = 66 (10 + 60 - 4); points reach it
+        self.assertAlmostEqual(max(ys), 66.0, delta=2.0)
+
+    def test_uniform_stitches_match_old_behavior(self):
+        uniform = RoundedRectangle(20, 15, 100, 60, radius=10)
+        explicit = RoundedRectangle(20, 15, 100, 60, radius=0,
+                                    radius_tl=10, radius_tr=10, radius_br=10, radius_bl=10)
+        a = uniform.stitch_segments(spacing=8, inset=7, stitch_length=3.5)
+        b = explicit.stitch_segments(spacing=8, inset=7, stitch_length=3.5)
+        self.assertEqual(len(a), len(b))
+
+    def test_contour_helper_per_corner(self):
+        c = rounded_rectangle_contour(0, 0, 100, 60, 0.0, radii=(10, 10, 0, 0))
+        self.assertGreater(len(c), 4)
+        # Bottom-right corner is sharp → contour contains the exact corner point
+        self.assertTrue(any(abs(p.x - 100) < 0.01 and abs(p.y - 60) < 0.01 for p in c))
+
+    def test_document_integration(self):
+        doc = SvgDocument(width_mm=120, height_mm=90)
+        s = RoundedRectangle(10, 10, 100, 70, radius=0, radius_tl=15, radius_tr=15,
+                             radius_br=0, radius_bl=0)
+        doc.add_shape(s, layer="cut")
+        doc.add_stitch_pattern(s, spacing=6, stitch_length=3, inset=5)
+        doc.add_holes(s, spacing=10, hole_radius=1.2, inset=5)
+        out = doc.to_svg()
+        self.assertIn("<path", out)
+        self.assertIn("<line", out)
+        self.assertIn("<circle", out)

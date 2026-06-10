@@ -283,7 +283,11 @@ Syntax:
 rounded_rectangle <id>
   at <x> <y>
   size <width> <height>
-  radius <radius>
+  radius <radius>             # uniform — all four corners
+  [radius_tl <radius>]        # optional per-corner overrides:
+  [radius_tr <radius>]        #   tl = top-left,    tr = top-right
+  [radius_br <radius>]        #   br = bottom-right, bl = bottom-left
+  [radius_bl <radius>]        # 0 = sharp corner
   [layer <layer_name>]
 end
 ```
@@ -291,8 +295,35 @@ end
 Compiler mapping:
 
 ```python
-RoundedRectangle(x, y, width, height, radius)
+RoundedRectangle(x, y, width, height, radius, radius_tl=…, radius_tr=…, radius_br=…, radius_bl=…)
 doc.add_shape(shape, layer="cut")
+```
+
+Either `radius` (> 0) or at least one per-corner key is required:
+
+- Only `radius` → all four corners use the uniform value (existing behaviour).
+- Only per-corner keys → unspecified corners are sharp (radius 0).
+- Both → per-corner keys override the uniform `radius` for those corners.
+
+Per-corner values must be >= 0. If two radii on a shared edge would overlap, all radii are scaled down proportionally. Stitches with `edges all` follow the asymmetric rounded contour.
+
+Example — card holder with rounded top and sharp bottom:
+
+```text
+rounded_rectangle card
+  at 10 10
+  size 100 75
+  radius_tl 18
+  radius_tr 18
+end
+
+stitches
+  source card
+  edges left bottom right
+  margin 5
+  spacing 5
+  length 3
+end
 ```
 
 Example with stitches on three edges:
@@ -1281,6 +1312,10 @@ spacing
 length
 angle
 radius
+radius_tl
+radius_tr
+radius_br
+radius_bl
 rx
 ry
 rounded_path

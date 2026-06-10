@@ -170,12 +170,20 @@ doc.add_holes(shape, edges=[0, 2], spacing=8.0, hole_radius=1.2, inset=5.0)
 ### RoundedRectangle
 
 ```python
-RoundedRectangle(x, y, width, height, radius=5.0)
+RoundedRectangle(x, y, width, height, radius=5.0,
+                 radius_tl=None, radius_tr=None, radius_br=None, radius_bl=None)
 ```
 
 Same edge indices as Rectangle (0=top, 1=right, 2=bottom, 3=left). Corner radius is automatically clamped to `min(radius, width/2, height/2)`.
 
-When `edges="all"`, the stitch pattern follows the smooth rounded contour. For partial edge selections it falls back to straight-edge placement.
+Each corner can be overridden individually with `radius_tl` / `radius_tr` / `radius_br` / `radius_bl` (top-left, top-right, bottom-right, bottom-left). `None` falls back to the uniform `radius`; `0` gives a sharp corner. If two radii on a shared edge would overlap, all four are scaled down proportionally (`corner_radii()` returns the effective values).
+
+When `edges="all"`, the stitch pattern follows the smooth rounded contour — including asymmetric per-corner contours. For partial edge selections it falls back to straight-edge placement.
+
+```python
+# Card holder: rounded top, sharp bottom
+shape = RoundedRectangle(10, 10, 100, 75, radius=0, radius_tl=18, radius_tr=18)
+```
 
 ```python
 shape = RoundedRectangle(20, 15, 100, 60, radius=10)
@@ -674,12 +682,16 @@ Compiles to `Rectangle(x, y, width, height)` + `doc.add_shape(...)`. Default lay
 rounded_rectangle <id>
   at <x> <y>
   size <width> <height>
-  radius <r>
+  radius <r>                  # uniform — all four corners
+  [radius_tl <r>]             # per-corner overrides (top-left, top-right,
+  [radius_tr <r>]             #  bottom-right, bottom-left); 0 = sharp corner
+  [radius_br <r>]
+  [radius_bl <r>]
   [layer <layer_name>]
 end
 ```
 
-Compiles to `RoundedRectangle(x, y, width, height, radius)`. `radius` must be > 0.
+Compiles to `RoundedRectangle(x, y, width, height, radius, radius_tl=…, …)`. Either `radius` (must be > 0) or at least one per-corner key is required. When only per-corner keys are given, unspecified corners are sharp (0). When `radius` is combined with per-corner keys, the per-corner values override the uniform radius for those corners. Per-corner values must be >= 0.
 
 #### `stadium`
 

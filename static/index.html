@@ -183,7 +183,7 @@ const TOP_KEYWORDS = new Set(["pattern","size","export","end"]);
 const ALL_KEYWORDS = new Set([...BLOCK_STARTERS, ...TOP_KEYWORDS]);
 
 const PROPERTY_NAMES = new Set([
-  "at","radius","rx","ry","layer","edges","margin","spacing","length","angle",
+  "at","radius","radius_tl","radius_tr","radius_br","radius_bl","rx","ry","layer","edges","margin","spacing","length","angle",
   "source","mirror","side","rounded_path","p1","p2","p3","smooth","step","count","from","to"
 ]);
 
@@ -237,7 +237,7 @@ CodeMirror.defineMode("lcraft", function() {
 // Properties valid inside each block type
 const BLOCK_PROPS = {
   rectangle:          ["at","size","layer","end"],
-  rounded_rectangle:  ["at","size","radius","layer","end"],
+  rounded_rectangle:  ["at","size","radius","radius_tl","radius_tr","radius_br","radius_bl","layer","end"],
   stadium:            ["at","size","layer","end"],
   circle:             ["at","radius","layer","end"],
   ellipse:            ["at","rx","ry","size","layer","end"],

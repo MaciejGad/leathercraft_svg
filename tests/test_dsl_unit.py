@@ -1381,3 +1381,79 @@ class TestCompileEllipse:
         doc = _parse("size 130 90\nellipse oval\n  at 65 45\n  size 110 70\nend")
         output = compile_document(doc).to_svg()
         assert "A 55.000 35.000" in output
+
+
+# ===========================================================================
+# Parser — Per-corner rounded rectangle
+# ===========================================================================
+
+
+class TestParsePerCornerRoundedRectangle:
+    def test_per_corner_only(self):
+        doc = _parse(
+            "size 120 90\nrounded_rectangle card\n  at 10 10\n  size 100 70\n"
+            "  radius_tl 15\n  radius_tr 15\nend"
+        )
+        s = doc.shapes[0]
+        assert s.radius == 0.0
+        assert s.radius_tl == 15.0
+        assert s.radius_tr == 15.0
+        assert s.radius_br == 0.0   # unspecified per-corner defaults to sharp
+        assert s.radius_bl == 0.0
+
+    def test_uniform_plus_override(self):
+        doc = _parse(
+            "size 120 90\nrounded_rectangle card\n  at 10 10\n  size 100 70\n"
+            "  radius 8\n  radius_bl 0\nend"
+        )
+        s = doc.shapes[0]
+        assert s.radius == 8.0
+        assert s.radius_bl == 0.0
+        assert s.radius_tl is None   # falls back to uniform radius
+
+    def test_uniform_only_unchanged(self):
+        doc = _parse(
+            "size 120 90\nrounded_rectangle card\n  at 10 10\n  size 100 70\n  radius 8\nend"
+        )
+        s = doc.shapes[0]
+        assert s.radius == 8.0
+        assert s.radius_tl is None
+
+    def test_missing_radius_and_corners_raises(self):
+        with pytest.raises(DslError, match="missing 'radius'"):
+            _parse("size 120 90\nrounded_rectangle card\n  at 10 10\n  size 100 70\nend")
+
+    def test_negative_corner_raises(self):
+        with pytest.raises(DslError, match="radius_tl must be >= 0"):
+            _parse(
+                "size 120 90\nrounded_rectangle card\n  at 10 10\n  size 100 70\n"
+                "  radius_tl -3\nend"
+            )
+
+
+class TestCompilePerCornerRoundedRectangle:
+    def test_sharp_bottom_has_two_q_curves(self):
+        doc = _parse(
+            "size 120 90\nrounded_rectangle card\n  at 10 10\n  size 100 70\n"
+            "  radius_tl 15\n  radius_tr 15\nend"
+        )
+        output = compile_document(doc).to_svg()
+        # Only the two rounded top corners produce Q curves
+        cut_path = [l for l in output.splitlines() if "<path" in l][0]
+        assert cut_path.count("Q") == 2
+
+    def test_stitches_compile(self):
+        doc = _parse(
+            "size 120 90\nrounded_rectangle card\n  at 10 10\n  size 100 70\n"
+            "  radius_tl 15\n  radius_tr 15\nend\n"
+            "stitches\n  source card\n  margin 5\n  spacing 6\n  length 3\nend"
+        )
+        assert "<line" in compile_document(doc).to_svg()
+
+    def test_holes_compile(self):
+        doc = _parse(
+            "size 120 90\nrounded_rectangle card\n  at 10 10\n  size 100 70\n"
+            "  radius 8\n  radius_br 0\nend\n"
+            "holes\n  source card\n  margin 5\n  spacing 8\n  radius 1.2\nend"
+        )
+        assert "<circle" in compile_document(doc).to_svg()

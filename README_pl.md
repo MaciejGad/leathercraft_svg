@@ -269,14 +269,17 @@ Indeksy krawędzi prostokąta:
 - `2` - dół,
 - `3` - lewa.
 
-### `RoundedRectangle(x, y, width, height, radius=5.0)`
+### `RoundedRectangle(x, y, width, height, radius=5.0, radius_tl=None, radius_tr=None, radius_br=None, radius_bl=None)`
 
 Prostokąt z zaokrąglonymi narożnikami.
 
 Parametry:
 
 - `x`, `y`, `width`, `height` - jak wyżej,
-- `radius` - promień zaokrąglenia.
+- `radius` - jednolity promień zaokrąglenia dla wszystkich czterech narożników,
+- `radius_tl`, `radius_tr`, `radius_br`, `radius_bl` - opcjonalne nadpisania dla poszczególnych narożników (lewy górny, prawy górny, prawy dolny, lewy dolny). Wartość `0` daje ostry narożnik; `None` (domyślnie) oznacza użycie jednolitego `radius`.
+
+Jeśli dwa promienie na wspólnej krawędzi nachodziłyby na siebie, wszystkie promienie są proporcjonalnie zmniejszane. Przy `edges="all"` szwy podążają wzdłuż zaokrąglonego konturu (także przy asymetrycznych narożnikach); przy częściowym wyborze krawędzi używane są proste, wsunięte krawędzie.
 
 ### `Stadium(x, y, width, height)`
 
@@ -577,6 +580,27 @@ stitches
 end
 
 export rounded_pocket
+```
+
+### Zaokrąglony prostokąt z różnymi narożnikami
+
+Każdy narożnik może mieć własny promień dzięki kluczom `radius_tl` / `radius_tr` / `radius_br` / `radius_bl` (lewy górny, prawy górny, prawy dolny, lewy dolny). Wartość `0` daje ostry narożnik. Gdy podane są tylko klucze narożników, pozostałe narożniki są ostre; w połączeniu z `radius` klucze narożników nadpisują wartość jednolitą.
+
+```text
+rounded_rectangle wizytownik
+  at 10 10
+  size 100 75
+  radius_tl 18
+  radius_tr 18
+end
+
+stitches
+  source wizytownik
+  edges left bottom right
+  margin 5
+  spacing 5
+  length 3
+end
 ```
 
 ### Stadium (kapsuła)

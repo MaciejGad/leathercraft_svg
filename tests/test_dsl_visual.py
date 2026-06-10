@@ -542,6 +542,26 @@ end
 # Scenario registry  name → builder
 # ---------------------------------------------------------------------------
 
+def _dsl_per_corner_rounded_rect() -> bytes:
+    return _compile_dsl("""
+size 120 90
+
+rounded_rectangle card
+  at 10 10
+  size 100 70
+  radius_tl 18
+  radius_tr 18
+end
+
+stitches
+  source card
+  margin 5
+  spacing 6
+  length 3
+end
+""")
+
+
 def _dsl_ellipse_stitches() -> bytes:
     return _compile_dsl("""
 size 130 90
@@ -658,6 +678,8 @@ SCENARIOS: dict[str, callable] = {
     "dsl_rounded_triangle_holes_straight.png": _dsl_rounded_triangle_holes_straight,
     "dsl_rounded_triangle_holes_rounded_path.png": _dsl_rounded_triangle_holes_rounded_path,
     "dsl_rounded_triangle_stitch_rounded_path.png": _dsl_rounded_triangle_stitch_rounded_path,
+    # --- per-corner rounded rectangle ---
+    "dsl_per_corner_rounded_rect.png": _dsl_per_corner_rounded_rect,
     # --- ellipse ---
     "dsl_ellipse_stitches.png": _dsl_ellipse_stitches,
     "dsl_ellipse_holes.png": _dsl_ellipse_holes,

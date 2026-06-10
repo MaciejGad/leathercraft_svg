@@ -11,7 +11,7 @@ in `leathercraft_svg.py` (Python library) and `leathercraft_dsl.py` (DSL).
 |---|---|---|---|
 | `<rect>` | `Rectangle` | `rectangle` | ✅ full |
 | `<rect rx ry>` (uniform radius) | `RoundedRectangle` | `rounded_rectangle` | ✅ full |
-| `<rect rx ry>` (per-corner radii) | — | — | ❌ missing |
+| `<rect rx ry>` (per-corner radii) | `RoundedRectangle` (`radius_tl/tr/br/bl`) | `rounded_rectangle` (`radius_tl` …) | ✅ full |
 | `<circle>` | `Circle` | `circle` | ✅ full |
 | `<ellipse>` | `Ellipse` | `ellipse` | ✅ full |
 | `<line>` | `add_line()` (document-level, not a Shape) | — | ⚠️ partial |
@@ -63,7 +63,13 @@ When `rx == ry` it is identical to a circle.
 
 ---
 
-### 2. Per-corner rounded rectangle
+### 2. Per-corner rounded rectangle — ✅ IMPLEMENTED
+
+> **Status:** Implemented by extending `RoundedRectangle` with optional
+> `radius_tl` / `radius_tr` / `radius_br` / `radius_bl` fields (defaulting to the
+> uniform `radius`; 0 = sharp corner; overlapping radii are scaled down).
+> The DSL `rounded_rectangle` block accepts the same keys.
+> See `examples/dsl/card_holder.lcraft`.
 
 **SVG primitive:** `<rect … rx="…" ry="…"/>` — SVG only supports one `rx` and one `ry`
 value for all corners, but a common extension (used in CSS, Inkscape, Figma) is to
@@ -275,7 +281,7 @@ fall back to Python code.
 |---|---|---|
 | ✅ Done | **Stadium / oblong** | Implemented — `Stadium` class + `stadium` DSL block |
 | ✅ Done | **Ellipse** | Implemented — `Ellipse` class + `ellipse` DSL block |
-| 🟡 Medium | **Per-corner rounded rect** | Small change to existing class; high design value |
+| ✅ Done | **Per-corner rounded rect** | Implemented — `radius_tl/tr/br/bl` on `RoundedRectangle` + DSL keys |
 | 🟡 Medium | **Arc / sector** | Needed for curved strap ends and fan cutouts |
 | 🟡 Medium | **Regular n-gon** | Easy to implement as a `Polygon` factory |
 | 🟢 Low | **Open polyline** | Niche use; partial support already exists via `path` in stitches |

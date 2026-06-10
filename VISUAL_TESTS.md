@@ -162,6 +162,48 @@ doc.add_stitch_pattern(
 
 ![Rounded rectangle partial stitch pattern](tests/baselines/rounded_rectangle_stitch_partial.png)
 
+## Per-Corner Rounded Rectangle Stitch Pattern
+
+Tests stitches following an asymmetric contour: rounded top corners, sharp bottom corners.
+
+```python
+doc = SvgDocument(140, 90)
+shape = RoundedRectangle(20, 15, 100, 60, radius=0,
+                         radius_tl=20, radius_tr=20, radius_br=0, radius_bl=0)
+
+doc.add_shape(shape, layer="cut")
+doc.add_stitch_pattern(
+    shape,
+    spacing=6.0,
+    stitch_length=3.0,
+    inset=5.0,
+    layer="stitch",
+    stitch_thickness=0.8,
+)
+```
+
+![Per-corner rounded rectangle stitches](tests/baselines/per_corner_rounded_rect_stitches.png)
+
+## Per-Corner Rounded Rectangle Hole Pattern
+
+Tests holes on a mixed contour: uniform radius with one sharp and one extra-large corner.
+
+```python
+doc = SvgDocument(140, 90)
+shape = RoundedRectangle(20, 15, 100, 60, radius=10, radius_bl=0, radius_tr=25)
+
+doc.add_shape(shape, layer="cut")
+doc.add_holes(
+    shape,
+    spacing=8.0,
+    hole_radius=1.4,
+    inset=6.0,
+    layer="stitch",
+)
+```
+
+![Per-corner rounded rectangle holes](tests/baselines/per_corner_rounded_rect_holes.png)
+
 ## Stadium Stitch Pattern
 
 Tests stitch segments following the full capsule contour, including both semicircular caps.

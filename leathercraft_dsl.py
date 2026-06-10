@@ -97,6 +97,10 @@ class RoundedRectangleDefinition:
     height: float
     radius: float
     layer: str = "cut"
+    radius_tl: float | None = None
+    radius_tr: float | None = None
+    radius_br: float | None = None
+    radius_bl: float | None = None
 
 
 @dataclass
@@ -523,19 +527,44 @@ def parse(text: str) -> PatternDocument:
 
             at_lineno, at_vals = _req("at")
             sz_lineno, sz_vals = _req("size")
-            r_lineno, r_vals = _req("radius")
             x = _parse_float(at_vals[0], at_lineno, "at x")
             y = _parse_float(at_vals[1], at_lineno, "at y")
             w = _parse_float(sz_vals[0], sz_lineno, "size width")
             h = _parse_float(sz_vals[1], sz_lineno, "size height")
-            r = _parse_float(r_vals[0], r_lineno, "radius")
-            if r <= 0:
-                raise DslError(f"Line {r_lineno}: radius must be greater than 0")
+
+            corner_keys = ("radius_tl", "radius_tr", "radius_br", "radius_bl")
+            corners: dict[str, float | None] = {k: None for k in corner_keys}
+            for k in corner_keys:
+                if k in data:
+                    c_ln, c_vals = data[k]
+                    val = _parse_float(c_vals[0], c_ln, k)
+                    if val < 0:
+                        raise DslError(f"Line {c_ln}: {k} must be >= 0")
+                    corners[k] = val
+
+            has_corner = any(v is not None for v in corners.values())
+            if "radius" in data:
+                r_lineno, r_vals = data["radius"]
+                r = _parse_float(r_vals[0], r_lineno, "radius")
+                if r <= 0:
+                    raise DslError(f"Line {r_lineno}: radius must be greater than 0")
+            elif has_corner:
+                # Per-corner only: unspecified corners default to sharp (0)
+                r = 0.0
+                corners = {k: (v if v is not None else 0.0) for k, v in corners.items()}
+            else:
+                raise DslError(
+                    f"Line {lineno}: rounded_rectangle '{shape_id}' is missing 'radius' "
+                    f"(or per-corner radius_tl/radius_tr/radius_br/radius_bl)"
+                )
+
             layer_name = "cut"
             if "layer" in data:
                 layer_name = data["layer"][1][0]
             shapes.append(RoundedRectangleDefinition(
-                id=shape_id, x=x, y=y, width=w, height=h, radius=r, layer=layer_name
+                id=shape_id, x=x, y=y, width=w, height=h, radius=r, layer=layer_name,
+                radius_tl=corners["radius_tl"], radius_tr=corners["radius_tr"],
+                radius_br=corners["radius_br"], radius_bl=corners["radius_bl"],
             ))
             shape_ids.add(shape_id)
 
@@ -978,6 +1007,10 @@ def compile_document(doc: PatternDocument) -> SvgDocument:
                 shape_def.x, shape_def.y,
                 shape_def.width, shape_def.height,
                 radius=shape_def.radius,
+                radius_tl=shape_def.radius_tl,
+                radius_tr=shape_def.radius_tr,
+                radius_br=shape_def.radius_br,
+                radius_bl=shape_def.radius_bl,
             )
             svg.add_shape(s, layer=shape_def.layer)
             shape_objects[shape_def.id] = s

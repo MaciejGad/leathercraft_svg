@@ -278,22 +278,57 @@ class Rectangle(Shape):
 
 @dataclass
 class RoundedRectangle(Rectangle):
+    """
+    Rectangle with rounded corners.
+
+    A single uniform ``radius`` applies to all four corners. Each corner can
+    be overridden individually with ``radius_tl`` / ``radius_tr`` /
+    ``radius_br`` / ``radius_bl`` (top-left, top-right, bottom-right,
+    bottom-left). A per-corner value of 0 produces a sharp corner.
+    """
+
     radius: float = 5.0
+    radius_tl: float | None = None
+    radius_tr: float | None = None
+    radius_br: float | None = None
+    radius_bl: float | None = None
+
+    def corner_radii(self) -> tuple[float, float, float, float]:
+        """Effective (tl, tr, br, bl) radii, clamped so adjacent corners never overlap."""
+        w, h = self.width, self.height
+        tl = self.radius if self.radius_tl is None else self.radius_tl
+        tr = self.radius if self.radius_tr is None else self.radius_tr
+        br = self.radius if self.radius_br is None else self.radius_br
+        bl = self.radius if self.radius_bl is None else self.radius_bl
+        radii = [max(0.0, r) for r in (tl, tr, br, bl)]
+        # Scale all radii down if two corners on a shared edge would overlap
+        scale = 1.0
+        for pair_sum, edge_len in (
+            (radii[0] + radii[1], w),  # top
+            (radii[2] + radii[3], w),  # bottom
+            (radii[1] + radii[2], h),  # right
+            (radii[3] + radii[0], h),  # left
+        ):
+            if pair_sum > edge_len > 0:
+                scale = min(scale, edge_len / pair_sum)
+        return tuple(r * scale for r in radii)
 
     def path_d(self) -> str:
         x, y, w, h = self.x, self.y, self.width, self.height
-        r = min(self.radius, w / 2, h / 2)
-        return (
-            f"M {x+r:.3f} {y:.3f} "
-            f"L {x+w-r:.3f} {y:.3f} "
-            f"Q {x+w:.3f} {y:.3f} {x+w:.3f} {y+r:.3f} "
-            f"L {x+w:.3f} {y+h-r:.3f} "
-            f"Q {x+w:.3f} {y+h:.3f} {x+w-r:.3f} {y+h:.3f} "
-            f"L {x+r:.3f} {y+h:.3f} "
-            f"Q {x:.3f} {y+h:.3f} {x:.3f} {y+h-r:.3f} "
-            f"L {x:.3f} {y+r:.3f} "
-            f"Q {x:.3f} {y:.3f} {x+r:.3f} {y:.3f} Z"
-        )
+        tl, tr, br, bl = self.corner_radii()
+        parts = [f"M {x+tl:.3f} {y:.3f}", f"L {x+w-tr:.3f} {y:.3f}"]
+        if tr > 0:
+            parts.append(f"Q {x+w:.3f} {y:.3f} {x+w:.3f} {y+tr:.3f}")
+        parts.append(f"L {x+w:.3f} {y+h-br:.3f}")
+        if br > 0:
+            parts.append(f"Q {x+w:.3f} {y+h:.3f} {x+w-br:.3f} {y+h:.3f}")
+        parts.append(f"L {x+bl:.3f} {y+h:.3f}")
+        if bl > 0:
+            parts.append(f"Q {x:.3f} {y+h:.3f} {x:.3f} {y+h-bl:.3f}")
+        parts.append(f"L {x:.3f} {y+tl:.3f}")
+        if tl > 0:
+            parts.append(f"Q {x:.3f} {y:.3f} {x+tl:.3f} {y:.3f}")
+        return " ".join(parts) + " Z"
 
     def stitch_segments(
         self,
@@ -324,8 +359,8 @@ class RoundedRectangle(Rectangle):
         if w <= 0 or h <= 0:
             return []
 
-        r = max(0.0, min(self.radius - inset, w / 2, h / 2))
-        contour = rounded_rectangle_contour(x, y, w, h, r)
+        radii = tuple(max(0.0, min(r - inset, w / 2, h / 2)) for r in self.corner_radii())
+        contour = rounded_rectangle_contour(x, y, w, h, 0.0, radii=radii)
         if len(contour) < 2:
             return []
 
@@ -1119,12 +1154,24 @@ def rounded_rectangle_contour(
     height: float,
     radius: float,
     arc_steps: int = 12,
+    radii: "tuple[float, float, float, float] | None" = None,
 ) -> list[Point]:
+    """
+    Closed polyline approximating a rounded rectangle.
+
+    ``radius`` applies the same rounding to all four corners. Pass ``radii``
+    as (tl, tr, br, bl) to control each corner independently; a value of 0
+    yields a sharp corner. ``radii`` takes precedence over ``radius``.
+    """
     if width <= 0 or height <= 0:
         return []
 
-    r = max(0.0, min(radius, width / 2, height / 2))
-    if r == 0.0:
+    if radii is None:
+        r = max(0.0, min(radius, width / 2, height / 2))
+        radii = (r, r, r, r)
+    tl, tr, br, bl = (max(0.0, min(r, width / 2, height / 2)) for r in radii)
+
+    if tl == tr == br == bl == 0.0:
         return [
             Point(x, y),
             Point(x + width, y),
@@ -1134,23 +1181,27 @@ def rounded_rectangle_contour(
 
     contour: list[Point] = []
 
-    def add_arc(cx: float, cy: float, start_angle: float, end_angle: float) -> None:
+    def add_arc(cx: float, cy: float, r: float, start_angle: float, end_angle: float) -> None:
         for step in range(1, arc_steps + 1):
             t = step / arc_steps
             angle = start_angle + (end_angle - start_angle) * t
             contour.append(Point(cx + r * cos(angle), cy + r * sin(angle)))
 
-    contour.append(Point(x + r, y))
-    contour.append(Point(x + width - r, y))
-    add_arc(x + width - r, y + r, -pi / 2, 0.0)
-    contour.append(Point(x + width, y + height - r))
-    add_arc(x + width - r, y + height - r, 0.0, pi / 2)
-    contour.append(Point(x + r, y + height))
-    add_arc(x + r, y + height - r, pi / 2, pi)
-    contour.append(Point(x, y + r))
-    add_arc(x + r, y + r, pi, 3 * pi / 2)
+    contour.append(Point(x + tl, y))
+    contour.append(Point(x + width - tr, y))
+    if tr > 0:
+        add_arc(x + width - tr, y + tr, tr, -pi / 2, 0.0)
+    contour.append(Point(x + width, y + height - br))
+    if br > 0:
+        add_arc(x + width - br, y + height - br, br, 0.0, pi / 2)
+    contour.append(Point(x + bl, y + height))
+    if bl > 0:
+        add_arc(x + bl, y + height - bl, bl, pi / 2, pi)
+    contour.append(Point(x, y + tl))
+    if tl > 0:
+        add_arc(x + tl, y + tl, tl, pi, 3 * pi / 2)
 
-    return contour
+    return deduplicate_points(contour)
 
 
 def stitch_segments_on_closed_polyline(

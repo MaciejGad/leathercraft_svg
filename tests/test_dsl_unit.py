@@ -1295,3 +1295,89 @@ class TestCompileStadium:
         output = compile_document(doc).to_svg()
         assert "A 15.000 15.000" in output
         assert "<line" in output
+
+
+# ===========================================================================
+# Parser — Ellipse
+# ===========================================================================
+
+
+class TestParseEllipse:
+    def test_rx_ry_form(self):
+        doc = _parse("size 130 90\nellipse oval\n  at 65 45\n  rx 55\n  ry 35\nend")
+        from leathercraft_dsl import EllipseDefinition
+        s = doc.shapes[0]
+        assert isinstance(s, EllipseDefinition)
+        assert s.id == "oval"
+        assert s.cx == 65.0
+        assert s.cy == 45.0
+        assert s.rx == 55.0
+        assert s.ry == 35.0
+        assert s.layer == "cut"
+
+    def test_size_form(self):
+        doc = _parse("size 130 90\nellipse oval\n  at 65 45\n  size 110 70\nend")
+        s = doc.shapes[0]
+        assert s.rx == 55.0
+        assert s.ry == 35.0
+
+    def test_custom_layer(self):
+        doc = _parse("size 130 90\nellipse oval\n  at 65 45\n  rx 55\n  ry 35\n  layer guide\nend")
+        assert doc.shapes[0].layer == "guide"
+
+    def test_missing_at_raises(self):
+        with pytest.raises(DslError, match="missing 'at'"):
+            _parse("size 130 90\nellipse oval\n  rx 55\n  ry 35\nend")
+
+    def test_missing_radii_raises(self):
+        with pytest.raises(DslError, match="needs either 'rx' \\+ 'ry' or 'size'"):
+            _parse("size 130 90\nellipse oval\n  at 65 45\nend")
+
+    def test_zero_radius_raises(self):
+        with pytest.raises(DslError, match="radii must be greater than 0"):
+            _parse("size 130 90\nellipse oval\n  at 65 45\n  rx 0\n  ry 35\nend")
+
+    def test_missing_id_raises(self):
+        with pytest.raises(DslError, match="requires an id"):
+            _parse("size 130 90\nellipse\n  at 65 45\n  rx 55\n  ry 35\nend")
+
+    def test_registered_as_source(self):
+        doc = _parse(
+            "size 130 90\nellipse oval\n  at 65 45\n  rx 55\n  ry 35\nend\n"
+            "stitches\n  source oval\n  margin 5\n  spacing 6\n  length 3\nend"
+        )
+        assert len(doc.operations) == 1
+
+
+# ===========================================================================
+# Compiler — Ellipse
+# ===========================================================================
+
+
+class TestCompileEllipse:
+    def test_produces_arc_path(self):
+        doc = _parse("size 130 90\nellipse oval\n  at 65 45\n  rx 55\n  ry 35\nend")
+        output = compile_document(doc).to_svg()
+        assert "<path" in output
+        assert "A 55.000 35.000" in output
+
+    def test_stitches_produce_lines(self):
+        doc = _parse(
+            "size 130 90\nellipse oval\n  at 65 45\n  rx 55\n  ry 35\nend\n"
+            "stitches\n  source oval\n  margin 5\n  spacing 6\n  length 3\nend"
+        )
+        output = compile_document(doc).to_svg()
+        assert "<line" in output
+
+    def test_holes_produce_circles(self):
+        doc = _parse(
+            "size 130 90\nellipse oval\n  at 65 45\n  rx 55\n  ry 35\nend\n"
+            "holes\n  source oval\n  margin 8\n  spacing 10\n  radius 1.5\nend"
+        )
+        output = compile_document(doc).to_svg()
+        assert "<circle" in output
+
+    def test_size_form_compiles(self):
+        doc = _parse("size 130 90\nellipse oval\n  at 65 45\n  size 110 70\nend")
+        output = compile_document(doc).to_svg()
+        assert "A 55.000 35.000" in output

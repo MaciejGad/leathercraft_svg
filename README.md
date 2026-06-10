@@ -299,6 +299,18 @@ Parameters:
 
 The `hole_points(...)` method for a circle places points around a helper circle with radius `radius - inset`.
 
+### `Ellipse(cx, cy, rx, ry)`
+
+Ellipse (oval) with two independent radii. When `rx == ry` it is identical to a circle.
+
+Parameters:
+
+- `cx`, `cy` - center,
+- `rx` - horizontal radius,
+- `ry` - vertical radius.
+
+Stitches and holes are distributed with even spacing along the contour of a helper ellipse with radii `rx - inset` and `ry - inset`. The `edges` parameter is accepted but ignored — the full contour is always used. If `inset` is greater than or equal to either radius, an empty list is returned.
+
 ### `Triangle(p1, p2, p3)`
 
 Triangle defined by three points.
@@ -603,6 +615,27 @@ holes
 end
 ```
 
+### Ellipse
+
+Two forms: explicit radii (`rx` + `ry`) or `size` (where `rx = width/2`, `ry = height/2`).
+
+```text
+ellipse oval
+  at 65 45
+  rx 55
+  ry 35
+end
+
+stitches
+  source oval
+  margin 5
+  spacing 6
+  length 3
+end
+```
+
+Stitches and holes are spaced evenly along the elliptical contour.
+
 ### Triangle
 
 Two forms: explicit points or `at + size` (box form).
@@ -666,7 +699,7 @@ Do not write unit suffixes such as `mm` or `cm`. Every numeric value is already 
 
 ### Supported keywords
 
-`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `stadium`, `circle`, `triangle`, `rounded_triangle`, `outer`, `stitches`, `holes`, `hole`, `export`
+`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `stadium`, `circle`, `ellipse`, `triangle`, `rounded_triangle`, `outer`, `stitches`, `holes`, `hole`, `export`
 
 Edge names for rectangles: `top`, `right`, `bottom`, `left`, `all`, `except_top`, `sides`, `horizontal`, `vertical`
 

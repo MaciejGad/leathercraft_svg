@@ -475,6 +475,64 @@ class Circle(Shape):
 
 
 @dataclass
+class Ellipse(Shape):
+    """
+    Ellipse (oval) defined by a centre point and two independent radii.
+    When rx == ry it is identical to a Circle.
+    """
+
+    cx: float
+    cy: float
+    rx: float
+    ry: float
+
+    def path_d(self) -> str:
+        x, y, rx, ry = self.cx, self.cy, self.rx, self.ry
+        return (
+            f"M {x-rx:.3f} {y:.3f} "
+            f"A {rx:.3f} {ry:.3f} 0 1 0 {x+rx:.3f} {y:.3f} "
+            f"A {rx:.3f} {ry:.3f} 0 1 0 {x-rx:.3f} {y:.3f} Z"
+        )
+
+    def _inner_contour(self, inset: float, steps: int = 96) -> list[Point]:
+        rx = self.rx - inset
+        ry = self.ry - inset
+        if rx <= 0 or ry <= 0:
+            return []
+        return [
+            Point(self.cx + rx * cos(2 * pi * i / steps), self.cy + ry * sin(2 * pi * i / steps))
+            for i in range(steps)
+        ]
+
+    def hole_points(self, edges="all", spacing=5.0, inset=4.0, include_corners=False, rounded_path=False) -> list[Point]:
+        contour = self._inner_contour(inset)
+        if len(contour) < 2:
+            return []
+        return points_on_closed_polyline(contour, spacing=spacing, include_corners=include_corners)
+
+    def stitch_segments(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=False,
+        stitch_length=2.0,
+        stitch_angle_deg=0.0,
+        rounded_path=False,
+    ) -> list[tuple[Point, Point]]:
+        contour = self._inner_contour(inset)
+        if len(contour) < 2:
+            return []
+        return stitch_segments_on_closed_polyline(
+            contour,
+            spacing=spacing,
+            stitch_length=stitch_length,
+            stitch_angle_deg=stitch_angle_deg,
+            include_corners=include_corners,
+        )
+
+
+@dataclass
 class Triangle(Shape):
     p1: Point
     p2: Point

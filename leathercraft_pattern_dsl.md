@@ -398,7 +398,63 @@ holes
 end
 ```
 
-### 7.5 Triangle
+### 7.5 Ellipse
+
+An oval defined by a centre point and two independent radii. Two forms are supported.
+
+**Radii form:**
+
+```text
+ellipse <id>
+  at <cx> <cy>
+  rx <horizontal_radius>
+  ry <vertical_radius>
+  [layer <layer_name>]
+end
+```
+
+**Size form** (`rx = width / 2`, `ry = height / 2`):
+
+```text
+ellipse <id>
+  at <cx> <cy>
+  size <width> <height>
+  [layer <layer_name>]
+end
+```
+
+Compiler mapping:
+
+```python
+Ellipse(cx, cy, rx, ry)
+doc.add_shape(shape, layer="cut")
+```
+
+Both radii must be > 0. Default layer: `cut`. Stitches and holes are distributed evenly along the elliptical contour; the `edges` parameter is accepted but ignored.
+
+Example — oval coaster:
+
+```text
+pattern oval_coaster
+size 130 90
+
+ellipse rim
+  at 65 45
+  rx 55
+  ry 35
+end
+
+stitches
+  source rim
+  margin 5
+  spacing 6
+  length 3
+end
+
+export oval_coaster
+```
+
+### 7.6 Triangle
 
 Two forms are supported: explicit three-point form and box form.
 
@@ -456,7 +512,7 @@ stitches
 end
 ```
 
-### 7.6 Rounded Triangle
+### 7.7 Rounded Triangle
 
 Same as `triangle` but with an additional `radius` field.
 
@@ -494,7 +550,7 @@ doc.add_shape(shape, layer="cut")
 
 The `rounded_path` flag (see section 9) applies specifically to `RoundedTriangle` and makes stitch marks or holes follow the smooth rounded corners instead of the straight inset.
 
-### 7.7 Outer Freeform Shape
+### 7.8 Outer Freeform Shape
 
 For irregular leather patterns, use `outer`.
 
@@ -1209,6 +1265,7 @@ rectangle
 rounded_rectangle
 stadium
 circle
+ellipse
 triangle
 rounded_triangle
 outer
@@ -1224,6 +1281,8 @@ spacing
 length
 angle
 radius
+rx
+ry
 rounded_path
 mirror
 at
@@ -1254,6 +1313,7 @@ rectangle
 rounded_rectangle
 stadium
 circle
+ellipse (rx/ry form and size form)
 triangle (point form and box form)
 rounded_triangle (point form and box form)
 outer smooth/straight mirrored

@@ -19,6 +19,7 @@ from typing import Union
 
 from leathercraft_svg import (
     Circle,
+    Ellipse,
     Point,
     Polygon,
     Rectangle,
@@ -114,6 +115,16 @@ class CircleDefinition:
     cx: float
     cy: float
     radius: float
+    layer: str = "cut"
+
+
+@dataclass
+class EllipseDefinition:
+    id: str
+    cx: float
+    cy: float
+    rx: float
+    ry: float
     layer: str = "cut"
 
 
@@ -262,7 +273,7 @@ def _resolve_color(token: str) -> str:
 
 _BLOCK_STARTERS = {
     "rectangle", "rounded_rectangle", "stadium",
-    "circle",
+    "circle", "ellipse",
     "triangle", "rounded_triangle",
     "outer",
     "stitches", "holes", "hole",
@@ -577,6 +588,42 @@ def parse(text: str) -> PatternDocument:
             if "layer" in data:
                 layer_name = data["layer"][1][0]
             shapes.append(CircleDefinition(id=shape_id, cx=cx, cy=cy, radius=r, layer=layer_name))
+            shape_ids.add(shape_id)
+
+        # ------------------------------------------------------------------
+        elif keyword == "ellipse":
+            if len(tokens) < 2:
+                raise DslError(f"Line {lineno}: 'ellipse' requires an id")
+            shape_id = tokens[1]
+            data = _parse_block_body(body)
+
+            def _req(k: str, sid=shape_id, ln=lineno) -> tuple[int, list[str]]:
+                if k not in data:
+                    raise DslError(f"Line {ln}: ellipse '{sid}' is missing '{k}'")
+                return data[k]
+
+            at_lineno, at_vals = _req("at")
+            cx = _parse_float(at_vals[0], at_lineno, "at cx")
+            cy = _parse_float(at_vals[1], at_lineno, "at cy")
+            if "rx" in data and "ry" in data:
+                rx_lineno, rx_vals = data["rx"]
+                ry_lineno, ry_vals = data["ry"]
+                rx = _parse_float(rx_vals[0], rx_lineno, "rx")
+                ry = _parse_float(ry_vals[0], ry_lineno, "ry")
+            elif "size" in data:
+                sz_lineno, sz_vals = data["size"]
+                rx = _parse_float(sz_vals[0], sz_lineno, "size width") / 2
+                ry = _parse_float(sz_vals[1], sz_lineno, "size height") / 2
+            else:
+                raise DslError(
+                    f"Line {lineno}: ellipse '{shape_id}' needs either 'rx' + 'ry' or 'size'"
+                )
+            if rx <= 0 or ry <= 0:
+                raise DslError(f"Line {lineno}: ellipse radii must be greater than 0")
+            layer_name = "cut"
+            if "layer" in data:
+                layer_name = data["layer"][1][0]
+            shapes.append(EllipseDefinition(id=shape_id, cx=cx, cy=cy, rx=rx, ry=ry, layer=layer_name))
             shape_ids.add(shape_id)
 
         # ------------------------------------------------------------------
@@ -942,6 +989,11 @@ def compile_document(doc: PatternDocument) -> SvgDocument:
 
         elif isinstance(shape_def, CircleDefinition):
             s = Circle(shape_def.cx, shape_def.cy, shape_def.radius)
+            svg.add_shape(s, layer=shape_def.layer)
+            shape_objects[shape_def.id] = s
+
+        elif isinstance(shape_def, EllipseDefinition):
+            s = Ellipse(shape_def.cx, shape_def.cy, shape_def.rx, shape_def.ry)
             svg.add_shape(s, layer=shape_def.layer)
             shape_objects[shape_def.id] = s
 

@@ -13,6 +13,7 @@ import unittest
 
 from leathercraft_svg import (
     Circle,
+    Ellipse,
     Point,
     Polygon,
     Rectangle,
@@ -1191,6 +1192,67 @@ class TestStadiumStitchSegments(unittest.TestCase):
         doc.add_shape(s, layer="cut")
         doc.add_stitch_pattern(s, spacing=5, stitch_length=3, inset=4)
         doc.add_holes(s, spacing=10, hole_radius=1.5, inset=8)
+        out = doc.to_svg()
+        self.assertIn("<path", out)
+        self.assertIn("<line", out)
+        self.assertIn("<circle", out)
+
+
+class TestEllipsePathD(unittest.TestCase):
+    def test_uses_two_arcs(self):
+        d = Ellipse(60, 40, 50, 25).path_d()
+        self.assertEqual(d.count("A 50.000 25.000"), 2)
+        self.assertTrue(d.startswith("M 10.000 40.000"))
+        self.assertTrue(d.rstrip().endswith("Z"))
+
+    def test_equal_radii_match_circle_extents(self):
+        d = Ellipse(50, 50, 30, 30).path_d()
+        self.assertIn("A 30.000 30.000", d)
+
+
+class TestEllipseHolePoints(unittest.TestCase):
+    def test_holes_on_inset_ellipse(self):
+        e = Ellipse(60, 40, 50, 25)
+        pts = e.hole_points(spacing=6, inset=4)
+        self.assertGreater(len(pts), 0)
+        # Every point must lie on the inset ellipse: ((x-cx)/rx')² + ((y-cy)/ry')² ≈ 1
+        for p in pts:
+            v = ((p.x - 60) / 46) ** 2 + ((p.y - 40) / 21) ** 2
+            self.assertAlmostEqual(v, 1.0, places=2)
+
+    def test_excessive_inset_returns_empty(self):
+        self.assertEqual(Ellipse(60, 40, 50, 25).hole_points(inset=25), [])
+        self.assertEqual(Ellipse(60, 40, 50, 25).hole_points(inset=50), [])
+
+    def test_smaller_spacing_gives_more_holes(self):
+        e = Ellipse(60, 40, 50, 25)
+        self.assertGreater(len(e.hole_points(spacing=4, inset=4)),
+                           len(e.hole_points(spacing=10, inset=4)))
+
+    def test_edges_parameter_ignored(self):
+        e = Ellipse(60, 40, 50, 25)
+        self.assertEqual(len(e.hole_points(edges=[0], spacing=6, inset=4)),
+                         len(e.hole_points(edges="all", spacing=6, inset=4)))
+
+
+class TestEllipseStitchSegments(unittest.TestCase):
+    def test_segments_generated(self):
+        segs = Ellipse(60, 40, 50, 25).stitch_segments(spacing=6, inset=4, stitch_length=3)
+        self.assertGreater(len(segs), 0)
+
+    def test_stitch_length_respected(self):
+        for a, b in Ellipse(60, 40, 50, 25).stitch_segments(spacing=8, inset=4, stitch_length=3):
+            self.assertAlmostEqual(distance(a, b), 3.0, places=1)
+
+    def test_excessive_inset_returns_empty(self):
+        self.assertEqual(Ellipse(60, 40, 50, 25).stitch_segments(inset=25, stitch_length=3), [])
+
+    def test_document_integration(self):
+        doc = SvgDocument(width_mm=130, height_mm=90)
+        e = Ellipse(65, 45, 55, 35)
+        doc.add_shape(e, layer="cut")
+        doc.add_stitch_pattern(e, spacing=6, stitch_length=3, inset=5)
+        doc.add_holes(e, spacing=8, hole_radius=1.5, inset=8)
         out = doc.to_svg()
         self.assertIn("<path", out)
         self.assertIn("<line", out)

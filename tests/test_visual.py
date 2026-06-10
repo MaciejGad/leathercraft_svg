@@ -167,6 +167,24 @@ def _circle_stitch_45deg() -> bytes:
     return render(doc)
 
 
+def _ellipse_holes() -> bytes:
+    from leathercraft_svg import Ellipse, SvgDocument
+    doc = SvgDocument(130, 90)
+    s = Ellipse(65, 45, 55, 35)
+    doc.add_shape(s, layer="cut")
+    doc.add_holes(s, spacing=8.0, hole_radius=1.5, inset=7.0, layer="stitch")
+    return render(doc)
+
+
+def _ellipse_stitches() -> bytes:
+    from leathercraft_svg import Ellipse, SvgDocument
+    doc = SvgDocument(130, 90)
+    s = Ellipse(65, 45, 55, 35)
+    doc.add_shape(s, layer="cut")
+    doc.add_stitch_pattern(s, spacing=6.0, stitch_length=3.0, inset=5.0, layer="stitch", stitch_thickness=0.8)
+    return render(doc)
+
+
 def _triangle_holes_all_edges() -> bytes:
     from leathercraft_svg import Point, SvgDocument, Triangle
     doc = SvgDocument(120, 90)
@@ -358,6 +376,8 @@ SCENARIOS: list[tuple[str, object]] = [
     ("circle_holes.png",                         _circle_holes),
     ("circle_stitch_0deg.png",                   _circle_stitch_0deg),
     ("circle_stitch_45deg.png",                  _circle_stitch_45deg),
+    ("ellipse_holes.png",                        _ellipse_holes),
+    ("ellipse_stitches.png",                     _ellipse_stitches),
     ("triangle_holes_all_edges.png",             _triangle_holes_all_edges),
     ("triangle_holes_partial_edges.png",         _triangle_holes_partial_edges),
     ("triangle_stitch_45deg.png",                _triangle_stitch_45deg),

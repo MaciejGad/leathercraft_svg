@@ -542,6 +542,43 @@ end
 # Scenario registry  name → builder
 # ---------------------------------------------------------------------------
 
+def _dsl_ellipse_stitches() -> bytes:
+    return _compile_dsl("""
+size 130 90
+
+ellipse oval
+  at 65 45
+  rx 55
+  ry 35
+end
+
+stitches
+  source oval
+  margin 5
+  spacing 6
+  length 3
+end
+""")
+
+
+def _dsl_ellipse_holes() -> bytes:
+    return _compile_dsl("""
+size 130 90
+
+ellipse oval
+  at 65 45
+  size 110 70
+end
+
+holes
+  source oval
+  margin 7
+  spacing 8
+  radius 1.5
+end
+""")
+
+
 def _dsl_stadium_stitches() -> bytes:
     return _compile_dsl("""
 size 140 60
@@ -621,6 +658,9 @@ SCENARIOS: dict[str, callable] = {
     "dsl_rounded_triangle_holes_straight.png": _dsl_rounded_triangle_holes_straight,
     "dsl_rounded_triangle_holes_rounded_path.png": _dsl_rounded_triangle_holes_rounded_path,
     "dsl_rounded_triangle_stitch_rounded_path.png": _dsl_rounded_triangle_stitch_rounded_path,
+    # --- ellipse ---
+    "dsl_ellipse_stitches.png": _dsl_ellipse_stitches,
+    "dsl_ellipse_holes.png": _dsl_ellipse_holes,
     # --- stadium ---
     "dsl_stadium_stitches.png": _dsl_stadium_stitches,
     "dsl_stadium_holes.png": _dsl_stadium_holes,

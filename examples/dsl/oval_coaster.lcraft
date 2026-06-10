@@ -1,0 +1,27 @@
+pattern oval_coaster
+size 130 90
+
+# Oval coaster blank with stitching around the rim
+# and a decorative crease line inside.
+
+ellipse rim
+  at 65 45
+  rx 55
+  ry 35
+end
+
+stitches
+  source rim
+  margin 5
+  spacing 6
+  length 3
+end
+
+ellipse inner_line
+  at 65 45
+  rx 40
+  ry 22
+  layer crease
+end
+
+export oval_coaster

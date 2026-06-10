@@ -176,14 +176,14 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const BLOCK_STARTERS = new Set([
-  "rectangle","rounded_rectangle","stadium","circle","triangle","rounded_triangle",
+  "rectangle","rounded_rectangle","stadium","circle","ellipse","triangle","rounded_triangle",
   "polygon","outer","stitches","holes","hole","path"
 ]);
 const TOP_KEYWORDS = new Set(["pattern","size","export","end"]);
 const ALL_KEYWORDS = new Set([...BLOCK_STARTERS, ...TOP_KEYWORDS]);
 
 const PROPERTY_NAMES = new Set([
-  "at","radius","layer","edges","margin","spacing","length","angle",
+  "at","radius","rx","ry","layer","edges","margin","spacing","length","angle",
   "source","mirror","side","rounded_path","p1","p2","p3","smooth","step","count","from","to"
 ]);
 
@@ -240,6 +240,7 @@ const BLOCK_PROPS = {
   rounded_rectangle:  ["at","size","radius","layer","end"],
   stadium:            ["at","size","layer","end"],
   circle:             ["at","radius","layer","end"],
+  ellipse:            ["at","rx","ry","size","layer","end"],
   triangle:           ["p1","p2","p3","at","size","layer","end"],
   rounded_triangle:   ["p1","p2","p3","at","size","radius","layer","end"],
   polygon:            ["layer","end"],
@@ -301,7 +302,7 @@ function lcraft_hint(editor) {
     } else {
       // Top level
       candidates = [
-        "pattern","size","rectangle","rounded_rectangle","stadium","circle",
+        "pattern","size","rectangle","rounded_rectangle","stadium","circle","ellipse",
         "triangle","rounded_triangle","polygon","stitches","holes","hole","export"
       ];
     }

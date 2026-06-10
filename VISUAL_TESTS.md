@@ -288,6 +288,47 @@ doc.add_stitch_pattern(
 
 ![Circle stitch pattern at 45 degrees](tests/baselines/circle_stitch_45deg.png)
 
+## Ellipse Hole Pattern
+
+Tests evenly spaced holes along the elliptical contour.
+
+```python
+doc = SvgDocument(130, 90)
+shape = Ellipse(65, 45, 55, 35)
+
+doc.add_shape(shape, layer="cut")
+doc.add_holes(
+    shape,
+    spacing=8.0,
+    hole_radius=1.5,
+    inset=7.0,
+    layer="stitch",
+)
+```
+
+![Ellipse holes](tests/baselines/ellipse_holes.png)
+
+## Ellipse Stitch Pattern
+
+Tests stitch segments distributed evenly along the elliptical contour.
+
+```python
+doc = SvgDocument(130, 90)
+shape = Ellipse(65, 45, 55, 35)
+
+doc.add_shape(shape, layer="cut")
+doc.add_stitch_pattern(
+    shape,
+    spacing=6.0,
+    stitch_length=3.0,
+    inset=5.0,
+    layer="stitch",
+    stitch_thickness=0.8,
+)
+```
+
+![Ellipse stitches](tests/baselines/ellipse_stitches.png)
+
 ## Triangle Hole Pattern On All Edges
 
 Tests holes around a triangle created from explicit points.

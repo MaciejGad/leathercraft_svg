@@ -299,6 +299,18 @@ Parametry:
 
 Metoda `hole_points(...)` dla okręgu rozmieszcza punkty wokół okręgu pomocniczego o promieniu `radius - inset`.
 
+### `Ellipse(cx, cy, rx, ry)`
+
+Elipsa (owal) o dwóch niezależnych promieniach. Gdy `rx == ry`, jest identyczna z okręgiem.
+
+Parametry:
+
+- `cx`, `cy` - środek,
+- `rx` - promień poziomy,
+- `ry` - promień pionowy.
+
+Szwy i otwory są rozmieszczane w równych odstępach wzdłuż konturu elipsy pomocniczej o promieniach `rx - inset` i `ry - inset`. Parametr `edges` jest akceptowany, ale ignorowany — zawsze używany jest pełny kontur. Jeśli `inset` jest większy lub równy któremukolwiek z promieni, zwracana jest pusta lista.
+
 ### `Triangle(p1, p2, p3)`
 
 Trójkąt z trzema punktami.
@@ -603,6 +615,27 @@ holes
 end
 ```
 
+### Elipsa
+
+Dostępne są dwie formy: jawne promienie (`rx` + `ry`) lub `size` (gdzie `rx = szerokość/2`, `ry = wysokość/2`).
+
+```text
+ellipse owal
+  at 65 45
+  rx 55
+  ry 35
+end
+
+stitches
+  source owal
+  margin 5
+  spacing 6
+  length 3
+end
+```
+
+Szwy i otwory są rozmieszczane równomiernie wzdłuż konturu elipsy.
+
 ### Trójkąt
 
 Dostępne są dwie formy: trzy jawne punkty lub forma pudełkowa (`at + size`).
@@ -666,7 +699,7 @@ Nie stosuj przyrostków jednostek takich jak `mm` ani `cm`. Każda liczba jest j
 
 ### Obsługiwane słowa kluczowe
 
-`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `stadium`, `circle`, `triangle`, `rounded_triangle`, `outer`, `stitches`, `holes`, `hole`, `export`
+`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `stadium`, `circle`, `ellipse`, `triangle`, `rounded_triangle`, `outer`, `stitches`, `holes`, `hole`, `export`
 
 Nazwy krawędzi prostokąta: `top`, `right`, `bottom`, `left`, `all`, `except_top`, `sides`, `horizontal`, `vertical`
 

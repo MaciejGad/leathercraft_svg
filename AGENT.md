@@ -12,7 +12,7 @@ from leathercraft_svg import (
     SvgDocument, StrokeStyle,
     Point,
     Rectangle, RoundedRectangle, Stadium,
-    Circle,
+    Circle, Ellipse,
     Triangle, RoundedTriangle,
 )
 ```
@@ -225,6 +225,23 @@ Circle(cx, cy, radius)
 shape = Circle(70, 45, 30)
 doc.add_shape(shape, layer="cut")
 doc.add_holes(shape, spacing=8.0, hole_radius=1.5, inset=7.0, layer="stitch")
+```
+
+---
+
+### Ellipse
+
+```python
+Ellipse(cx, cy, rx, ry)
+# cx, cy = center; rx = horizontal radius; ry = vertical radius
+```
+
+Oval with two independent radii — identical to `Circle` when `rx == ry`. `hole_points` and `stitch_segments` distribute evenly (by arc length) along the contour of a helper ellipse with radii `rx - inset` and `ry - inset`. The `edges` parameter is accepted but ignored. Returns an empty list when `inset >= rx` or `inset >= ry`.
+
+```python
+shape = Ellipse(65, 45, 55, 35)
+doc.add_shape(shape, layer="cut")
+doc.add_stitch_pattern(shape, spacing=6.0, stitch_length=3.0, inset=5.0)
 ```
 
 To place holes or stitches only on a portion of a circle (e.g. leaving a gap), compute the points manually and filter by angle:
@@ -687,6 +704,33 @@ end
 ```
 
 Compiles to `Circle(cx, cy, radius)`. The `edges` parameter in `stitches`/`holes` is accepted but has no effect — the full circumference is always used.
+
+#### `ellipse`
+
+Two forms are supported.
+
+**Radii form:**
+
+```text
+ellipse <id>
+  at <cx> <cy>
+  rx <horizontal_radius>
+  ry <vertical_radius>
+  [layer <layer_name>]
+end
+```
+
+**Size form** (`rx = width / 2`, `ry = height / 2`):
+
+```text
+ellipse <id>
+  at <cx> <cy>
+  size <width> <height>
+  [layer <layer_name>]
+end
+```
+
+Compiles to `Ellipse(cx, cy, rx, ry)`. Both radii must be > 0. The `edges` parameter in `stitches`/`holes` is accepted but has no effect — the full contour is always used.
 
 #### `triangle`
 

@@ -13,7 +13,7 @@ in `leathercraft_svg.py` (Python library) and `leathercraft_dsl.py` (DSL).
 | `<rect rx ry>` (uniform radius) | `RoundedRectangle` | `rounded_rectangle` | ✅ full |
 | `<rect rx ry>` (per-corner radii) | — | — | ❌ missing |
 | `<circle>` | `Circle` | `circle` | ✅ full |
-| `<ellipse>` | — | — | ❌ missing |
+| `<ellipse>` | `Ellipse` | `ellipse` | ✅ full |
 | `<line>` | `add_line()` (document-level, not a Shape) | — | ⚠️ partial |
 | `<polyline>` (open path) | utilities only (`offset_polyline`) | `path` inside `stitches` only | ⚠️ partial |
 | `<polygon>` | `Polygon` | `polygon` (via `outer` block) | ✅ full |
@@ -27,7 +27,12 @@ in `leathercraft_svg.py` (Python library) and `leathercraft_dsl.py` (DSL).
 
 ## Missing shapes — detailed descriptions
 
-### 1. Ellipse
+### 1. Ellipse — ✅ IMPLEMENTED
+
+> **Status:** Implemented as `Ellipse(cx, cy, rx, ry)` in `leathercraft_svg.py`
+> and the `ellipse` block in the DSL (radii form `rx`/`ry` or `size` form).
+> Stitches and holes are distributed evenly along the contour.
+> See `examples/dsl/oval_coaster.lcraft`.
 
 **SVG primitive:** `<ellipse cx="…" cy="…" rx="…" ry="…"/>`
 
@@ -269,7 +274,7 @@ fall back to Python code.
 | Priority | Shape | Reason |
 |---|---|---|
 | ✅ Done | **Stadium / oblong** | Implemented — `Stadium` class + `stadium` DSL block |
-| 🔴 High | **Ellipse** | Basic SVG primitive; oval shapes are very common |
+| ✅ Done | **Ellipse** | Implemented — `Ellipse` class + `ellipse` DSL block |
 | 🟡 Medium | **Per-corner rounded rect** | Small change to existing class; high design value |
 | 🟡 Medium | **Arc / sector** | Needed for curved strap ends and fan cutouts |
 | 🟡 Medium | **Regular n-gon** | Easy to implement as a `Polygon` factory |

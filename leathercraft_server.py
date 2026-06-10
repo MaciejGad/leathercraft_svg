@@ -40,6 +40,26 @@ def index() -> Response:
     return send_from_directory("static", "index.html")
 
 
+@app.route("/pyodide")
+def pyodide_index() -> Response:
+    return send_from_directory("static", "pyodide_index.html")
+
+
+@app.route("/pyodide_editor.js")
+def pyodide_editor_js() -> Response:
+    return send_from_directory("static", "pyodide_editor.js")
+
+
+@app.route("/leathercraft_svg.py")
+def leathercraft_svg_source() -> Response:
+    return send_file(Path(app.root_path) / "leathercraft_svg.py", mimetype="text/x-python")
+
+
+@app.route("/leathercraft_dsl.py")
+def leathercraft_dsl_source() -> Response:
+    return send_file(Path(app.root_path) / "leathercraft_dsl.py", mimetype="text/x-python")
+
+
 @app.route("/api/compile", methods=["POST"])
 def compile_endpoint() -> Response:
     """Compile .lcraft source → SVG string.

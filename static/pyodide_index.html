@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leathercraft Browser Editor</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/theme/dracula.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/addon/hint/show-hint.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/addon/hint/show-hint.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/addon/edit/closebrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/addon/comment/comment.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.27.2/full/pyodide.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: system-ui, -apple-system, sans-serif; }
+    body { display: flex; flex-direction: column; background: #1e1e2e; color: #cdd6f4; overflow: hidden; }
+
+    #toolbar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 8px 16px; background: #181825; border-bottom: 1px solid #313244;
+      flex-shrink: 0; height: 48px;
+    }
+    #toolbar .logo { font-weight: 700; font-size: 15px; letter-spacing: .5px; color: #cba6f7; }
+    #toolbar .logo span { color: #89b4fa; }
+    #toolbar .mode-note { font-size: 11px; color: #a6adc8; white-space: nowrap; }
+    #status {
+      font-size: 12px; padding: 3px 10px; border-radius: 12px;
+      background: #313244; color: #a6adc8; transition: background .2s, color .2s;
+      white-space: nowrap;
+    }
+    #status.ok  { background: #1e3a2e; color: #a6e3a1; }
+    #status.err { background: #3a1e2e; color: #f38ba8; }
+    #status.busy { background: #2e2e1e; color: #f9e2af; }
+
+    .spacer { flex: 1; }
+
+    .btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 6px; border: 1px solid #45475a;
+      background: #313244; color: #cdd6f4; font-size: 12px; font-weight: 500;
+      cursor: pointer; transition: background .15s, border-color .15s, opacity .15s;
+      white-space: nowrap;
+    }
+    .btn:hover { background: #45475a; border-color: #585b70; }
+    .btn:active { background: #585b70; }
+    .btn:disabled {
+      opacity: .45; cursor: not-allowed; background: #2b2d3b; border-color: #3b3d4d;
+    }
+    .btn svg { width: 13px; height: 13px; }
+
+    #split { display: flex; flex: 1; overflow: hidden; }
+
+    #editor-panel {
+      display: flex; flex-direction: column; flex: 0 0 50%; min-width: 200px;
+      overflow: hidden; border-right: 1px solid #313244;
+    }
+    .panel-header {
+      padding: 5px 12px; font-size: 11px; font-weight: 600; letter-spacing: .8px;
+      text-transform: uppercase; color: #6c6f85; background: #1e1e2e;
+      border-bottom: 1px solid #313244; flex-shrink: 0;
+    }
+    .CodeMirror {
+      height: 100% !important; font-size: 13px;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+      line-height: 1.6;
+    }
+    .CodeMirror-scroll { padding-bottom: 0; }
+
+    .cm-keyword     { color: #cba6f7 !important; font-weight: 600; }
+    .cm-property    { color: #89b4fa !important; }
+    .cm-atom        { color: #a6e3a1 !important; }
+    .cm-number      { color: #fab387 !important; }
+    .cm-comment     { color: #6272a4 !important; font-style: italic; }
+    .cm-variable    { color: #f5c2e7 !important; }
+    .cm-def         { color: #f5c2e7 !important; font-weight: 600; }
+    .cm-builtin     { color: #94e2d5 !important; }
+    .cm-operator    { color: #f5e0dc !important; }
+
+    #error-bar {
+      padding: 6px 12px; font-size: 12px; font-family: monospace;
+      background: #2a1020; color: #f38ba8; border-top: 1px solid #5a1030;
+      white-space: pre-wrap; word-break: break-word; max-height: 100px;
+      overflow-y: auto; flex-shrink: 0; display: none;
+    }
+    #error-bar.visible { display: block; }
+
+    #resizer {
+      width: 5px; background: #313244; cursor: col-resize; flex-shrink: 0;
+      transition: background .15s;
+    }
+    #resizer:hover, #resizer.active { background: #cba6f7; }
+
+    #preview-panel {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden;
+      background: #181825;
+    }
+    #preview-scroll {
+      flex: 1; overflow: auto; display: flex; align-items: center;
+      justify-content: center; padding: 24px;
+    }
+    #svg-container {
+      background: white; box-shadow: 0 4px 24px rgba(0,0,0,.5);
+      border-radius: 4px; display: inline-flex;
+      align-items: center; justify-content: center;
+      max-width: 100%; max-height: 100%;
+    }
+    #svg-container svg { display: block; max-width: 100%; max-height: calc(100vh - 140px); }
+    #preview-placeholder {
+      color: #45475a; font-size: 14px; text-align: center; line-height: 2;
+      padding: 24px;
+    }
+    #preview-placeholder code { font-size: 12px; color: #585b70; }
+
+    .CodeMirror-hints {
+      background: #1e1e2e !important; border: 1px solid #45475a !important;
+      border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,.5);
+    }
+    .CodeMirror-hint { color: #cdd6f4 !important; padding: 3px 12px !important; font-size: 12px; }
+    .CodeMirror-hint-active { background: #313244 !important; color: #cba6f7 !important; }
+  </style>
+</head>
+<body>
+<div id="toolbar">
+  <div class="logo">leather<span>craft</span></div>
+  <div id="status">loading pyodide</div>
+  <div class="mode-note">browser mode · SVG export only</div>
+  <div class="spacer"></div>
+
+  <button class="btn" id="btn-lcraft" title="Download .lcraft source" disabled>
+    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/><rect x="2" y="13" width="12" height="1.5" rx=".75"/></svg>
+    .lcraft
+  </button>
+  <button class="btn" id="btn-svg" title="Download compiled SVG" disabled>
+    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/><rect x="2" y="13" width="12" height="1.5" rx=".75"/></svg>
+    .svg
+  </button>
+</div>
+
+<div id="split">
+  <div id="editor-panel">
+    <div class="panel-header">editor — .lcraft</div>
+    <textarea id="editor"></textarea>
+    <div id="error-bar"></div>
+  </div>
+
+  <div id="resizer"></div>
+
+  <div id="preview-panel">
+    <div class="panel-header">preview</div>
+    <div id="preview-scroll">
+      <div id="svg-container">
+        <div id="preview-placeholder">
+          Type a pattern in the editor.<br>
+          Python runs locally in your browser via Pyodide.<br>
+          <code>Ctrl+Space</code> for autocomplete &nbsp;·&nbsp; <code>Ctrl+/</code> to comment
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="./pyodide_editor.js"></script>
+</body>
+</html>

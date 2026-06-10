@@ -82,6 +82,16 @@ doc.save("sample.svg")
 doc.save_png("sample.png", background_color="white")
 ```
 
+## Browser Editor
+
+There are now two frontend modes:
+
+- `python leathercraft_server.py` serves the existing Flask-backed editor at `/`
+- the same server also serves a browser-only Pyodide editor at `/pyodide`
+
+The Pyodide editor compiles `.lcraft` directly in the browser and supports
+downloading `.lcraft` and `.svg` only. It does not offer PNG/PDF/DXF export.
+
 Illustration:
 
 ![Rounded rectangle with 45 degree stitches on the right, bottom, and left edges](sample.png)

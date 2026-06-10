@@ -1,0 +1,35 @@
+pattern variables_rounded_pocket
+
+# ---- variables ----------------------------------------------------------
+# All dimensions in millimeters. Change these and the whole pattern updates.
+doc_width = 120
+doc_height = 90
+
+margin = 10
+pocket_width = doc_width - 2 * margin
+pocket_height = doc_height - 2 * margin
+
+corner_radius = min(8, pocket_height / 4)
+seam_margin = 5
+stitch_spacing = 5
+stitch_length = 3.5
+
+# ---- pattern ------------------------------------------------------------
+size doc_width doc_height
+
+rounded_rectangle pocket
+  at margin, margin
+  size pocket_width, pocket_height
+  radius corner_radius
+end
+
+stitches
+  source pocket
+  edges except_top
+  margin seam_margin
+  spacing stitch_spacing
+  length stitch_length
+  angle 45
+end
+
+export variables_rounded_pocket

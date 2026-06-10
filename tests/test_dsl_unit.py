@@ -1726,3 +1726,201 @@ class TestCompileArc:
             "holes\n  source fan\n  margin 6\n  spacing 8\n  radius 1.2\nend"
         )
         assert "<circle" in compile_document(doc).to_svg()
+
+
+# ===========================================================================
+# Variables and numeric expressions
+# ===========================================================================
+
+
+class TestVariableAssignment:
+    def test_basic_replacement(self):
+        doc = _parse("width = 120\nheight = 80\nsize width height")
+        assert doc.width_mm == 120.0
+        assert doc.height_mm == 80.0
+
+    def test_float_values(self):
+        doc = _parse("w = 112.5\nsize w 80")
+        assert doc.width_mm == 112.5
+
+    def test_variable_referencing_variable(self):
+        doc = _parse("width = 150\naxis = width / 2\nsize width 100\nsymmetry axis")
+        assert doc.symmetry_axis_x == 75.0
+
+    def test_comment_after_assignment(self):
+        doc = _parse("width = 150  # document width\nsize width 100")
+        assert doc.width_mm == 150.0
+
+
+class TestExpressionArithmetic:
+    def test_subtraction_in_size(self):
+        doc = _parse(
+            "width = 120\nmargin = 10\nsize width 80\n"
+            "rectangle panel\n  at margin margin\n  size width - 2 * margin, 60\nend"
+        )
+        assert doc.shapes[0].width == 100.0
+
+    def test_precedence(self):
+        doc = _parse("a = 10 + 5 * 2\nsize a 10")
+        assert doc.width_mm == 20.0
+
+    def test_parentheses(self):
+        doc = _parse("b = (10 + 5) * 2\nsize b 10")
+        assert doc.width_mm == 30.0
+
+    def test_unary_minus(self):
+        doc = _parse("a = -10\nsize 10 10\nrectangle r\n  at a, 0\n  size 5 5\nend")
+        assert doc.shapes[0].x == -10.0
+
+    def test_division_is_float(self):
+        doc = _parse("a = 150 / 4\nsize a 10")
+        assert doc.width_mm == 37.5
+
+
+class TestExpressionFunctions:
+    def test_min(self):
+        doc = _parse("width = 120\nr = min(12, width / 4)\nsize 10 10\n"
+                     "circle c\n  at 5 5\n  radius r\nend")
+        assert doc.shapes[0].radius == 12.0
+
+    def test_max(self):
+        doc = _parse("t = 3\nm = max(4, t * 2.5)\nsize m 10")
+        assert doc.width_mm == 7.5
+
+    def test_abs(self):
+        doc = _parse("a = abs(0 - 15)\nsize a 10")
+        assert doc.width_mm == 15.0
+
+    def test_round(self):
+        doc = _parse("a = round(10 / 3)\nsize a 10")
+        assert doc.width_mm == 3.0
+
+    def test_unsupported_function(self):
+        with pytest.raises(DslError, match="unsupported function 'sin'"):
+            _parse("x = sin(45)\nsize 10 10")
+
+
+class TestVariableErrors:
+    def test_use_before_definition(self):
+        with pytest.raises(DslError, match="unknown variable 'width'"):
+            _parse("axis = width / 2\nwidth = 150\nsize 10 10")
+
+    def test_unknown_variable_in_command(self):
+        with pytest.raises(DslError, match="unknown variable 'width'"):
+            _parse("size width 100")
+
+    def test_reassignment(self):
+        with pytest.raises(DslError, match="variable 'width' is already defined"):
+            _parse("width = 150\nwidth = 160\nsize 10 10")
+
+    def test_division_by_zero(self):
+        with pytest.raises(DslError, match="division by zero"):
+            _parse("width = 150\nx = width / 0\nsize 10 10")
+
+    def test_invalid_variable_name(self):
+        with pytest.raises(DslError, match="invalid variable name 'stitch-spacing'"):
+            _parse("stitch-spacing = 5\nsize 10 10")
+
+    def test_reserved_keyword_as_variable(self):
+        with pytest.raises(DslError, match="'size' is a reserved keyword"):
+            _parse("size = 100\nsize 10 10")
+
+    def test_reserved_structural_keyword(self):
+        with pytest.raises(DslError, match="reserved keyword"):
+            _parse("export = 5\nsize 10 10")
+
+    def test_invalid_expression(self):
+        with pytest.raises(DslError, match="invalid expression"):
+            _parse("width = 150 +\nsize 10 10")
+
+    def test_units_rejected(self):
+        with pytest.raises(DslError, match="units are not allowed"):
+            _parse("width = 150mm\nsize 10 10")
+
+    def test_unsupported_syntax_blocked(self):
+        with pytest.raises(DslError, match="unsupported expression syntax"):
+            _parse('x = __import__("os").system("ls")\nsize 10 10')
+
+
+class TestParameterNamesAllowedAsVariables:
+    def test_radius_as_variable(self):
+        doc = _parse(
+            "radius = 8\nsize 120 80\n"
+            "rounded_rectangle panel\n  at 10 10\n  size 100 60\n  radius radius\nend"
+        )
+        assert doc.shapes[0].radius == 8.0
+
+    def test_margin_spacing_as_variables(self):
+        doc = _parse(
+            "margin = 4\nspacing = 5\nsize 120 80\n"
+            "rectangle p\n  at 10 10\n  size 100 60\nend\n"
+            "stitches\n  source p\n  margin margin\n  spacing spacing\nend"
+        )
+        op = doc.operations[0]
+        assert op.margin == 4.0
+        assert op.spacing == 5.0
+
+
+class TestCommaMultiValue:
+    def test_comma_separated_at_and_size(self):
+        doc = _parse(
+            "width = 120\nheight = 80\nmargin = 10\nsize width height\n"
+            "rectangle panel\n  at margin, margin\n"
+            "  size width - 2 * margin, height - 2 * margin\nend"
+        )
+        s = doc.shapes[0]
+        assert (s.x, s.y, s.width, s.height) == (10.0, 10.0, 100.0, 60.0)
+
+    def test_ambiguous_without_comma_raises(self):
+        with pytest.raises(DslError, match="expects 2 values"):
+            _parse("width = 120\nmargin = 10\nsize width - margin 80")
+
+    def test_simple_whitespace_form_still_works(self):
+        doc = _parse("width = 120\nheight = 80\nsize width height")
+        assert (doc.width_mm, doc.height_mm) == (120.0, 80.0)
+
+    def test_function_comma_not_split_as_values(self):
+        # min(...) has an internal comma but is a single value
+        doc = _parse("width = 120\nsize 10 10\ncircle c\n  at 5 5\n  radius min(12, width)\nend")
+        assert doc.shapes[0].radius == 12.0
+
+    def test_triangle_points_with_expressions(self):
+        doc = _parse(
+            "w = 120\nh = 90\nsize w h\n"
+            "triangle t\n  p1 w / 2, 10\n  p2 w - 10, h - 10\n  p3 10, h - 10\nend"
+        )
+        s = doc.shapes[0]
+        assert s.p1 == (60.0, 10.0)
+        assert s.p2 == (110.0, 80.0)
+        assert s.p3 == (10.0, 80.0)
+
+
+class TestExpressionsInPointLists:
+    def test_axis_variable_in_outer_points(self):
+        doc = _parse(
+            "axis = 30\nsize 60 60\nsymmetry axis\n"
+            "outer\n  axis 10\n  50 20\n  axis 50\nend"
+        )
+        outer = doc.shapes[0]
+        assert outer.points[0] == (30.0, 10.0)
+        assert outer.points[2] == (30.0, 50.0)
+
+
+class TestBackwardCompatibility:
+    def test_plain_numeric_file_unchanged(self):
+        doc = _parse(
+            "size 120 80\n"
+            "rectangle panel\n  at 10 10\n  size 100 60\nend\n"
+            "stitches\n  source panel\n  edges all\n  margin 4\n  spacing 5\n  length 3\nend"
+        )
+        assert doc.width_mm == 120.0
+        assert doc.shapes[0].width == 100.0
+        assert doc.operations[0].margin == 4.0
+
+    def test_symmetry_vertical_x_equals_still_command(self):
+        doc = _parse("size 150 100\nsymmetry vertical x=75")
+        assert doc.symmetry_axis_x == 75.0
+
+    def test_symmetry_vertical_x_equals_expression(self):
+        doc = _parse("w = 150\nsize w 100\nsymmetry vertical x=w / 2")
+        assert doc.symmetry_axis_x == 75.0

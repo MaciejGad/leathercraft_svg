@@ -10,7 +10,7 @@ end
 stitches
     source portfel
     edges left bottom
-    magin 10
+    margin 10
     spacing 10
     length 3
     angle 30

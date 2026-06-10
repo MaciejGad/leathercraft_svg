@@ -825,6 +825,34 @@ holes
 end
 ```
 
+### Zmienne i wyrażenia
+
+Można definiować zmienne na poziomie dokumentu za pomocą `<nazwa> = <wyrażenie>` i używać ich wszędzie tam, gdzie oczekiwana jest liczba. Dzięki temu powtarzające się wymiary trzymane są w jednym miejscu.
+
+```text
+width = 120
+height = 80
+margin = 10
+corner_radius = min(8, height / 4)
+
+size width height
+
+rounded_rectangle pocket
+  at margin, margin
+  size width - 2 * margin, height - 2 * margin
+  radius corner_radius
+end
+```
+
+Zasady:
+
+- Wyrażenia są wyłącznie numeryczne i obsługują `+`, `-`, `*`, `/`, nawiasy, minus jednoargumentowy oraz funkcje `min`, `max`, `abs`, `round`, `floor`, `ceil`.
+- Zmienne muszą być zdefiniowane **przed** użyciem i nie można ich ponownie przypisać.
+- Słów kluczowych struktury (`size`, `at`, `rectangle`, …) nie można używać jako nazw zmiennych, ale nazwy parametrów (`radius`, `spacing`, `margin`, `length`, `angle`, `rx`, `ry`) są dozwolone.
+- Gdy polecenie przyjmuje kilka wartości i przynajmniej jedna z nich jest złożonym wyrażeniem, oddziel wartości przecinkami: `size width - 2 * margin, height - 2 * margin`. Proste formy, takie jak `size width height`, nadal działają bez przecinków.
+
+Pełny przykład znajdziesz w `examples/dsl/variables_rounded_pocket.lcraft`. Pełna dokumentacja: `leathercraft_dsl_variables_expressions.md`.
+
 ### Wszystkie wartości podajemy w milimetrach
 
 Nie stosuj przyrostków jednostek takich jak `mm` ani `cm`. Każda liczba jest już w milimetrach.

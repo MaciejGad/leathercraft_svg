@@ -679,6 +679,35 @@ If `layer` commands are omitted, the compiler uses the same defaults as `SvgDocu
 
 ---
 
+### Variables and expressions
+
+Define document-level variables with `<name> = <expression>` and reuse them anywhere a number is expected. Evaluated in file order; define before use; no reassignment. Implemented with a safe AST whitelist (never `eval`).
+
+```text
+width = 150
+height = 112
+axis = width / 2
+margin = 4
+corner_radius = min(8, height / 4)
+
+size width height
+symmetry axis
+```
+
+| Rule | Detail |
+|------|--------|
+| Operators | `+`, `-`, `*`, `/`, parentheses, unary `+`/`-` |
+| Functions | `min`, `max`, `abs`, `round`, `floor`, `ceil` (whitelist only) |
+| Variable names | `[A-Za-z_][A-Za-z0-9_]*`; structural keywords forbidden, parameter names (`radius`, `spacing`, `margin`, `length`, `angle`, `rx`, `ry`) allowed |
+| Multi-value commands | Simple form `size width height`; for complex expressions use commas: `size width - 2 * margin, height - 2 * margin` |
+| `symmetry vertical x=75` | Still a command, NOT an assignment (whitespace before `=`) |
+
+Common errors (all raise `DslError` with line numbers): `unknown variable 'x'`, `variable 'x' is already defined`, `division by zero`, `invalid variable name 'x'`, `'size' is a reserved keyword...`, `unsupported function 'sin'`, `command 'size' expects 2 values. Use commas...`.
+
+Full reference: `leathercraft_dsl_variables_expressions.md`. Example: `examples/dsl/variables_rounded_pocket.lcraft`.
+
+---
+
 ### Shapes
 
 #### `rectangle`

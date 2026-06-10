@@ -825,6 +825,34 @@ holes
 end
 ```
 
+### Variables and expressions
+
+You can define document-level variables with `<name> = <expression>` and reuse them anywhere a number is expected. This keeps repeated dimensions in one place.
+
+```text
+width = 120
+height = 80
+margin = 10
+corner_radius = min(8, height / 4)
+
+size width height
+
+rounded_rectangle pocket
+  at margin, margin
+  size width - 2 * margin, height - 2 * margin
+  radius corner_radius
+end
+```
+
+Rules:
+
+- Expressions are numeric only and support `+`, `-`, `*`, `/`, parentheses, unary minus, and the functions `min`, `max`, `abs`, `round`, `floor`, `ceil`.
+- Variables must be defined **before** they are used, and cannot be reassigned.
+- Structural keywords (`size`, `at`, `rectangle`, …) cannot be used as variable names, but parameter-like names (`radius`, `spacing`, `margin`, `length`, `angle`, `rx`, `ry`) are allowed.
+- When a command takes several values and at least one is a complex expression, separate the values with commas: `size width - 2 * margin, height - 2 * margin`. Simple forms like `size width height` still work without commas.
+
+See `examples/dsl/variables_rounded_pocket.lcraft` for a complete example. Full reference: `leathercraft_dsl_variables_expressions.md`.
+
 ### All values are millimeters
 
 Do not write unit suffixes such as `mm` or `cm`. Every numeric value is already in millimeters.

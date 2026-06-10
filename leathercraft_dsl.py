@@ -12,6 +12,8 @@ stitches, holes, hole, export.
 
 from __future__ import annotations
 
+import ast as _ast
+import math as _math
 import re
 import sys
 from dataclasses import dataclass, field
@@ -290,7 +292,7 @@ def _check_no_unit_suffix(token: str, lineno: int) -> None:
     if re.search(r"\d(mm|cm|in|pt|px)$", token, re.IGNORECASE):
         raise DslError(
             f"Line {lineno}: units are not allowed in numeric values. "
-            f"Use 'size 150 112', not 'size 150mm 112mm'. All dimensions are millimeters."
+            f"Use '150', not '150mm'. All dimensions are millimeters."
         )
 
 
@@ -323,6 +325,190 @@ _BLOCK_STARTERS = {
     "stitches", "holes", "hole",
     "path", "points",
 }
+
+
+# ---------------------------------------------------------------------------
+# Variables and numeric expressions
+# ---------------------------------------------------------------------------
+#
+# A line of the form ``<identifier> = <expression>`` defines a document-level
+# variable. Expressions are numeric only and are evaluated with a strict
+# AST whitelist (never Python ``eval``). Variables must be defined before use
+# and may not be reassigned. See leathercraft_dsl_variables_expressions.md.
+
+_IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+_SAFE_FUNCTIONS = {
+    "min": min,
+    "max": max,
+    "abs": abs,
+    "round": round,
+    "floor": _math.floor,
+    "ceil": _math.ceil,
+}
+
+# Structural keywords that may not be used as variable names. Parameter-like
+# names (radius, spacing, margin, length, angle, rx, ry, ...) are intentionally
+# allowed because they read naturally in pattern files.
+_RESERVED_VAR_NAMES = _BLOCK_STARTERS | {
+    "pattern", "size", "layer", "symmetry", "outer", "export", "end",
+    "source", "edges", "at", "p1", "p2", "p3",
+    "from_angle", "to_angle", "inner_radius",
+    "mirror", "mirrored", "smooth", "straight",
+    "x_from_center", "y",
+}
+
+
+class ExpressionEvaluator:
+    """Evaluate numeric DSL expressions against a global variable scope."""
+
+    def __init__(self) -> None:
+        self.variables: dict[str, float] = {}
+
+    # -- variable definition ------------------------------------------------
+
+    def define(self, name: str, expression: str, lineno: int) -> float:
+        if not re.fullmatch(_IDENTIFIER_RE, name):
+            raise DslError(f"Line {lineno}: invalid variable name '{name}'")
+        if name in _RESERVED_VAR_NAMES:
+            raise DslError(
+                f"Line {lineno}: '{name}' is a reserved keyword and cannot be "
+                f"used as a variable name"
+            )
+        if name in self.variables:
+            raise DslError(f"Line {lineno}: variable '{name}' is already defined")
+        value = self.eval(expression, lineno)
+        self.variables[name] = value
+        return value
+
+    # -- expression evaluation ---------------------------------------------
+
+    def eval(self, expression: str, lineno: int) -> float:
+        expr = expression.strip()
+        if not expr:
+            raise DslError(f"Line {lineno}: invalid expression ''")
+        for token in expr.replace("(", " ").replace(")", " ").replace(",", " ").split():
+            _check_no_unit_suffix(token, lineno)
+        try:
+            tree = _ast.parse(expr, mode="eval")
+        except SyntaxError:
+            raise DslError(f"Line {lineno}: invalid expression '{expr}'")
+        return float(self._eval_node(tree.body, expr, lineno))
+
+    def _eval_node(self, node, expr: str, lineno: int) -> float:
+        if isinstance(node, _ast.Constant):
+            if isinstance(node.value, bool) or not isinstance(node.value, (int, float)):
+                raise DslError(f"Line {lineno}: unsupported expression syntax")
+            return node.value
+        if isinstance(node, _ast.Name):
+            if node.id in self.variables:
+                return self.variables[node.id]
+            raise DslError(f"Line {lineno}: unknown variable '{node.id}'")
+        if isinstance(node, _ast.BinOp):
+            left = self._eval_node(node.left, expr, lineno)
+            right = self._eval_node(node.right, expr, lineno)
+            op = node.op
+            if isinstance(op, _ast.Add):
+                return left + right
+            if isinstance(op, _ast.Sub):
+                return left - right
+            if isinstance(op, _ast.Mult):
+                return left * right
+            if isinstance(op, _ast.Div):
+                if right == 0:
+                    raise DslError(
+                        f"Line {lineno}: division by zero in expression '{expr}'"
+                    )
+                return left / right
+            raise DslError(f"Line {lineno}: unsupported expression syntax")
+        if isinstance(node, _ast.UnaryOp):
+            operand = self._eval_node(node.operand, expr, lineno)
+            if isinstance(node.op, _ast.UAdd):
+                return +operand
+            if isinstance(node.op, _ast.USub):
+                return -operand
+            raise DslError(f"Line {lineno}: unsupported expression syntax")
+        if isinstance(node, _ast.Call):
+            if not isinstance(node.func, _ast.Name):
+                raise DslError(f"Line {lineno}: unsupported expression syntax")
+            fname = node.func.id
+            if fname not in _SAFE_FUNCTIONS:
+                raise DslError(f"Line {lineno}: unsupported function '{fname}'")
+            if node.keywords:
+                raise DslError(f"Line {lineno}: unsupported expression syntax")
+            args = [self._eval_node(a, expr, lineno) for a in node.args]
+            try:
+                return _SAFE_FUNCTIONS[fname](*args)
+            except TypeError:
+                raise DslError(
+                    f"Line {lineno}: invalid arguments to function '{fname}'"
+                )
+        raise DslError(f"Line {lineno}: unsupported expression syntax")
+
+
+def _split_top_commas(text: str) -> list[str]:
+    """Split on commas that are not nested inside parentheses."""
+    parts: list[str] = []
+    depth = 0
+    current: list[str] = []
+    for ch in text:
+        if ch == "(":
+            depth += 1
+            current.append(ch)
+        elif ch == ")":
+            depth -= 1
+            current.append(ch)
+        elif ch == "," and depth == 0:
+            parts.append("".join(current))
+            current = []
+        else:
+            current.append(ch)
+    parts.append("".join(current))
+    return [p.strip() for p in parts]
+
+
+def _eval_values(
+    tokens: list[str],
+    count: int,
+    evaluator: ExpressionEvaluator,
+    lineno: int,
+    command: str,
+) -> list[float]:
+    """
+    Resolve ``count`` numeric values from a command's value tokens.
+
+    Two forms are accepted:
+      * simple whitespace form — each value is a single token (number or
+        bare variable name): ``size width height``
+      * comma form — for complex expressions: ``size width - 2 * margin, height``
+    """
+    raw = " ".join(tokens).strip()
+    parts = _split_top_commas(raw)
+    if len(parts) > 1:
+        if len(parts) != count:
+            raise DslError(
+                f"Line {lineno}: command '{command}' expects {count} values, "
+                f"got {len(parts)}"
+            )
+        return [evaluator.eval(p, lineno) for p in parts]
+    if count == 1:
+        return [evaluator.eval(raw, lineno)]
+    whitespace_tokens = raw.split()
+    if len(whitespace_tokens) != count:
+        raise DslError(
+            f"Line {lineno}: command '{command}' expects {count} values. "
+            f"Use commas for complex expressions: {command} <expr>, <expr>"
+        )
+    return [evaluator.eval(t, lineno) for t in whitespace_tokens]
+
+
+def _eval_value(
+    tokens: list[str],
+    evaluator: ExpressionEvaluator,
+    lineno: int,
+    command: str,
+) -> float:
+    return _eval_values(tokens, 1, evaluator, lineno, command)[0]
 
 
 def _split_blocks(lines: list[tuple[int, str]]) -> list[tuple[int, str, list[tuple[int, str]]]]:
@@ -423,14 +609,15 @@ def _parse_block_body(body: list[tuple[int, str]]) -> dict:
     return data
 
 
-def _parse_xy_list(lines: list[tuple[int, str]]) -> list[tuple[float, float]]:
+def _parse_xy_list(
+    lines: list[tuple[int, str]],
+    evaluator: ExpressionEvaluator,
+) -> list[tuple[float, float]]:
     pts = []
     for lineno, line in lines:
-        tokens = line.split()
-        if len(tokens) != 2:
-            raise DslError(f"Line {lineno}: expected 'x y' point, got '{line}'")
-        x = _parse_float(tokens[0], lineno, "x")
-        y = _parse_float(tokens[1], lineno, "y")
+        # Supports plain "x y", variables ("axis 14"), and comma-separated
+        # expressions ("width - 10, height - 10").
+        x, y = _eval_values(line.split(), 2, evaluator, lineno, "point")
         pts.append((x, y))
     return pts
 
@@ -439,22 +626,21 @@ def _parse_triangle_points(
     data: dict,
     shape_id: str,
     lineno: int,
+    evaluator: ExpressionEvaluator,
 ) -> tuple[tuple[float, float], tuple[float, float], tuple[float, float]]:
     """Extract p1/p2/p3 from block body; support both point form and at+size box form."""
     if "p1" in data and "p2" in data and "p3" in data:
         p1_ln, p1v = data["p1"]
         p2_ln, p2v = data["p2"]
         p3_ln, p3v = data["p3"]
-        p1 = (_parse_float(p1v[0], p1_ln, "p1 x"), _parse_float(p1v[1], p1_ln, "p1 y"))
-        p2 = (_parse_float(p2v[0], p2_ln, "p2 x"), _parse_float(p2v[1], p2_ln, "p2 y"))
-        p3 = (_parse_float(p3v[0], p3_ln, "p3 x"), _parse_float(p3v[1], p3_ln, "p3 y"))
+        p1 = tuple(_eval_values(p1v, 2, evaluator, p1_ln, "p1"))
+        p2 = tuple(_eval_values(p2v, 2, evaluator, p2_ln, "p2"))
+        p3 = tuple(_eval_values(p3v, 2, evaluator, p3_ln, "p3"))
     elif "at" in data and "size" in data:
         at_ln, at_v = data["at"]
         sz_ln, sz_v = data["size"]
-        x = _parse_float(at_v[0], at_ln, "at x")
-        y = _parse_float(at_v[1], at_ln, "at y")
-        w = _parse_float(sz_v[0], sz_ln, "size width")
-        h = _parse_float(sz_v[1], sz_ln, "size height")
+        x, y = _eval_values(at_v, 2, evaluator, at_ln, "at")
+        w, h = _eval_values(sz_v, 2, evaluator, sz_ln, "size")
         # Triangle.from_box layout: top-center, bottom-right, bottom-left
         p1 = (x + w / 2, y)
         p2 = (x + w, y + h)
@@ -487,8 +673,23 @@ def parse(text: str) -> PatternDocument:
     exports: list[ExportDefinition] = []
 
     shape_ids: set[str] = set()
+    evaluator = ExpressionEvaluator()
 
     for lineno, line, body in blocks:
+        # ------------------------------------------------------------------
+        # Variable assignment: ``<identifier> = <expression>`` (top-level only).
+        # Must be checked before keyword dispatch. An assignment is recognised
+        # when the text left of the first '=' is a single whitespace-free token;
+        # this lets ``symmetry vertical x=75`` (whitespace before '=') stay a
+        # normal command, while an invalid name like ``stitch-spacing = 5`` is
+        # still routed to define() for a helpful "invalid variable name" error.
+        if not body and "=" in line:
+            lhs, _, rhs = line.partition("=")
+            lhs = lhs.strip()
+            if lhs and not re.search(r"\s", lhs):
+                evaluator.define(lhs, rhs.strip(), lineno)
+                continue
+
         tokens = line.split()
         keyword = tokens[0]
 
@@ -500,10 +701,9 @@ def parse(text: str) -> PatternDocument:
 
         # ------------------------------------------------------------------
         elif keyword == "size":
-            if len(tokens) < 3:
+            if len(tokens) < 2:
                 raise DslError(f"Line {lineno}: 'size' requires width and height")
-            width_mm = _parse_float(tokens[1], lineno, "width")
-            height_mm = _parse_float(tokens[2], lineno, "height")
+            width_mm, height_mm = _eval_values(tokens[1:], 2, evaluator, lineno, "size")
 
         # ------------------------------------------------------------------
         elif keyword == "layer":
@@ -511,7 +711,7 @@ def parse(text: str) -> PatternDocument:
                 raise DslError(f"Line {lineno}: 'layer' requires name, color, stroke_width")
             lname = tokens[1]
             color = _resolve_color(tokens[2])
-            sw = _parse_float(tokens[3], lineno, "stroke_width")
+            sw = _eval_value([tokens[3]], evaluator, lineno, "stroke_width")
             dashed = len(tokens) > 4 and tokens[4] == "dashed"
             layers[lname] = LayerStyle(color=color, stroke_width=sw, dashed=dashed)
 
@@ -521,13 +721,13 @@ def parse(text: str) -> PatternDocument:
             if not rest:
                 raise DslError(f"Line {lineno}: 'symmetry' requires a value")
             if rest[0] == "vertical":
-                xpart = rest[1] if len(rest) > 1 else ""
+                xpart = " ".join(rest[1:])
                 if xpart.startswith("x="):
-                    symmetry_axis_x = _parse_float(xpart[2:], lineno, "symmetry x")
+                    symmetry_axis_x = evaluator.eval(xpart[2:], lineno)
                 else:
                     raise DslError(f"Line {lineno}: expected 'x=<value>' after 'symmetry vertical'")
             else:
-                symmetry_axis_x = _parse_float(rest[0], lineno, "symmetry x")
+                symmetry_axis_x = _eval_value(rest, evaluator, lineno, "symmetry")
 
         # ------------------------------------------------------------------
         elif keyword == "rectangle":
@@ -543,10 +743,8 @@ def parse(text: str) -> PatternDocument:
 
             at_lineno, at_vals = _req("at")
             sz_lineno, sz_vals = _req("size")
-            x = _parse_float(at_vals[0], at_lineno, "at x")
-            y = _parse_float(at_vals[1], at_lineno, "at y")
-            w = _parse_float(sz_vals[0], sz_lineno, "size width")
-            h = _parse_float(sz_vals[1], sz_lineno, "size height")
+            x, y = _eval_values(at_vals, 2, evaluator, at_lineno, "at")
+            w, h = _eval_values(sz_vals, 2, evaluator, sz_lineno, "size")
             layer_name = "cut"
             if "layer" in data:
                 layer_name = data["layer"][1][0]
@@ -567,17 +765,15 @@ def parse(text: str) -> PatternDocument:
 
             at_lineno, at_vals = _req("at")
             sz_lineno, sz_vals = _req("size")
-            x = _parse_float(at_vals[0], at_lineno, "at x")
-            y = _parse_float(at_vals[1], at_lineno, "at y")
-            w = _parse_float(sz_vals[0], sz_lineno, "size width")
-            h = _parse_float(sz_vals[1], sz_lineno, "size height")
+            x, y = _eval_values(at_vals, 2, evaluator, at_lineno, "at")
+            w, h = _eval_values(sz_vals, 2, evaluator, sz_lineno, "size")
 
             corner_keys = ("radius_tl", "radius_tr", "radius_br", "radius_bl")
             corners: dict[str, float | None] = {k: None for k in corner_keys}
             for k in corner_keys:
                 if k in data:
                     c_ln, c_vals = data[k]
-                    val = _parse_float(c_vals[0], c_ln, k)
+                    val = _eval_value(c_vals, evaluator, c_ln, k)
                     if val < 0:
                         raise DslError(f"Line {c_ln}: {k} must be >= 0")
                     corners[k] = val
@@ -585,7 +781,7 @@ def parse(text: str) -> PatternDocument:
             has_corner = any(v is not None for v in corners.values())
             if "radius" in data:
                 r_lineno, r_vals = data["radius"]
-                r = _parse_float(r_vals[0], r_lineno, "radius")
+                r = _eval_value(r_vals, evaluator, r_lineno, "radius")
                 if r <= 0:
                     raise DslError(f"Line {r_lineno}: radius must be greater than 0")
             elif has_corner:
@@ -622,10 +818,8 @@ def parse(text: str) -> PatternDocument:
 
             at_lineno, at_vals = _req("at")
             sz_lineno, sz_vals = _req("size")
-            x = _parse_float(at_vals[0], at_lineno, "at x")
-            y = _parse_float(at_vals[1], at_lineno, "at y")
-            w = _parse_float(sz_vals[0], sz_lineno, "size width")
-            h = _parse_float(sz_vals[1], sz_lineno, "size height")
+            x, y = _eval_values(at_vals, 2, evaluator, at_lineno, "at")
+            w, h = _eval_values(sz_vals, 2, evaluator, sz_lineno, "size")
             if w <= 0 or h <= 0:
                 raise DslError(f"Line {sz_lineno}: stadium size must be greater than 0")
             layer_name = "cut"
@@ -648,9 +842,8 @@ def parse(text: str) -> PatternDocument:
 
             at_lineno, at_vals = _req("at")
             r_lineno, r_vals = _req("radius")
-            cx = _parse_float(at_vals[0], at_lineno, "at cx")
-            cy = _parse_float(at_vals[1], at_lineno, "at cy")
-            r = _parse_float(r_vals[0], r_lineno, "radius")
+            cx, cy = _eval_values(at_vals, 2, evaluator, at_lineno, "at")
+            r = _eval_value(r_vals, evaluator, r_lineno, "radius")
             if r <= 0:
                 raise DslError(f"Line {r_lineno}: radius must be greater than 0")
             layer_name = "cut"
@@ -675,17 +868,16 @@ def parse(text: str) -> PatternDocument:
             r_lineno, r_vals = _req("radius")
             fa_lineno, fa_vals = _req("from_angle")
             ta_lineno, ta_vals = _req("to_angle")
-            cx = _parse_float(at_vals[0], at_lineno, "at cx")
-            cy = _parse_float(at_vals[1], at_lineno, "at cy")
-            r = _parse_float(r_vals[0], r_lineno, "radius")
+            cx, cy = _eval_values(at_vals, 2, evaluator, at_lineno, "at")
+            r = _eval_value(r_vals, evaluator, r_lineno, "radius")
             if r <= 0:
                 raise DslError(f"Line {r_lineno}: radius must be greater than 0")
-            start_a = _parse_float(fa_vals[0], fa_lineno, "from_angle")
-            end_a = _parse_float(ta_vals[0], ta_lineno, "to_angle")
+            start_a = _eval_value(fa_vals, evaluator, fa_lineno, "from_angle")
+            end_a = _eval_value(ta_vals, evaluator, ta_lineno, "to_angle")
             inner_r = 0.0
             if "inner_radius" in data:
                 ir_lineno, ir_vals = data["inner_radius"]
-                inner_r = _parse_float(ir_vals[0], ir_lineno, "inner_radius")
+                inner_r = _eval_value(ir_vals, evaluator, ir_lineno, "inner_radius")
                 if inner_r < 0:
                     raise DslError(f"Line {ir_lineno}: inner_radius must be >= 0")
                 if inner_r >= r:
@@ -713,17 +905,17 @@ def parse(text: str) -> PatternDocument:
                 return data[k]
 
             at_lineno, at_vals = _req("at")
-            cx = _parse_float(at_vals[0], at_lineno, "at cx")
-            cy = _parse_float(at_vals[1], at_lineno, "at cy")
+            cx, cy = _eval_values(at_vals, 2, evaluator, at_lineno, "at")
             if "rx" in data and "ry" in data:
                 rx_lineno, rx_vals = data["rx"]
                 ry_lineno, ry_vals = data["ry"]
-                rx = _parse_float(rx_vals[0], rx_lineno, "rx")
-                ry = _parse_float(ry_vals[0], ry_lineno, "ry")
+                rx = _eval_value(rx_vals, evaluator, rx_lineno, "rx")
+                ry = _eval_value(ry_vals, evaluator, ry_lineno, "ry")
             elif "size" in data:
                 sz_lineno, sz_vals = data["size"]
-                rx = _parse_float(sz_vals[0], sz_lineno, "size width") / 2
-                ry = _parse_float(sz_vals[1], sz_lineno, "size height") / 2
+                sw, sh = _eval_values(sz_vals, 2, evaluator, sz_lineno, "size")
+                rx = sw / 2
+                ry = sh / 2
             else:
                 raise DslError(
                     f"Line {lineno}: ellipse '{shape_id}' needs either 'rx' + 'ry' or 'size'"
@@ -742,7 +934,7 @@ def parse(text: str) -> PatternDocument:
                 raise DslError(f"Line {lineno}: 'triangle' requires an id")
             shape_id = tokens[1]
             data = _parse_block_body(body)
-            p1, p2, p3 = _parse_triangle_points(data, shape_id, lineno)
+            p1, p2, p3 = _parse_triangle_points(data, shape_id, lineno, evaluator)
             layer_name = "cut"
             if "layer" in data:
                 layer_name = data["layer"][1][0]
@@ -755,11 +947,11 @@ def parse(text: str) -> PatternDocument:
                 raise DslError(f"Line {lineno}: 'rounded_triangle' requires an id")
             shape_id = tokens[1]
             data = _parse_block_body(body)
-            p1, p2, p3 = _parse_triangle_points(data, shape_id, lineno)
+            p1, p2, p3 = _parse_triangle_points(data, shape_id, lineno, evaluator)
             if "radius" not in data:
                 raise DslError(f"Line {lineno}: rounded_triangle '{shape_id}' is missing 'radius'")
             r_lineno, r_vals = data["radius"]
-            r = _parse_float(r_vals[0], r_lineno, "radius")
+            r = _eval_value(r_vals, evaluator, r_lineno, "radius")
             if r <= 0:
                 raise DslError(f"Line {r_lineno}: radius must be greater than 0")
             layer_name = "cut"
@@ -785,10 +977,9 @@ def parse(text: str) -> PatternDocument:
             at_lineno, at_vals = _req("at")
             radius_lineno, radius_vals = _req("radius")
             sides_lineno, sides_vals = _req("sides")
-            cx = _parse_float(at_vals[0], at_lineno, "at cx")
-            cy = _parse_float(at_vals[1], at_lineno, "at cy")
-            radius = _parse_float(radius_vals[0], radius_lineno, "radius")
-            sides_value = _parse_float(sides_vals[0], sides_lineno, "sides")
+            cx, cy = _eval_values(at_vals, 2, evaluator, at_lineno, "at")
+            radius = _eval_value(radius_vals, evaluator, radius_lineno, "radius")
+            sides_value = _eval_value(sides_vals, evaluator, sides_lineno, "sides")
             sides = int(sides_value)
             if sides != sides_value:
                 raise DslError(f"Line {sides_lineno}: sides must be a whole number")
@@ -799,7 +990,7 @@ def parse(text: str) -> PatternDocument:
             rotation = -90.0
             if "rotation" in data:
                 rotation_lineno, rotation_vals = data["rotation"]
-                rotation = _parse_float(rotation_vals[0], rotation_lineno, "rotation")
+                rotation = _eval_value(rotation_vals, evaluator, rotation_lineno, "rotation")
             layer_name = "cut"
             if "layer" in data:
                 layer_name = data["layer"][1][0]
@@ -829,10 +1020,9 @@ def parse(text: str) -> PatternDocument:
             at_lineno, at_vals = _req("at")
             radius_lineno, radius_vals = _req("radius")
             sides_lineno, sides_vals = _req("sides")
-            cx = _parse_float(at_vals[0], at_lineno, "at cx")
-            cy = _parse_float(at_vals[1], at_lineno, "at cy")
-            radius = _parse_float(radius_vals[0], radius_lineno, "radius")
-            sides_value = _parse_float(sides_vals[0], sides_lineno, "sides")
+            cx, cy = _eval_values(at_vals, 2, evaluator, at_lineno, "at")
+            radius = _eval_value(radius_vals, evaluator, radius_lineno, "radius")
+            sides_value = _eval_value(sides_vals, evaluator, sides_lineno, "sides")
             sides = int(sides_value)
             if sides != sides_value:
                 raise DslError(f"Line {sides_lineno}: sides must be a whole number")
@@ -844,7 +1034,7 @@ def parse(text: str) -> PatternDocument:
             rotation = -90.0
             if "rotation" in data:
                 rotation_lineno, rotation_vals = data["rotation"]
-                rotation = _parse_float(rotation_vals[0], rotation_lineno, "rotation")
+                rotation = _eval_value(rotation_vals, evaluator, rotation_lineno, "rotation")
 
             corner_overrides: dict[int, float] = {}
             allowed_keys = {"at", "radius", "corner_radius", "sides", "rotation", "layer"}
@@ -861,14 +1051,14 @@ def parse(text: str) -> PatternDocument:
                     raise DslError(
                         f"Line {key_lineno}: {key} is out of range for {sides} sides"
                     )
-                value = _parse_float(key_vals[0], key_lineno, key)
+                value = _eval_value(key_vals, evaluator, key_lineno, key)
                 if value < 0:
                     raise DslError(f"Line {key_lineno}: {key} must be >= 0")
                 corner_overrides[index] = value
 
             if "corner_radius" in data:
                 corner_radius_lineno, corner_radius_vals = data["corner_radius"]
-                corner_radius = _parse_float(corner_radius_vals[0], corner_radius_lineno, "corner_radius")
+                corner_radius = _eval_value(corner_radius_vals, evaluator, corner_radius_lineno, "corner_radius")
                 if corner_radius < 0:
                     raise DslError(f"Line {corner_radius_lineno}: corner_radius must be >= 0")
             elif corner_overrides:
@@ -907,7 +1097,7 @@ def parse(text: str) -> PatternDocument:
                     smooth = False
                 elif tok == "mirrored":
                     mirrored = True
-            pts = _parse_xy_list(body)
+            pts = _parse_xy_list(body, evaluator)
             if not pts:
                 raise DslError(f"Line {lineno}: 'outer' block has no points")
             shapes.append(OuterPathDefinition(smooth=smooth, mirrored=mirrored, points=pts))
@@ -953,16 +1143,16 @@ def parse(text: str) -> PatternDocument:
                 edges_raw = _resolve_edges(e_vals, e_ln)
             if "margin" in data:
                 ln, vals = data["margin"]
-                margin = _parse_float(vals[0], ln, "margin")
+                margin = _eval_value(vals, evaluator, ln, "margin")
             if "spacing" in data:
                 ln, vals = data["spacing"]
-                spacing = _parse_float(vals[0], ln, "spacing")
+                spacing = _eval_value(vals, evaluator, ln, "spacing")
             if "length" in data:
                 ln, vals = data["length"]
-                length = _parse_float(vals[0], ln, "length")
+                length = _eval_value(vals, evaluator, ln, "length")
             if "angle" in data:
                 ln, vals = data["angle"]
-                angle = _parse_float(vals[0], ln, "angle")
+                angle = _eval_value(vals, evaluator, ln, "angle")
             if "layer" in data:
                 layer_name = data["layer"][1][0]
             if "mirror" in data:
@@ -970,7 +1160,7 @@ def parse(text: str) -> PatternDocument:
             if "side" in data:
                 side = data["side"][1][0]
             if "path" in data:
-                path_pts = _parse_xy_list(data["path"])
+                path_pts = _parse_xy_list(data["path"], evaluator)
             if "rounded_path" in data:
                 rounded_path = True
 
@@ -1028,13 +1218,13 @@ def parse(text: str) -> PatternDocument:
                 edges_raw = _resolve_edges(e_vals, e_ln)
             if "margin" in data:
                 ln, vals = data["margin"]
-                margin = _parse_float(vals[0], ln, "margin")
+                margin = _eval_value(vals, evaluator, ln, "margin")
             if "spacing" in data:
                 ln, vals = data["spacing"]
-                spacing = _parse_float(vals[0], ln, "spacing")
+                spacing = _eval_value(vals, evaluator, ln, "spacing")
             if "radius" in data:
                 ln, vals = data["radius"]
-                radius = _parse_float(vals[0], ln, "radius")
+                radius = _eval_value(vals, evaluator, ln, "radius")
                 if radius <= 0:
                     raise DslError(f"Line {ln}: radius must be greater than 0")
             if "layer" in data:
@@ -1074,9 +1264,9 @@ def parse(text: str) -> PatternDocument:
                 y_ln, y_vals = _req_field("y")
                 r_ln, r_vals = _req_field("radius")
 
-                xfc = _parse_float(xfc_vals[0], xfc_ln, "x_from_center")
-                hole_y = _parse_float(y_vals[0], y_ln, "y")
-                r = _parse_float(r_vals[0], r_ln, "radius")
+                xfc = _eval_value(xfc_vals, evaluator, xfc_ln, "x_from_center")
+                hole_y = _eval_value(y_vals, evaluator, y_ln, "y")
+                r = _eval_value(r_vals, evaluator, r_ln, "radius")
                 if r <= 0:
                     raise DslError(f"Line {r_ln}: radius must be greater than 0")
 
@@ -1093,9 +1283,8 @@ def parse(text: str) -> PatternDocument:
                 at_ln, at_vals = _req_field("at")
                 r_ln, r_vals = _req_field("radius")
 
-                hole_x = _parse_float(at_vals[0], at_ln, "at x")
-                hole_y = _parse_float(at_vals[1], at_ln, "at y")
-                r = _parse_float(r_vals[0], r_ln, "radius")
+                hole_x, hole_y = _eval_values(at_vals, 2, evaluator, at_ln, "at")
+                r = _eval_value(r_vals, evaluator, r_ln, "radius")
                 if r <= 0:
                     raise DslError(f"Line {r_ln}: radius must be greater than 0")
 

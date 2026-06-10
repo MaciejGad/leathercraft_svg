@@ -74,6 +74,8 @@
     .cm-comment     { color: #6272a4 !important; font-style: italic; }
     .cm-variable    { color: #f5c2e7 !important; }   /* shape id */
     .cm-def         { color: #f5c2e7 !important; font-weight: 600; }
+    .cm-builtin     { color: #94e2d5 !important; }   /* expression functions */
+    .cm-operator    { color: #f5e0dc !important; }   /* + - * / ( ) = , */
 
     #error-bar {
       padding: 6px 12px; font-size: 12px; font-family: monospace;
@@ -193,6 +195,9 @@ const VALUE_ATOMS = new Set([
   "svg","png","pdf"
 ]);
 
+// Whitelisted numeric functions for variable expressions
+const EXPR_FUNCTIONS = new Set(["min","max","abs","round","floor","ceil"]);
+
 CodeMirror.defineMode("lcraft", function() {
   return {
     startState: () => ({}),
@@ -214,14 +219,18 @@ CodeMirror.defineMode("lcraft", function() {
       // Hex colour literal (e.g. #aa0000)
       if (stream.match(/^#[0-9a-fA-F]{3,8}/)) return "atom";
 
+      // Expression operators
+      if (stream.match(/^[+\-*/()=,]/)) return "operator";
+
       // Identifier / keyword
       if (stream.match(/^[a-zA-Z_][a-zA-Z0-9_]*/)) {
         const word = stream.current();
         if (ALL_KEYWORDS.has(word)) return "keyword";
+        if (EXPR_FUNCTIONS.has(word)) return "builtin";
         if (/^(radius|corner_radius)_\d+$/.test(word)) return "property";
         if (PROPERTY_NAMES.has(word)) return "property";
         if (VALUE_ATOMS.has(word)) return "atom";
-        return "variable";   // shape id
+        return "variable";   // shape id or user variable
       }
 
       stream.next();

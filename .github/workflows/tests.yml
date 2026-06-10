@@ -28,7 +28,7 @@ jobs:
       - name: Install test dependencies
         run: |
           .venv/bin/python -m pip install --upgrade pip
-          .venv/bin/python -m pip install pytest cairosvg
+          .venv/bin/python -m pip install pytest cairosvg ezdxf
 
       - name: Run test suite
         run: ./test.sh

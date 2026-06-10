@@ -278,6 +278,16 @@ Parameters:
 - `x`, `y`, `width`, `height` - as above,
 - `radius` - corner radius.
 
+### `Stadium(x, y, width, height)`
+
+Capsule / oblong: a rectangle whose two short ends are replaced by semicircles. The cap radius is always `min(width, height) / 2` — a wide bounding box gives caps on the left and right, a tall one gives caps on the top and bottom. The classic key-fob blank.
+
+Parameters:
+
+- `x`, `y`, `width`, `height` - bounding box, as for `Rectangle`.
+
+Stitches and holes follow the full capsule contour (including both semicircular caps) when applied to all edges. With a subset of `edges` (`0`–`3`) they fall back to straight inset edges like a plain rectangle.
+
 ### `Circle(cx, cy, radius)`
 
 Circle.
@@ -557,6 +567,26 @@ end
 export rounded_pocket
 ```
 
+### Stadium (capsule)
+
+A rectangle with semicircular caps on the short ends — the classic key-fob blank. The cap radius is computed automatically as half of the shorter side.
+
+```text
+stadium fob
+  at 10 15
+  size 120 30
+end
+
+stitches
+  source fob
+  margin 4
+  spacing 5
+  length 3
+end
+```
+
+Stitches and holes follow the full capsule contour, including the curved caps.
+
 ### Circle
 
 ```text
@@ -636,7 +666,7 @@ Do not write unit suffixes such as `mm` or `cm`. Every numeric value is already 
 
 ### Supported keywords
 
-`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `circle`, `triangle`, `rounded_triangle`, `outer`, `stitches`, `holes`, `hole`, `export`
+`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `stadium`, `circle`, `triangle`, `rounded_triangle`, `outer`, `stitches`, `holes`, `hole`, `export`
 
 Edge names for rectangles: `top`, `right`, `bottom`, `left`, `all`, `except_top`, `sides`, `horizontal`, `vertical`
 

@@ -11,7 +11,7 @@ This file is intended for AI agents generating code with the `leathercraft_svg` 
 from leathercraft_svg import (
     SvgDocument, StrokeStyle,
     Point,
-    Rectangle, RoundedRectangle,
+    Rectangle, RoundedRectangle, Stadium,
     Circle,
     Triangle, RoundedTriangle,
 )
@@ -190,6 +190,24 @@ doc.add_stitch_pattern(
     layer="stitch",
     stitch_thickness=0.8,
 )
+```
+
+---
+
+### Stadium
+
+```python
+Stadium(x, y, width, height)
+```
+
+Capsule / oblong: a rectangle whose two short ends are replaced by semicircles. The cap radius is always `min(width, height) / 2` (read-only `radius` property) — a wide box gives left/right caps, a tall box gives top/bottom caps. Same edge indices as Rectangle (0=top, 1=right, 2=bottom, 3=left).
+
+When `edges="all"`, both `hole_points` and `stitch_segments` follow the full capsule contour, including the curved caps. For partial edge selections they fall back to straight-edge placement. If `inset` consumes the whole shape (`width - 2*inset <= 0` or `height - 2*inset <= 0`), an empty list is returned.
+
+```python
+shape = Stadium(10, 15, 120, 30)   # key-fob blank, cap radius = 15
+doc.add_shape(shape, layer="cut")
+doc.add_stitch_pattern(shape, spacing=5.0, stitch_length=3.0, inset=4.0)
 ```
 
 ---
@@ -539,7 +557,7 @@ doc.save("mixed.svg")
 | Using `rounded_path=True` on Rectangle/Circle | Only affects RoundedTriangle; safe to pass but has no effect |
 | Forgetting `layer="stitch"` for holes | Default is `"cut"` (red); use `"stitch"` (blue) for stitching guides |
 | `radius` too large on RoundedRectangle | Automatically clamped — no error, but visual result may surprise you |
-| Edge index out of range | Rectangle/RoundedRectangle: 0–3; Triangle/RoundedTriangle: 0–2 |
+| Edge index out of range | Rectangle/RoundedRectangle/Stadium: 0–3; Triangle/RoundedTriangle: 0–2 |
 | `Polygon.from_mirror` half doesn't start/end on axis | Both endpoints must have `x == center_x`; otherwise the seam won't close |
 | `offset_polyline` side="right" goes outward | For a left edge going top→bottom, "right" is inward. Swap to "left" if offset goes the wrong way |
 | `smooth=True` on a polygon with few/collinear points | Works but may produce unexpected curves; preview the SVG before cutting |
@@ -645,6 +663,18 @@ end
 ```
 
 Compiles to `RoundedRectangle(x, y, width, height, radius)`. `radius` must be > 0.
+
+#### `stadium`
+
+```text
+stadium <id>
+  at <x> <y>
+  size <width> <height>
+  [layer <layer_name>]
+end
+```
+
+Compiles to `Stadium(x, y, width, height)` — a capsule / oblong: a rectangle whose two short ends are replaced by semicircles. The cap radius is computed automatically as `min(width, height) / 2` — there is no `radius` key. Width and height must be > 0. With `edges all` (the default), stitches and holes follow the full capsule contour including the curved caps; with a numeric subset of edges (`0`–`3`) they fall back to straight inset edges like a plain rectangle.
 
 #### `circle`
 

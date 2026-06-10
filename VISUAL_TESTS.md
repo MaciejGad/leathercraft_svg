@@ -162,6 +162,68 @@ doc.add_stitch_pattern(
 
 ![Rounded rectangle partial stitch pattern](tests/baselines/rounded_rectangle_stitch_partial.png)
 
+## Stadium Stitch Pattern
+
+Tests stitch segments following the full capsule contour, including both semicircular caps.
+
+```python
+doc = SvgDocument(140, 60)
+shape = Stadium(10, 15, 120, 30)
+
+doc.add_shape(shape, layer="cut")
+doc.add_stitch_pattern(
+    shape,
+    spacing=5.0,
+    stitch_length=3.0,
+    inset=4.0,
+    layer="stitch",
+    stitch_thickness=0.8,
+)
+```
+
+![Stadium stitches](tests/baselines/stadium_stitches.png)
+
+## Stadium Hole Pattern
+
+Tests evenly spaced holes around the capsule contour.
+
+```python
+doc = SvgDocument(140, 60)
+shape = Stadium(10, 15, 120, 30)
+
+doc.add_shape(shape, layer="cut")
+doc.add_holes(
+    shape,
+    spacing=8.0,
+    hole_radius=1.5,
+    inset=5.0,
+    layer="stitch",
+)
+```
+
+![Stadium holes](tests/baselines/stadium_holes.png)
+
+## Vertical Stadium Stitch Pattern
+
+Tests that a tall bounding box places the semicircular caps on the top and bottom.
+
+```python
+doc = SvgDocument(60, 140)
+shape = Stadium(15, 10, 30, 120)
+
+doc.add_shape(shape, layer="cut")
+doc.add_stitch_pattern(
+    shape,
+    spacing=5.0,
+    stitch_length=3.0,
+    inset=4.0,
+    layer="stitch",
+    stitch_thickness=0.8,
+)
+```
+
+![Vertical stadium stitches](tests/baselines/stadium_vertical_stitches.png)
+
 ## Circle Hole Pattern
 
 Tests evenly spaced holes around a circular path.

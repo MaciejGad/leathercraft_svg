@@ -339,6 +339,92 @@ class RoundedRectangle(Rectangle):
 
 
 @dataclass
+class Stadium(Rectangle):
+    """
+    Capsule / oblong: a rectangle whose two short ends are replaced by
+    semicircles.  The cap radius is always min(width, height) / 2, so the
+    orientation follows from the bounding box (wide box -> caps on the left
+    and right, tall box -> caps on the top and bottom).
+    """
+
+    @property
+    def radius(self) -> float:
+        return min(self.width, self.height) / 2
+
+    def path_d(self) -> str:
+        x, y, w, h = self.x, self.y, self.width, self.height
+        r = self.radius
+        return (
+            f"M {x+r:.3f} {y:.3f} "
+            f"L {x+w-r:.3f} {y:.3f} "
+            f"A {r:.3f} {r:.3f} 0 0 1 {x+w:.3f} {y+r:.3f} "
+            f"L {x+w:.3f} {y+h-r:.3f} "
+            f"A {r:.3f} {r:.3f} 0 0 1 {x+w-r:.3f} {y+h:.3f} "
+            f"L {x+r:.3f} {y+h:.3f} "
+            f"A {r:.3f} {r:.3f} 0 0 1 {x:.3f} {y+h-r:.3f} "
+            f"L {x:.3f} {y+r:.3f} "
+            f"A {r:.3f} {r:.3f} 0 0 1 {x+r:.3f} {y:.3f} Z"
+        )
+
+    def _inner_contour(self, inset: float) -> list[Point]:
+        x = self.x + inset
+        y = self.y + inset
+        w = self.width - 2 * inset
+        h = self.height - 2 * inset
+        if w <= 0 or h <= 0:
+            return []
+        r = max(0.0, min(self.radius - inset, w / 2, h / 2))
+        return rounded_rectangle_contour(x, y, w, h, r)
+
+    def hole_points(self, edges="all", spacing=5.0, inset=4.0, include_corners=False, rounded_path=False) -> list[Point]:
+        all_edges = edges == "all" or sorted(set(edges)) == [0, 1, 2, 3]
+        if not all_edges:
+            return super().hole_points(
+                edges=edges,
+                spacing=spacing,
+                inset=inset,
+                include_corners=include_corners,
+                rounded_path=rounded_path,
+            )
+        contour = self._inner_contour(inset)
+        if len(contour) < 2:
+            return []
+        return points_on_closed_polyline(contour, spacing=spacing, include_corners=include_corners)
+
+    def stitch_segments(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=False,
+        stitch_length=2.0,
+        stitch_angle_deg=0.0,
+        rounded_path=False,
+    ) -> list[tuple[Point, Point]]:
+        all_edges = edges == "all" or sorted(set(edges)) == [0, 1, 2, 3]
+        if not all_edges:
+            return super().stitch_segments(
+                edges=edges,
+                spacing=spacing,
+                inset=inset,
+                include_corners=include_corners,
+                stitch_length=stitch_length,
+                stitch_angle_deg=stitch_angle_deg,
+                rounded_path=rounded_path,
+            )
+        contour = self._inner_contour(inset)
+        if len(contour) < 2:
+            return []
+        return stitch_segments_on_closed_polyline(
+            contour,
+            spacing=spacing,
+            stitch_length=stitch_length,
+            stitch_angle_deg=stitch_angle_deg,
+            include_corners=include_corners,
+        )
+
+
+@dataclass
 class Circle(Shape):
     cx: float
     cy: float

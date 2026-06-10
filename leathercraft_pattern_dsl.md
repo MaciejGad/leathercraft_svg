@@ -319,7 +319,51 @@ end
 export pocket_panel
 ```
 
-### 7.3 Circle
+### 7.3 Stadium
+
+A capsule / oblong: a rectangle whose two short ends are replaced by semicircles. The cap radius is computed automatically as `min(width, height) / 2` — there is no `radius` key. A wide bounding box gives caps on the left and right; a tall one gives caps on the top and bottom.
+
+```text
+stadium <id>
+  at <x> <y>
+  size <width> <height>
+  [layer <layer_name>]
+end
+```
+
+Compiler mapping:
+
+```python
+Stadium(x, y, width, height)
+doc.add_shape(shape, layer="cut")
+```
+
+Both `width` and `height` must be > 0. Default layer: `cut`.
+
+With `edges all` (the default), stitches and holes follow the full capsule contour, including the curved caps. With a numeric subset of edges (`0`–`3`, same indices as rectangle) they fall back to straight inset edges.
+
+Example — key-fob blank:
+
+```text
+pattern key_fob
+size 140 60
+
+stadium fob
+  at 10 15
+  size 120 30
+end
+
+stitches
+  source fob
+  margin 4
+  spacing 5
+  length 3
+end
+
+export key_fob
+```
+
+### 7.4 Circle
 
 ```text
 circle <id>
@@ -354,7 +398,7 @@ holes
 end
 ```
 
-### 7.4 Triangle
+### 7.5 Triangle
 
 Two forms are supported: explicit three-point form and box form.
 
@@ -412,7 +456,7 @@ stitches
 end
 ```
 
-### 7.5 Rounded Triangle
+### 7.6 Rounded Triangle
 
 Same as `triangle` but with an additional `radius` field.
 
@@ -450,7 +494,7 @@ doc.add_shape(shape, layer="cut")
 
 The `rounded_path` flag (see section 9) applies specifically to `RoundedTriangle` and makes stitch marks or holes follow the smooth rounded corners instead of the straight inset.
 
-### 7.6 Outer Freeform Shape
+### 7.7 Outer Freeform Shape
 
 For irregular leather patterns, use `outer`.
 
@@ -1163,6 +1207,7 @@ layer
 symmetry
 rectangle
 rounded_rectangle
+stadium
 circle
 triangle
 rounded_triangle
@@ -1207,6 +1252,7 @@ layer
 symmetry
 rectangle
 rounded_rectangle
+stadium
 circle
 triangle (point form and box form)
 rounded_triangle (point form and box form)

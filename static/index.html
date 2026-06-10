@@ -176,7 +176,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const BLOCK_STARTERS = new Set([
-  "rectangle","rounded_rectangle","circle","triangle","rounded_triangle",
+  "rectangle","rounded_rectangle","stadium","circle","triangle","rounded_triangle",
   "polygon","outer","stitches","holes","hole","path"
 ]);
 const TOP_KEYWORDS = new Set(["pattern","size","export","end"]);
@@ -238,6 +238,7 @@ CodeMirror.defineMode("lcraft", function() {
 const BLOCK_PROPS = {
   rectangle:          ["at","size","layer","end"],
   rounded_rectangle:  ["at","size","radius","layer","end"],
+  stadium:            ["at","size","layer","end"],
   circle:             ["at","radius","layer","end"],
   triangle:           ["p1","p2","p3","at","size","layer","end"],
   rounded_triangle:   ["p1","p2","p3","at","size","radius","layer","end"],
@@ -300,7 +301,7 @@ function lcraft_hint(editor) {
     } else {
       // Top level
       candidates = [
-        "pattern","size","rectangle","rounded_rectangle","circle",
+        "pattern","size","rectangle","rounded_rectangle","stadium","circle",
         "triangle","rounded_triangle","polygon","stitches","holes","hole","export"
       ];
     }

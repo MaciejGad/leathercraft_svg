@@ -19,7 +19,7 @@ in `leathercraft_svg.py` (Python library) and `leathercraft_dsl.py` (DSL).
 | `<polygon>` | `Polygon` | `polygon` (via `outer` block) | ✅ full |
 | `<path>` (raw `d` string) | `add_path(d)` (document-level, not a Shape) | — | ⚠️ partial |
 | Arc / circular sector | — | — | ❌ missing |
-| Stadium / oblong | — | — | ❌ missing |
+| Stadium / oblong | `Stadium` | `stadium` | ✅ full |
 | Regular n-gon | — | — | ❌ missing |
 | Cubic Bézier path | — | — | ❌ missing |
 
@@ -127,7 +127,11 @@ A shape that is a filled slice of a circle (pie/wedge), or a ring segment (annul
 
 ---
 
-### 4. Stadium / oblong (capsule)
+### 4. Stadium / oblong (capsule) — ✅ IMPLEMENTED
+
+> **Status:** Implemented as `Stadium(x, y, width, height)` in `leathercraft_svg.py`
+> and the `stadium` block in the DSL. Cap radius is automatic (`min(w, h) / 2`).
+> Stitches and holes follow the full capsule contour. See `examples/dsl/key_fob.lcraft`.
 
 **SVG primitive:** expressed as a `<path>` — two parallel lines capped by semicircles.
 Also called a "discorectangle" or "capsule".
@@ -264,7 +268,7 @@ fall back to Python code.
 
 | Priority | Shape | Reason |
 |---|---|---|
-| 🔴 High | **Stadium / oblong** | Most common blank shape in leathercraft; currently requires a workaround with `RoundedRectangle` using exact radius = half-height |
+| ✅ Done | **Stadium / oblong** | Implemented — `Stadium` class + `stadium` DSL block |
 | 🔴 High | **Ellipse** | Basic SVG primitive; oval shapes are very common |
 | 🟡 Medium | **Per-corner rounded rect** | Small change to existing class; high design value |
 | 🟡 Medium | **Arc / sector** | Needed for curved strap ends and fan cutouts |

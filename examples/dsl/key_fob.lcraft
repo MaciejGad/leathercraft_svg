@@ -1,0 +1,24 @@
+pattern key_fob
+size 140 60
+
+# Classic key-fob blank: a stadium (capsule) with stitching all around
+# and a single hole for the key ring on the left cap.
+
+stadium fob
+  at 10 15
+  size 120 30
+end
+
+stitches
+  source fob
+  margin 4
+  spacing 5
+  length 3
+end
+
+hole ring
+  at 22 30
+  radius 3
+end
+
+export key_fob

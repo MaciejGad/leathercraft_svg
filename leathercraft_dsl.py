@@ -24,6 +24,7 @@ from leathercraft_svg import (
     Rectangle,
     RoundedRectangle,
     RoundedTriangle,
+    Stadium,
     StrokeStyle,
     SvgDocument,
     Triangle,
@@ -94,6 +95,16 @@ class RoundedRectangleDefinition:
     width: float
     height: float
     radius: float
+    layer: str = "cut"
+
+
+@dataclass
+class StadiumDefinition:
+    id: str
+    x: float
+    y: float
+    width: float
+    height: float
     layer: str = "cut"
 
 
@@ -250,7 +261,7 @@ def _resolve_color(token: str) -> str:
 # ---------------------------------------------------------------------------
 
 _BLOCK_STARTERS = {
-    "rectangle", "rounded_rectangle",
+    "rectangle", "rounded_rectangle", "stadium",
     "circle",
     "triangle", "rounded_triangle",
     "outer",
@@ -515,6 +526,32 @@ def parse(text: str) -> PatternDocument:
             shapes.append(RoundedRectangleDefinition(
                 id=shape_id, x=x, y=y, width=w, height=h, radius=r, layer=layer_name
             ))
+            shape_ids.add(shape_id)
+
+        # ------------------------------------------------------------------
+        elif keyword == "stadium":
+            if len(tokens) < 2:
+                raise DslError(f"Line {lineno}: 'stadium' requires an id")
+            shape_id = tokens[1]
+            data = _parse_block_body(body)
+
+            def _req(k: str, sid=shape_id, ln=lineno) -> tuple[int, list[str]]:
+                if k not in data:
+                    raise DslError(f"Line {ln}: stadium '{sid}' is missing '{k}'")
+                return data[k]
+
+            at_lineno, at_vals = _req("at")
+            sz_lineno, sz_vals = _req("size")
+            x = _parse_float(at_vals[0], at_lineno, "at x")
+            y = _parse_float(at_vals[1], at_lineno, "at y")
+            w = _parse_float(sz_vals[0], sz_lineno, "size width")
+            h = _parse_float(sz_vals[1], sz_lineno, "size height")
+            if w <= 0 or h <= 0:
+                raise DslError(f"Line {sz_lineno}: stadium size must be greater than 0")
+            layer_name = "cut"
+            if "layer" in data:
+                layer_name = data["layer"][1][0]
+            shapes.append(StadiumDefinition(id=shape_id, x=x, y=y, width=w, height=h, layer=layer_name))
             shape_ids.add(shape_id)
 
         # ------------------------------------------------------------------
@@ -895,6 +932,11 @@ def compile_document(doc: PatternDocument) -> SvgDocument:
                 shape_def.width, shape_def.height,
                 radius=shape_def.radius,
             )
+            svg.add_shape(s, layer=shape_def.layer)
+            shape_objects[shape_def.id] = s
+
+        elif isinstance(shape_def, StadiumDefinition):
+            s = Stadium(shape_def.x, shape_def.y, shape_def.width, shape_def.height)
             svg.add_shape(s, layer=shape_def.layer)
             shape_objects[shape_def.id] = s
 

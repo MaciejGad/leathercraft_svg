@@ -542,6 +542,60 @@ end
 # Scenario registry  name → builder
 # ---------------------------------------------------------------------------
 
+def _dsl_stadium_stitches() -> bytes:
+    return _compile_dsl("""
+size 140 60
+
+stadium fob
+  at 10 15
+  size 120 30
+end
+
+stitches
+  source fob
+  margin 4
+  spacing 5
+  length 3
+end
+""")
+
+
+def _dsl_stadium_holes() -> bytes:
+    return _compile_dsl("""
+size 140 60
+
+stadium fob
+  at 10 15
+  size 120 30
+end
+
+holes
+  source fob
+  margin 5
+  spacing 8
+  radius 1.5
+end
+""")
+
+
+def _dsl_stadium_vertical() -> bytes:
+    return _compile_dsl("""
+size 60 140
+
+stadium tag
+  at 15 10
+  size 30 120
+end
+
+stitches
+  source tag
+  margin 4
+  spacing 5
+  length 3
+end
+""")
+
+
 SCENARIOS: dict[str, callable] = {
     "dsl_rectangle_holes_all_edges.png": _dsl_rectangle_holes_all_edges,
     "dsl_rectangle_holes_partial_edges.png": _dsl_rectangle_holes_partial_edges,
@@ -567,6 +621,10 @@ SCENARIOS: dict[str, callable] = {
     "dsl_rounded_triangle_holes_straight.png": _dsl_rounded_triangle_holes_straight,
     "dsl_rounded_triangle_holes_rounded_path.png": _dsl_rounded_triangle_holes_rounded_path,
     "dsl_rounded_triangle_stitch_rounded_path.png": _dsl_rounded_triangle_stitch_rounded_path,
+    # --- stadium ---
+    "dsl_stadium_stitches.png": _dsl_stadium_stitches,
+    "dsl_stadium_holes.png": _dsl_stadium_holes,
+    "dsl_stadium_vertical.png": _dsl_stadium_vertical,
 }
 
 

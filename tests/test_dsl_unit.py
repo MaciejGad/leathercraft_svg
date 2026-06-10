@@ -1211,3 +1211,87 @@ end
         output = svg.to_svg()
         assert "<path" in output
         assert "<circle" in output
+
+
+# ===========================================================================
+# Parser — Stadium
+# ===========================================================================
+
+
+class TestParseStadium:
+    def test_basic(self):
+        doc = _parse("size 140 60\nstadium fob\n  at 10 15\n  size 120 30\nend")
+        from leathercraft_dsl import StadiumDefinition
+        s = doc.shapes[0]
+        assert isinstance(s, StadiumDefinition)
+        assert s.id == "fob"
+        assert s.x == 10.0
+        assert s.y == 15.0
+        assert s.width == 120.0
+        assert s.height == 30.0
+        assert s.layer == "cut"
+
+    def test_custom_layer(self):
+        doc = _parse("size 140 60\nstadium fob\n  at 10 15\n  size 120 30\n  layer guide\nend")
+        assert doc.shapes[0].layer == "guide"
+
+    def test_missing_at_raises(self):
+        with pytest.raises(DslError, match="missing 'at'"):
+            _parse("size 140 60\nstadium fob\n  size 120 30\nend")
+
+    def test_missing_size_raises(self):
+        with pytest.raises(DslError, match="missing 'size'"):
+            _parse("size 140 60\nstadium fob\n  at 10 15\nend")
+
+    def test_zero_size_raises(self):
+        with pytest.raises(DslError, match="size must be greater than 0"):
+            _parse("size 140 60\nstadium fob\n  at 10 15\n  size 0 30\nend")
+
+    def test_missing_id_raises(self):
+        with pytest.raises(DslError, match="requires an id"):
+            _parse("size 140 60\nstadium\n  at 10 15\n  size 120 30\nend")
+
+    def test_registered_as_source(self):
+        doc = _parse(
+            "size 140 60\nstadium fob\n  at 10 15\n  size 120 30\nend\n"
+            "stitches\n  source fob\n  margin 4\n  spacing 5\n  length 3\nend"
+        )
+        assert len(doc.operations) == 1
+
+
+# ===========================================================================
+# Compiler — Stadium
+# ===========================================================================
+
+
+class TestCompileStadium:
+    def test_produces_arc_path(self):
+        doc = _parse("size 140 60\nstadium fob\n  at 10 15\n  size 120 30\nend")
+        output = compile_document(doc).to_svg()
+        assert "<path" in output
+        assert "A 15.000 15.000" in output  # semicircular caps
+
+    def test_stitches_produce_lines(self):
+        doc = _parse(
+            "size 140 60\nstadium fob\n  at 10 15\n  size 120 30\nend\n"
+            "stitches\n  source fob\n  margin 4\n  spacing 5\n  length 3\nend"
+        )
+        output = compile_document(doc).to_svg()
+        assert "<line" in output
+
+    def test_holes_produce_circles(self):
+        doc = _parse(
+            "size 140 60\nstadium fob\n  at 10 15\n  size 120 30\nend\n"
+            "holes\n  source fob\n  margin 8\n  spacing 10\n  radius 1.5\nend"
+        )
+        output = compile_document(doc).to_svg()
+        assert "<circle" in output
+
+    def test_vertical_stadium(self):
+        doc = _parse(
+            "size 60 140\nstadium tag\n  at 15 10\n  size 30 120\nend\n"
+            "stitches\n  source tag\n  margin 4\n  spacing 5\n  length 3\nend"
+        )
+        output = compile_document(doc).to_svg()
+        assert "A 15.000 15.000" in output
+        assert "<line" in output

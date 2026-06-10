@@ -18,6 +18,7 @@ from leathercraft_svg import (
     Rectangle,
     RoundedRectangle,
     RoundedTriangle,
+    Stadium,
     StrokeStyle,
     SvgDocument,
     Triangle,
@@ -1100,3 +1101,97 @@ class TestPolygonStitchSegments(unittest.TestCase):
         shape = Polygon.from_mirror(half, center_x=50)
         segs = shape.stitch_segments(spacing=8, inset=4, stitch_length=3)
         self.assertGreater(len(segs), 0)
+
+
+class TestStadiumPathD(unittest.TestCase):
+    def test_horizontal_radius_is_half_height(self):
+        s = Stadium(10, 10, 100, 30)
+        self.assertEqual(s.radius, 15.0)
+
+    def test_vertical_radius_is_half_width(self):
+        s = Stadium(10, 10, 30, 100)
+        self.assertEqual(s.radius, 15.0)
+
+    def test_path_uses_arcs(self):
+        d = Stadium(10, 10, 100, 30).path_d()
+        self.assertIn("A 15.000 15.000", d)
+        self.assertTrue(d.startswith("M "))
+        self.assertTrue(d.rstrip().endswith("Z"))
+
+    def test_square_box_is_circle_like(self):
+        # width == height → both caps meet, straight segments degenerate
+        d = Stadium(0, 0, 40, 40).path_d()
+        self.assertIn("A 20.000 20.000", d)
+
+
+class TestStadiumHolePoints(unittest.TestCase):
+    def test_all_edges_follow_contour(self):
+        s = Stadium(10, 10, 100, 30)
+        pts = s.hole_points(spacing=6, inset=4)
+        self.assertGreater(len(pts), 0)
+        # Points on the caps must extend beyond the straight-edge x range
+        xs = [p.x for p in pts]
+        self.assertLess(min(xs), 25.0)   # inside the left cap
+        self.assertGreater(max(xs), 95.0)  # inside the right cap
+
+    def test_holes_inside_shape(self):
+        s = Stadium(10, 10, 100, 30)
+        for p in s.hole_points(spacing=6, inset=4):
+            self.assertGreaterEqual(p.x, 10.0)
+            self.assertLessEqual(p.x, 110.0)
+            self.assertGreaterEqual(p.y, 10.0)
+            self.assertLessEqual(p.y, 40.0)
+
+    def test_partial_edges_use_straight_fallback(self):
+        s = Stadium(10, 10, 100, 30)
+        pts = s.hole_points(edges=[0], spacing=6, inset=4)
+        # Top edge only → all points share the same y
+        self.assertTrue(all(abs(p.y - 14.0) < 0.001 for p in pts))
+
+    def test_excessive_inset_returns_empty(self):
+        s = Stadium(10, 10, 100, 30)
+        self.assertEqual(s.hole_points(spacing=6, inset=20), [])
+
+    def test_smaller_spacing_gives_more_holes(self):
+        s = Stadium(10, 10, 100, 30)
+        few = s.hole_points(spacing=10, inset=4)
+        many = s.hole_points(spacing=4, inset=4)
+        self.assertGreater(len(many), len(few))
+
+
+class TestStadiumStitchSegments(unittest.TestCase):
+    def test_all_edges_follow_contour(self):
+        s = Stadium(10, 10, 100, 30)
+        segs = s.stitch_segments(spacing=6, inset=4, stitch_length=3)
+        self.assertGreater(len(segs), 0)
+        xs = [a.x for a, b in segs] + [b.x for a, b in segs]
+        self.assertLess(min(xs), 25.0)
+        self.assertGreater(max(xs), 95.0)
+
+    def test_stitch_length_respected(self):
+        s = Stadium(10, 10, 100, 30)
+        for a, b in s.stitch_segments(spacing=8, inset=4, stitch_length=3):
+            self.assertAlmostEqual(distance(a, b), 3.0, places=1)
+
+    def test_partial_edges_use_straight_fallback(self):
+        s = Stadium(10, 10, 100, 30)
+        segs = s.stitch_segments(edges=[0], spacing=6, inset=4, stitch_length=3)
+        self.assertGreater(len(segs), 0)
+        for a, b in segs:
+            self.assertAlmostEqual(a.y, 14.0, places=3)
+            self.assertAlmostEqual(b.y, 14.0, places=3)
+
+    def test_excessive_inset_returns_empty(self):
+        s = Stadium(10, 10, 100, 30)
+        self.assertEqual(s.stitch_segments(spacing=6, inset=20, stitch_length=3), [])
+
+    def test_document_integration(self):
+        doc = SvgDocument(width_mm=140, height_mm=60)
+        s = Stadium(10, 15, 120, 30)
+        doc.add_shape(s, layer="cut")
+        doc.add_stitch_pattern(s, spacing=5, stitch_length=3, inset=4)
+        doc.add_holes(s, spacing=10, hole_radius=1.5, inset=8)
+        out = doc.to_svg()
+        self.assertIn("<path", out)
+        self.assertIn("<line", out)
+        self.assertIn("<circle", out)

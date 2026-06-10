@@ -278,6 +278,16 @@ Parametry:
 - `x`, `y`, `width`, `height` - jak wyżej,
 - `radius` - promień zaokrąglenia.
 
+### `Stadium(x, y, width, height)`
+
+Kapsuła / owal podłużny: prostokąt, którego dwa krótsze boki zastąpiono półokręgami. Promień zaokrąglenia jest zawsze równy `min(width, height) / 2` — szerokie pole daje zaokrąglenia po lewej i prawej stronie, wysokie pole daje zaokrąglenia na górze i dole. Klasyczny kształt breloka do kluczy.
+
+Parametry:
+
+- `x`, `y`, `width`, `height` - prostokąt ograniczający, jak w `Rectangle`.
+
+Szwy i otwory podążają wzdłuż pełnego konturu kapsuły (łącznie z oboma półokręgami), gdy stosowane są do wszystkich krawędzi. Przy podzbiorze krawędzi (`edges` `0`–`3`) używane są proste, wsunięte krawędzie jak w zwykłym prostokącie.
+
 ### `Circle(cx, cy, radius)`
 
 Okrąg.
@@ -557,6 +567,26 @@ end
 export rounded_pocket
 ```
 
+### Stadium (kapsuła)
+
+Prostokąt z półokrągłymi zakończeniami na krótszych bokach — klasyczny kształt breloka do kluczy. Promień zaokrąglenia jest wyliczany automatycznie jako połowa krótszego boku.
+
+```text
+stadium brelok
+  at 10 15
+  size 120 30
+end
+
+stitches
+  source brelok
+  margin 4
+  spacing 5
+  length 3
+end
+```
+
+Szwy i otwory podążają wzdłuż pełnego konturu kapsuły, łącznie z zaokrąglonymi końcami.
+
 ### Okrąg
 
 ```text
@@ -636,7 +666,7 @@ Nie stosuj przyrostków jednostek takich jak `mm` ani `cm`. Każda liczba jest j
 
 ### Obsługiwane słowa kluczowe
 
-`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `circle`, `triangle`, `rounded_triangle`, `outer`, `stitches`, `holes`, `hole`, `export`
+`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `stadium`, `circle`, `triangle`, `rounded_triangle`, `outer`, `stitches`, `holes`, `hole`, `export`
 
 Nazwy krawędzi prostokąta: `top`, `right`, `bottom`, `left`, `all`, `except_top`, `sides`, `horizontal`, `vertical`
 

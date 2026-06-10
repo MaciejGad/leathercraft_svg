@@ -113,6 +113,33 @@ def _rounded_rectangle_stitch_partial() -> bytes:
     return render(doc)
 
 
+def _stadium_stitches() -> bytes:
+    from leathercraft_svg import Stadium, SvgDocument
+    doc = SvgDocument(140, 60)
+    s = Stadium(10, 15, 120, 30)
+    doc.add_shape(s, layer="cut")
+    doc.add_stitch_pattern(s, spacing=5.0, stitch_length=3.0, inset=4.0, layer="stitch", stitch_thickness=0.8)
+    return render(doc)
+
+
+def _stadium_holes() -> bytes:
+    from leathercraft_svg import Stadium, SvgDocument
+    doc = SvgDocument(140, 60)
+    s = Stadium(10, 15, 120, 30)
+    doc.add_shape(s, layer="cut")
+    doc.add_holes(s, spacing=8.0, hole_radius=1.5, inset=5.0, layer="stitch")
+    return render(doc)
+
+
+def _stadium_vertical_stitches() -> bytes:
+    from leathercraft_svg import Stadium, SvgDocument
+    doc = SvgDocument(60, 140)
+    s = Stadium(15, 10, 30, 120)
+    doc.add_shape(s, layer="cut")
+    doc.add_stitch_pattern(s, spacing=5.0, stitch_length=3.0, inset=4.0, layer="stitch", stitch_thickness=0.8)
+    return render(doc)
+
+
 def _circle_holes() -> bytes:
     from leathercraft_svg import Circle, SvgDocument
     doc = SvgDocument(100, 100)
@@ -325,6 +352,9 @@ SCENARIOS: list[tuple[str, object]] = [
     ("rectangle_stitch_45deg.png",               _rectangle_stitch_45deg),
     ("rounded_rectangle_holes.png",              _rounded_rectangle_holes_all_edges),
     ("rounded_rectangle_stitch_partial.png",     _rounded_rectangle_stitch_partial),
+    ("stadium_stitches.png",                     _stadium_stitches),
+    ("stadium_holes.png",                        _stadium_holes),
+    ("stadium_vertical_stitches.png",            _stadium_vertical_stitches),
     ("circle_holes.png",                         _circle_holes),
     ("circle_stitch_0deg.png",                   _circle_stitch_0deg),
     ("circle_stitch_45deg.png",                  _circle_stitch_45deg),

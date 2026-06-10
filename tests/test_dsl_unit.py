@@ -210,6 +210,26 @@ class TestParseStitches:
         doc = _parse(self._base() + "stitches\n  source panel\n  margin 4\n  spacing 5\n  length 3\n  angle 45\nend")
         assert doc.operations[0].angle == 45.0
 
+    def test_distribution_defaults_to_fixed_spacing(self):
+        doc = _parse(self._base() + "stitches\n  source panel\nend")
+        assert doc.operations[0].distribution == "fixed_spacing"
+
+    def test_distribution_fit_evenly(self):
+        doc = _parse(
+            self._base()
+            + "stitches\n  source panel\n  spacing 5\n  length 3\n"
+            "  distribution fit_evenly\nend"
+        )
+        assert doc.operations[0].distribution == "fit_evenly"
+
+    def test_invalid_distribution_raises(self):
+        with pytest.raises(DslError, match="unknown distribution 'magic'"):
+            _parse(self._base() + "stitches\n  source panel\n  distribution magic\nend")
+
+    def test_nonpositive_spacing_raises(self):
+        with pytest.raises(DslError, match="spacing must be greater than 0"):
+            _parse(self._base() + "stitches\n  source panel\n  spacing 0\nend")
+
     def test_edges_except_top(self):
         doc = _parse(self._base() + "stitches\n  source panel\n  edges except_top\n  margin 4\n  spacing 5\n  length 3\nend")
         op = doc.operations[0]
@@ -259,6 +279,28 @@ class TestParseHoles:
         assert isinstance(op, HolesOperation)
         assert op.source == "panel"
         assert op.radius == pytest.approx(1.2)
+
+    def test_distribution_defaults_to_fixed_spacing(self):
+        doc = _parse(self._base() + "holes\n  source panel\nend")
+        assert doc.operations[0].distribution == "fixed_spacing"
+
+    def test_distribution_fit_evenly(self):
+        doc = _parse(
+            self._base()
+            + "holes\n  source panel\n  spacing 6\n  distribution fit_evenly\nend"
+        )
+        assert doc.operations[0].distribution == "fit_evenly"
+
+    def test_fixed_count_is_not_supported(self):
+        with pytest.raises(DslError, match="fixed_count.*not supported yet"):
+            _parse(
+                self._base()
+                + "holes\n  source panel\n  distribution fixed_count\nend"
+            )
+
+    def test_nonpositive_spacing_raises(self):
+        with pytest.raises(DslError, match="spacing must be greater than 0"):
+            _parse(self._base() + "holes\n  source panel\n  spacing -1\nend")
 
     def test_zero_radius_raises(self):
         with pytest.raises(DslError, match="radius must be greater than 0"):
@@ -427,6 +469,15 @@ class TestCompileStitchesOnShape:
         svg = compile_document(self._doc(edges="top bottom"))
         output = svg.to_svg()
         assert "<line" in output
+
+    def test_fit_evenly_reaches_geometry_layer(self):
+        doc = _parse(
+            "size 120 40\n"
+            "rectangle panel\n  at 0 0\n  size 100 20\nend\n"
+            "stitches\n  source panel\n  edges top\n  margin 0\n"
+            "  spacing 30\n  length 3\n  distribution fit_evenly\nend"
+        )
+        assert compile_document(doc).to_svg().count("<line") == 2
 
 
 class TestCompileHolesOnShape:

@@ -1,0 +1,20 @@
+pattern rounded_pocket_fit_evenly
+size 120 90
+
+rounded_rectangle pocket
+  at 10 10
+  size 100 70
+  radius 8
+end
+
+stitches
+  source pocket
+  edges except_top
+  margin 5
+  spacing 5
+  length 3.5
+  angle 45
+  distribution fit_evenly
+end
+
+export rounded_pocket_fit_evenly

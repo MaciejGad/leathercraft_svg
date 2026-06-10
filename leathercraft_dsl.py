@@ -215,6 +215,7 @@ class StitchesOperation:
     side: str
     path_points: list[tuple[float, float]]  # empty if source-based
     rounded_path: bool = False
+    distribution: str = "fixed_spacing"
 
 
 @dataclass
@@ -226,6 +227,7 @@ class HolesOperation:
     radius: float
     layer: str
     rounded_path: bool = False
+    distribution: str = "fixed_spacing"
 
 
 @dataclass
@@ -1139,6 +1141,7 @@ def parse(text: str) -> PatternDocument:
             _KNOWN_STITCH_KEYS = {
                 "source", "edges", "margin", "spacing", "length", "angle",
                 "layer", "mirror", "side", "path", "rounded_path",
+                "distribution",
             }
             for _k in data:
                 if _k not in _KNOWN_STITCH_KEYS:
@@ -1159,6 +1162,7 @@ def parse(text: str) -> PatternDocument:
             side = "right"
             path_pts: list[tuple[float, float]] = []
             rounded_path = False
+            distribution = "fixed_spacing"
 
             if "source" in data:
                 src_ln, src_vals = data["source"]
@@ -1176,6 +1180,8 @@ def parse(text: str) -> PatternDocument:
             if "spacing" in data:
                 ln, vals = data["spacing"]
                 spacing = _eval_value(vals, evaluator, ln, "spacing")
+                if spacing <= 0:
+                    raise DslError(f"Line {ln}: spacing must be greater than 0")
             if "length" in data:
                 ln, vals = data["length"]
                 length = _eval_value(vals, evaluator, ln, "length")
@@ -1192,6 +1198,20 @@ def parse(text: str) -> PatternDocument:
                 path_pts = _parse_xy_list(data["path"], evaluator)
             if "rounded_path" in data:
                 rounded_path = True
+            if "distribution" in data:
+                dist_ln, dist_vals = data["distribution"]
+                if len(dist_vals) != 1:
+                    raise DslError(f"Line {dist_ln}: distribution requires exactly one value")
+                distribution = dist_vals[0]
+                if distribution == "fixed_count":
+                    raise DslError(
+                        f"Line {dist_ln}: distribution 'fixed_count' is not supported yet"
+                    )
+                if distribution not in ("fixed_spacing", "fit_evenly"):
+                    raise DslError(
+                        f"Line {dist_ln}: unknown distribution '{distribution}'. "
+                        "Use: fixed_spacing, fit_evenly"
+                    )
 
             operations.append(StitchesOperation(
                 source=source,
@@ -1205,6 +1225,7 @@ def parse(text: str) -> PatternDocument:
                 side=side,
                 path_points=path_pts,
                 rounded_path=rounded_path,
+                distribution=distribution,
             ))
 
         # ------------------------------------------------------------------
@@ -1213,7 +1234,7 @@ def parse(text: str) -> PatternDocument:
 
             _KNOWN_HOLES_KEYS = {
                 "source", "edges", "margin", "spacing", "radius",
-                "layer", "rounded_path",
+                "layer", "rounded_path", "distribution",
             }
             for _k in data:
                 if _k not in _KNOWN_HOLES_KEYS:
@@ -1241,6 +1262,7 @@ def parse(text: str) -> PatternDocument:
             radius = 1.2
             layer_name = "cut"
             rounded_path = False
+            distribution = "fixed_spacing"
 
             if "edges" in data:
                 e_ln, e_vals = data["edges"]
@@ -1251,6 +1273,8 @@ def parse(text: str) -> PatternDocument:
             if "spacing" in data:
                 ln, vals = data["spacing"]
                 spacing = _eval_value(vals, evaluator, ln, "spacing")
+                if spacing <= 0:
+                    raise DslError(f"Line {ln}: spacing must be greater than 0")
             if "radius" in data:
                 ln, vals = data["radius"]
                 radius = _eval_value(vals, evaluator, ln, "radius")
@@ -1260,6 +1284,20 @@ def parse(text: str) -> PatternDocument:
                 layer_name = data["layer"][1][0]
             if "rounded_path" in data:
                 rounded_path = True
+            if "distribution" in data:
+                dist_ln, dist_vals = data["distribution"]
+                if len(dist_vals) != 1:
+                    raise DslError(f"Line {dist_ln}: distribution requires exactly one value")
+                distribution = dist_vals[0]
+                if distribution == "fixed_count":
+                    raise DslError(
+                        f"Line {dist_ln}: distribution 'fixed_count' is not supported yet"
+                    )
+                if distribution not in ("fixed_spacing", "fit_evenly"):
+                    raise DslError(
+                        f"Line {dist_ln}: unknown distribution '{distribution}'. "
+                        "Use: fixed_spacing, fit_evenly"
+                    )
 
             operations.append(HolesOperation(
                 source=source,
@@ -1269,6 +1307,7 @@ def parse(text: str) -> PatternDocument:
                 radius=radius,
                 layer=layer_name,
                 rounded_path=rounded_path,
+                distribution=distribution,
             ))
 
         # ------------------------------------------------------------------
@@ -1539,6 +1578,7 @@ def compile_document(doc: PatternDocument) -> SvgDocument:
                     layer=op.layer,
                     stitch_angle_deg=op.angle,
                     rounded_path=op.rounded_path,
+                    distribution=op.distribution,
                 )
             else:
                 if not op.path_points:
@@ -1550,6 +1590,7 @@ def compile_document(doc: PatternDocument) -> SvgDocument:
                     stitch_length=op.length,
                     stitch_angle_deg=op.angle,
                     layer=op.layer,
+                    distribution=op.distribution,
                 )
                 if op.mirror:
                     if doc.symmetry_axis_x is None:
@@ -1563,6 +1604,7 @@ def compile_document(doc: PatternDocument) -> SvgDocument:
                         stitch_length=op.length,
                         stitch_angle_deg=op.angle,
                         layer=op.layer,
+                        distribution=op.distribution,
                     )
 
         elif isinstance(op, HolesOperation):
@@ -1576,6 +1618,7 @@ def compile_document(doc: PatternDocument) -> SvgDocument:
                 inset=op.margin,
                 layer=op.layer,
                 rounded_path=op.rounded_path,
+                distribution=op.distribution,
             )
 
         elif isinstance(op, SingleHoleDefinition):

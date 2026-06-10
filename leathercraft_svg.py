@@ -7,6 +7,8 @@ from typing import Iterable, Literal, Sequence
 
 LayerName = Literal["cut", "stitch", "crease", "guide"]
 
+SUPPORTED_DISTRIBUTIONS = ("fixed_spacing", "fit_evenly")
+
 
 @dataclass(frozen=True)
 class Point:
@@ -71,13 +73,18 @@ class SvgDocument:
         layer: LayerName = "cut",
         include_corners: bool = False,
         rounded_path: bool = False,
+        distribution: str = "fixed_spacing",
+        count: int | None = None,
     ) -> None:
+        validate_distribution(spacing, distribution, count)
         for p in shape.hole_points(
             edges=edges,
             spacing=spacing,
             inset=inset,
             include_corners=include_corners,
             rounded_path=rounded_path,
+            distribution=distribution,
+            count=count,
         ):
             self.add_circle(p.x, p.y, hole_radius, layer)
 
@@ -89,9 +96,19 @@ class SvgDocument:
         stitch_angle_deg: float = 0.0,
         layer: LayerName = "stitch",
         stitch_thickness: float | None = None,
+        distribution: str = "fixed_spacing",
+        count: int | None = None,
     ) -> None:
         """Add stitch marks distributed along an open polyline."""
-        for p1, p2 in stitch_segments_on_open_polyline(points, spacing, stitch_length, stitch_angle_deg):
+        validate_distribution(spacing, distribution, count)
+        for p1, p2 in stitch_segments_on_open_polyline(
+            points,
+            spacing,
+            stitch_length,
+            stitch_angle_deg,
+            distribution=distribution,
+            count=count,
+        ):
             self.add_line(p1.x, p1.y, p2.x, p2.y, layer=layer, stroke_width=stitch_thickness)
 
     def add_stitch_holes(
@@ -104,8 +121,21 @@ class SvgDocument:
         layer: LayerName = "cut",
         include_corners: bool = False,
         rounded_path: bool = False,
+        distribution: str = "fixed_spacing",
+        count: int | None = None,
     ) -> None:
-        self.add_holes(shape, edges, spacing, hole_radius, inset, layer, include_corners, rounded_path)
+        self.add_holes(
+            shape,
+            edges,
+            spacing,
+            hole_radius,
+            inset,
+            layer,
+            include_corners,
+            rounded_path,
+            distribution,
+            count,
+        )
 
     def add_stitch_pattern(
         self,
@@ -119,7 +149,10 @@ class SvgDocument:
         stitch_thickness: float | None = None,
         stitch_angle_deg: float = 0.0,
         rounded_path: bool = False,
+        distribution: str = "fixed_spacing",
+        count: int | None = None,
     ) -> None:
+        validate_distribution(spacing, distribution, count)
         for p1, p2 in shape.stitch_segments(
             edges=edges,
             spacing=spacing,
@@ -128,6 +161,8 @@ class SvgDocument:
             stitch_length=stitch_length,
             stitch_angle_deg=stitch_angle_deg,
             rounded_path=rounded_path,
+            distribution=distribution,
+            count=count,
         ):
             self.add_line(p1.x, p1.y, p2.x, p2.y, layer=layer, stroke_width=stitch_thickness)
 
@@ -176,6 +211,8 @@ class Shape:
         inset: float = 4.0,
         include_corners: bool = False,
         rounded_path: bool = False,
+        distribution: str = "fixed_spacing",
+        count: int | None = None,
     ) -> list[Point]:
         raise NotImplementedError
 
@@ -188,6 +225,8 @@ class Shape:
         stitch_length: float = 2.0,
         stitch_angle_deg: float = 0.0,
         rounded_path: bool = False,
+        distribution: str = "fixed_spacing",
+        count: int | None = None,
     ) -> list[tuple[Point, Point]]:
         raise NotImplementedError
 
@@ -203,7 +242,17 @@ class Rectangle(Shape):
         x, y, w, h = self.x, self.y, self.width, self.height
         return f"M {x:.3f} {y:.3f} L {x+w:.3f} {y:.3f} L {x+w:.3f} {y+h:.3f} L {x:.3f} {y+h:.3f} Z"
 
-    def hole_points(self, edges="all", spacing=5.0, inset=4.0, include_corners=False, rounded_path=False) -> list[Point]:
+    def hole_points(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=False,
+        rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
+    ) -> list[Point]:
+        validate_distribution(spacing, distribution, count)
         x = self.x + inset
         y = self.y + inset
         w = self.width - 2 * inset
@@ -221,13 +270,22 @@ class Rectangle(Shape):
             length = distance(p1, p2)
             if length == 0:
                 continue
-            positions = positions_on_side_center(length, spacing, include_corners)
-            positions = adjust_positions_near_corners(
-                positions,
-                length,
-                include_corners,
-                spacing,
-            )
+            if distribution == "fixed_spacing":
+                positions = positions_on_side_center(length, spacing, include_corners)
+                positions = adjust_positions_near_corners(
+                    positions,
+                    length,
+                    include_corners,
+                    spacing,
+                )
+            else:
+                positions = distribute_distances(
+                    length,
+                    spacing,
+                    distribution=distribution,
+                    include_start=include_corners,
+                    include_end=include_corners,
+                )
             for local_pos in positions:
                 if edge_index not in selected_set:
                     continue
@@ -243,7 +301,10 @@ class Rectangle(Shape):
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
     ) -> list[tuple[Point, Point]]:
+        validate_distribution(spacing, distribution, count)
         x = self.x + inset
         y = self.y + inset
         w = self.width - 2 * inset
@@ -261,14 +322,25 @@ class Rectangle(Shape):
             length = distance(p1, p2)
             if length == 0:
                 continue
-            positions = positions_on_side_center(length, spacing, include_corners)
-            adjusted = adjust_stitch_positions_and_lengths(
-                positions,
-                length,
-                include_corners,
-                spacing,
-                stitch_length,
-            )
+            if distribution == "fixed_spacing":
+                positions = positions_on_side_center(length, spacing, include_corners)
+                adjusted = adjust_stitch_positions_and_lengths(
+                    positions,
+                    length,
+                    include_corners,
+                    spacing,
+                    stitch_length,
+                )
+            else:
+                positions = distribute_distances(
+                    length,
+                    spacing,
+                    distribution=distribution,
+                    include_start=include_corners,
+                    include_end=include_corners,
+                )
+                validate_stitch_length(stitch_length, fitted_spacing(length, spacing))
+                adjusted = [(position, stitch_length) for position in positions]
             for local_pos, local_stitch_length in adjusted:
                 if edge_index not in selected_set:
                     continue
@@ -339,7 +411,10 @@ class RoundedRectangle(Rectangle):
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
     ) -> list[tuple[Point, Point]]:
+        validate_distribution(spacing, distribution, count)
         all_rectangle_edges = edges == "all" or sorted(set(edges)) == [0, 1, 2, 3]
         if not all_rectangle_edges:
             return super().stitch_segments(
@@ -350,6 +425,8 @@ class RoundedRectangle(Rectangle):
                 stitch_length=stitch_length,
                 stitch_angle_deg=stitch_angle_deg,
                 rounded_path=rounded_path,
+                distribution=distribution,
+                count=count,
             )
 
         x = self.x + inset
@@ -370,6 +447,8 @@ class RoundedRectangle(Rectangle):
             stitch_length=stitch_length,
             stitch_angle_deg=stitch_angle_deg,
             include_corners=include_corners,
+            distribution=distribution,
+            count=count,
         )
 
 
@@ -411,7 +490,17 @@ class Stadium(Rectangle):
         r = max(0.0, min(self.radius - inset, w / 2, h / 2))
         return rounded_rectangle_contour(x, y, w, h, r)
 
-    def hole_points(self, edges="all", spacing=5.0, inset=4.0, include_corners=False, rounded_path=False) -> list[Point]:
+    def hole_points(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=False,
+        rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
+    ) -> list[Point]:
+        validate_distribution(spacing, distribution, count)
         all_edges = edges == "all" or sorted(set(edges)) == [0, 1, 2, 3]
         if not all_edges:
             return super().hole_points(
@@ -420,11 +509,19 @@ class Stadium(Rectangle):
                 inset=inset,
                 include_corners=include_corners,
                 rounded_path=rounded_path,
+                distribution=distribution,
+                count=count,
             )
         contour = self._inner_contour(inset)
         if len(contour) < 2:
             return []
-        return points_on_closed_polyline(contour, spacing=spacing, include_corners=include_corners)
+        return points_on_closed_polyline(
+            contour,
+            spacing=spacing,
+            include_corners=include_corners,
+            distribution=distribution,
+            count=count,
+        )
 
     def stitch_segments(
         self,
@@ -435,7 +532,10 @@ class Stadium(Rectangle):
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
     ) -> list[tuple[Point, Point]]:
+        validate_distribution(spacing, distribution, count)
         all_edges = edges == "all" or sorted(set(edges)) == [0, 1, 2, 3]
         if not all_edges:
             return super().stitch_segments(
@@ -446,6 +546,8 @@ class Stadium(Rectangle):
                 stitch_length=stitch_length,
                 stitch_angle_deg=stitch_angle_deg,
                 rounded_path=rounded_path,
+                distribution=distribution,
+                count=count,
             )
         contour = self._inner_contour(inset)
         if len(contour) < 2:
@@ -456,6 +558,8 @@ class Stadium(Rectangle):
             stitch_length=stitch_length,
             stitch_angle_deg=stitch_angle_deg,
             include_corners=include_corners,
+            distribution=distribution,
+            count=count,
         )
 
 
@@ -469,12 +573,28 @@ class Circle(Shape):
         x, y, r = self.cx, self.cy, self.radius
         return f"M {x-r:.3f} {y:.3f} A {r:.3f} {r:.3f} 0 1 0 {x+r:.3f} {y:.3f} A {r:.3f} {r:.3f} 0 1 0 {x-r:.3f} {y:.3f} Z"
 
-    def hole_points(self, edges="all", spacing=5.0, inset=4.0, include_corners=False, rounded_path=False) -> list[Point]:
+    def hole_points(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=False,
+        rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
+    ) -> list[Point]:
+        validate_distribution(spacing, distribution, count)
         r = max(self.radius - inset, 0.1)
-        count = max(3, int((2 * pi * r) // spacing))
+        if distribution == "fixed_spacing":
+            point_count = max(3, int((2 * pi * r) // spacing))
+        else:
+            point_count = max(1, round((2 * pi * r) / spacing))
         return [
-            Point(self.cx + r * cos(2 * pi * i / count), self.cy + r * sin(2 * pi * i / count))
-            for i in range(count)
+            Point(
+                self.cx + r * cos(2 * pi * i / point_count),
+                self.cy + r * sin(2 * pi * i / point_count),
+            )
+            for i in range(point_count)
         ]
 
     def stitch_segments(
@@ -486,14 +606,22 @@ class Circle(Shape):
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
     ) -> list[tuple[Point, Point]]:
+        validate_distribution(spacing, distribution, count)
         r = max(self.radius - inset, 0.1)
-        count = max(3, int((2 * pi * r) // spacing))
+        circumference = 2 * pi * r
+        if distribution == "fixed_spacing":
+            point_count = max(3, int(circumference // spacing))
+        else:
+            point_count = max(1, round(circumference / spacing))
+            validate_stitch_length(stitch_length, circumference / point_count)
         half = stitch_length / 2
         angle_offset = stitch_angle_deg * pi / 180
         segments = []
-        for i in range(count):
-            angle = 2 * pi * i / count
+        for i in range(point_count):
+            angle = 2 * pi * i / point_count
             cx = self.cx + r * cos(angle)
             cy = self.cy + r * sin(angle)
             tx = -sin(angle)
@@ -539,11 +667,27 @@ class Ellipse(Shape):
             for i in range(steps)
         ]
 
-    def hole_points(self, edges="all", spacing=5.0, inset=4.0, include_corners=False, rounded_path=False) -> list[Point]:
+    def hole_points(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=False,
+        rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
+    ) -> list[Point]:
+        validate_distribution(spacing, distribution, count)
         contour = self._inner_contour(inset)
         if len(contour) < 2:
             return []
-        return points_on_closed_polyline(contour, spacing=spacing, include_corners=include_corners)
+        return points_on_closed_polyline(
+            contour,
+            spacing=spacing,
+            include_corners=include_corners,
+            distribution=distribution,
+            count=count,
+        )
 
     def stitch_segments(
         self,
@@ -554,7 +698,10 @@ class Ellipse(Shape):
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
     ) -> list[tuple[Point, Point]]:
+        validate_distribution(spacing, distribution, count)
         contour = self._inner_contour(inset)
         if len(contour) < 2:
             return []
@@ -564,6 +711,8 @@ class Ellipse(Shape):
             stitch_length=stitch_length,
             stitch_angle_deg=stitch_angle_deg,
             include_corners=include_corners,
+            distribution=distribution,
+            count=count,
         )
 
 
@@ -716,12 +865,28 @@ class Arc(Shape):
         ]
         return outer + centre_arc
 
-    def hole_points(self, edges="all", spacing=5.0, inset=4.0, include_corners=False, rounded_path=False) -> list[Point]:
+    def hole_points(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=False,
+        rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
+    ) -> list[Point]:
+        validate_distribution(spacing, distribution, count)
         pts = self._inset_contour(inset)
         if len(pts) < 3:
             return []
         polyline = [Point(x, y) for x, y in pts]
-        return points_on_closed_polyline(polyline, spacing=spacing, include_corners=include_corners)
+        return points_on_closed_polyline(
+            polyline,
+            spacing=spacing,
+            include_corners=include_corners,
+            distribution=distribution,
+            count=count,
+        )
 
     def stitch_segments(
         self,
@@ -732,7 +897,10 @@ class Arc(Shape):
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
     ) -> list[tuple[Point, Point]]:
+        validate_distribution(spacing, distribution, count)
         pts = self._inset_contour(inset)
         if len(pts) < 3:
             return []
@@ -743,6 +911,8 @@ class Arc(Shape):
             stitch_length=stitch_length,
             stitch_angle_deg=stitch_angle_deg,
             include_corners=include_corners,
+            distribution=distribution,
+            count=count,
         )
 
 
@@ -759,7 +929,17 @@ class Triangle(Shape):
     def path_d(self) -> str:
         return f"M {self.p1.x:.3f} {self.p1.y:.3f} L {self.p2.x:.3f} {self.p2.y:.3f} L {self.p3.x:.3f} {self.p3.y:.3f} Z"
 
-    def hole_points(self, edges="all", spacing=5.0, inset=4.0, include_corners=False, rounded_path=False) -> list[Point]:
+    def hole_points(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=False,
+        rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
+    ) -> list[Point]:
+        validate_distribution(spacing, distribution, count)
         p1, p2, p3 = inset_triangle_vertices(self.p1, self.p2, self.p3, inset)
         edge_defs = [(p1, p2), (p2, p3), (p3, p1)]
         selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
@@ -770,9 +950,18 @@ class Triangle(Shape):
                 selected_edge_defs,
                 spacing,
                 include_corners,
+                distribution,
+                count,
             )
 
-        return points_on_selected_edges(edge_defs, edges, spacing, include_corners)
+        return points_on_selected_edges(
+            edge_defs,
+            edges,
+            spacing,
+            include_corners,
+            distribution,
+            count,
+        )
 
     def stitch_segments(
         self,
@@ -783,7 +972,10 @@ class Triangle(Shape):
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
     ) -> list[tuple[Point, Point]]:
+        validate_distribution(spacing, distribution, count)
         p1, p2, p3 = inset_triangle_vertices(self.p1, self.p2, self.p3, inset)
         edge_defs = [(p1, p2), (p2, p3), (p3, p1)]
         selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
@@ -796,6 +988,8 @@ class Triangle(Shape):
                 stitch_length,
                 include_corners,
                 stitch_angle_deg,
+                distribution,
+                count,
             )
 
         return segments_on_selected_edges(
@@ -805,6 +999,8 @@ class Triangle(Shape):
             stitch_length,
             include_corners,
             stitch_angle_deg,
+            distribution,
+            count,
         )
 
 
@@ -840,7 +1036,10 @@ class RoundedTriangle(Triangle):
         inset=4.0,
         include_corners=False,
         rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
     ) -> list[Point]:
+        validate_distribution(spacing, distribution, count)
         all_triangle_edges = edges == "all" or sorted(set(edges)) == [0, 1, 2]
         if not rounded_path or not all_triangle_edges:
             return super().hole_points(
@@ -849,6 +1048,8 @@ class RoundedTriangle(Triangle):
                 inset=inset,
                 include_corners=include_corners,
                 rounded_path=rounded_path,
+                distribution=distribution,
+                count=count,
             )
 
         p1, p2, p3 = inset_triangle_vertices(self.p1, self.p2, self.p3, inset)
@@ -860,6 +1061,8 @@ class RoundedTriangle(Triangle):
             contour,
             spacing=spacing,
             include_corners=include_corners,
+            distribution=distribution,
+            count=count,
         )
 
     def stitch_segments(
@@ -871,7 +1074,10 @@ class RoundedTriangle(Triangle):
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
     ) -> list[tuple[Point, Point]]:
+        validate_distribution(spacing, distribution, count)
         all_triangle_edges = edges == "all" or sorted(set(edges)) == [0, 1, 2]
         if not rounded_path or not all_triangle_edges:
             return super().stitch_segments(
@@ -882,6 +1088,8 @@ class RoundedTriangle(Triangle):
                 stitch_length=stitch_length,
                 stitch_angle_deg=stitch_angle_deg,
                 rounded_path=rounded_path,
+                distribution=distribution,
+                count=count,
             )
 
         p1, p2, p3 = inset_triangle_vertices(self.p1, self.p2, self.p3, inset)
@@ -895,6 +1103,8 @@ class RoundedTriangle(Triangle):
             stitch_length=stitch_length,
             stitch_angle_deg=stitch_angle_deg,
             include_corners=include_corners,
+            distribution=distribution,
+            count=count,
         )
 
 
@@ -946,10 +1156,19 @@ class Polygon(Shape):
         inset: float = 4.0,
         include_corners: bool = False,
         rounded_path: bool = False,
+        distribution: str = "fixed_spacing",
+        count: int | None = None,
     ) -> list[Point]:
+        validate_distribution(spacing, distribution, count)
         pts = _offset_closed_polygon(self.points, inset) if inset > 0 else self.points
         polyline = [Point(x, y) for x, y in pts]
-        return points_on_closed_polyline(polyline, spacing=spacing, include_corners=include_corners)
+        return points_on_closed_polyline(
+            polyline,
+            spacing=spacing,
+            include_corners=include_corners,
+            distribution=distribution,
+            count=count,
+        )
 
     def stitch_segments(
         self,
@@ -960,7 +1179,10 @@ class Polygon(Shape):
         stitch_length: float = 2.0,
         stitch_angle_deg: float = 0.0,
         rounded_path: bool = False,
+        distribution: str = "fixed_spacing",
+        count: int | None = None,
     ) -> "list[tuple[Point, Point]]":
+        validate_distribution(spacing, distribution, count)
         pts = _offset_closed_polygon(self.points, inset) if inset > 0 else self.points
         polyline = [Point(x, y) for x, y in pts]
         return stitch_segments_on_closed_polyline(
@@ -969,6 +1191,8 @@ class Polygon(Shape):
             stitch_length=stitch_length,
             stitch_angle_deg=stitch_angle_deg,
             include_corners=include_corners,
+            distribution=distribution,
+            count=count,
         )
 
 
@@ -1028,7 +1252,10 @@ class RegularPolygon(Shape):
         inset=4.0,
         include_corners=False,
         rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
     ) -> list[Point]:
+        validate_distribution(spacing, distribution, count)
         vertices = self._inner_vertices(inset)
         if len(vertices) < 3:
             return []
@@ -1038,8 +1265,21 @@ class RegularPolygon(Shape):
         ]
         selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
         if selected == list(range(len(edge_defs))):
-            return points_on_closed_edges(edge_defs, spacing, include_corners)
-        return points_on_selected_edges(edge_defs, selected, spacing, include_corners)
+            return points_on_closed_edges(
+                edge_defs,
+                spacing,
+                include_corners,
+                distribution,
+                count,
+            )
+        return points_on_selected_edges(
+            edge_defs,
+            selected,
+            spacing,
+            include_corners,
+            distribution,
+            count,
+        )
 
     def stitch_segments(
         self,
@@ -1050,7 +1290,10 @@ class RegularPolygon(Shape):
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
     ) -> list[tuple[Point, Point]]:
+        validate_distribution(spacing, distribution, count)
         vertices = self._inner_vertices(inset)
         if len(vertices) < 3:
             return []
@@ -1066,6 +1309,8 @@ class RegularPolygon(Shape):
                 stitch_length,
                 include_corners,
                 stitch_angle_deg,
+                distribution,
+                count,
             )
         return segments_on_selected_edges(
             edge_defs,
@@ -1074,6 +1319,8 @@ class RegularPolygon(Shape):
             stitch_length,
             include_corners,
             stitch_angle_deg,
+            distribution,
+            count,
         )
 
 
@@ -1159,7 +1406,10 @@ class RoundedRegularPolygon(Shape):
         inset=4.0,
         include_corners=False,
         rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
     ) -> list[Point]:
+        validate_distribution(spacing, distribution, count)
         all_edges = edges == "all" or sorted(set(edges)) == list(range(self.sides))
         radii = self.corner_radii()
         if not all_edges or not any(radii):
@@ -1172,8 +1422,21 @@ class RoundedRegularPolygon(Shape):
             ]
             selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
             if selected == list(range(len(edge_defs))):
-                return points_on_closed_edges(edge_defs, spacing, include_corners)
-            return points_on_selected_edges(edge_defs, selected, spacing, include_corners)
+                return points_on_closed_edges(
+                    edge_defs,
+                    spacing,
+                    include_corners,
+                    distribution,
+                    count,
+                )
+            return points_on_selected_edges(
+                edge_defs,
+                selected,
+                spacing,
+                include_corners,
+                distribution,
+                count,
+            )
 
         inner_vertices = [Point(x, y) for x, y in self._inner_vertices(inset)]
         if len(inner_vertices) < 3:
@@ -1182,7 +1445,13 @@ class RoundedRegularPolygon(Shape):
         contour = rounded_polygon_contour(inner_vertices, inner_radii)
         if len(contour) < 2:
             return []
-        return points_on_closed_polyline(contour, spacing=spacing, include_corners=include_corners)
+        return points_on_closed_polyline(
+            contour,
+            spacing=spacing,
+            include_corners=include_corners,
+            distribution=distribution,
+            count=count,
+        )
 
     def stitch_segments(
         self,
@@ -1193,7 +1462,10 @@ class RoundedRegularPolygon(Shape):
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
     ) -> list[tuple[Point, Point]]:
+        validate_distribution(spacing, distribution, count)
         all_edges = edges == "all" or sorted(set(edges)) == list(range(self.sides))
         radii = self.corner_radii()
         if not all_edges or not any(radii):
@@ -1212,6 +1484,8 @@ class RoundedRegularPolygon(Shape):
                     stitch_length,
                     include_corners,
                     stitch_angle_deg,
+                    distribution,
+                    count,
                 )
             return segments_on_selected_edges(
                 edge_defs,
@@ -1220,6 +1494,8 @@ class RoundedRegularPolygon(Shape):
                 stitch_length,
                 include_corners,
                 stitch_angle_deg,
+                distribution,
+                count,
             )
 
         inner_vertices = [Point(x, y) for x, y in self._inner_vertices(inset)]
@@ -1235,16 +1511,95 @@ class RoundedRegularPolygon(Shape):
             stitch_length=stitch_length,
             stitch_angle_deg=stitch_angle_deg,
             include_corners=include_corners,
+            distribution=distribution,
+            count=count,
         )
 
 
-def points_on_selected_edges(edge_defs, edges, spacing, include_corners) -> list[Point]:
+def validate_distribution(
+    spacing: float,
+    distribution: str,
+    count: int | None = None,
+) -> None:
+    if distribution == "fixed_count":
+        raise ValueError("distribution 'fixed_count' is not supported yet")
+    if distribution not in SUPPORTED_DISTRIBUTIONS:
+        choices = ", ".join(SUPPORTED_DISTRIBUTIONS)
+        raise ValueError(f"unknown distribution '{distribution}'. Use: {choices}")
+    if spacing <= 0:
+        raise ValueError("spacing must be greater than 0")
+
+
+def fitted_spacing(length: float, target_spacing: float) -> float:
+    interval_count = max(1, round(length / target_spacing))
+    return length / interval_count
+
+
+def validate_stitch_length(stitch_length: float, actual_spacing: float) -> None:
+    if stitch_length >= actual_spacing:
+        raise ValueError("stitch_length must be smaller than actual stitch spacing")
+
+
+def distribute_distances(
+    length: float,
+    spacing: float,
+    *,
+    distribution: str = "fixed_spacing",
+    count: int | None = None,
+    include_start: bool = False,
+    include_end: bool = False,
+    min_count: int = 1,
+) -> list[float]:
+    validate_distribution(spacing, distribution, count)
+    if length <= 0:
+        return []
+
+    if distribution == "fixed_spacing":
+        distances = [0.0] if include_start else []
+        position = spacing
+        while position < length - 1e-9:
+            distances.append(position)
+            position += spacing
+        if include_end and (not distances or abs(distances[-1] - length) > 1e-9):
+            distances.append(length)
+        return distances
+
+    actual_spacing = fitted_spacing(length, spacing)
+    interval_count = max(1, round(length / spacing))
+    distances = [
+        index * actual_spacing
+        for index in range(interval_count + 1)
+        if (include_start or index > 0) and (include_end or index < interval_count)
+    ]
+    if len(distances) < min_count and not include_start and not include_end:
+        return [length / 2]
+    return distances
+
+
+def points_on_selected_edges(
+    edge_defs,
+    edges,
+    spacing,
+    include_corners,
+    distribution="fixed_spacing",
+    count=None,
+) -> list[Point]:
+    validate_distribution(spacing, distribution, count)
     selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
 
     result = []
     for index in selected:
         p1, p2 = edge_defs[index]
-        result.extend(points_on_line(p1, p2, spacing, include_corners))
+        result.extend(
+            points_on_line(
+                p1,
+                p2,
+                spacing,
+                include_corners,
+                distribution,
+                count,
+            )
+        )
     return deduplicate_points(result)
 
 
@@ -1255,13 +1610,27 @@ def segments_on_selected_edges(
     stitch_length,
     include_corners,
     stitch_angle_deg,
+    distribution="fixed_spacing",
+    count=None,
 ) -> list[tuple[Point, Point]]:
+    validate_distribution(spacing, distribution, count)
     selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
 
     result: list[tuple[Point, Point]] = []
     for index in selected:
         p1, p2 = edge_defs[index]
-        result.extend(segments_on_line(p1, p2, spacing, stitch_length, include_corners, stitch_angle_deg))
+        result.extend(
+            segments_on_line(
+                p1,
+                p2,
+                spacing,
+                stitch_length,
+                include_corners,
+                stitch_angle_deg,
+                distribution,
+                count,
+            )
+        )
     return result
 
 
@@ -1361,20 +1730,35 @@ def segments_on_closed_edges(
     stitch_length: float,
     include_corners: bool,
     stitch_angle_deg: float,
+    distribution: str = "fixed_spacing",
+    count: int | None = None,
 ) -> list[tuple[Point, Point]]:
+    validate_distribution(spacing, distribution, count)
     result: list[tuple[Point, Point]] = []
     for a, b in edge_defs:
         length = distance(a, b)
         if length == 0:
             continue
-        positions = positions_on_side_center(length, spacing, include_corners)
-        adjusted = adjust_stitch_positions_and_lengths(
-            positions,
-            length,
-            include_corners,
-            spacing,
-            stitch_length,
-        )
+        if distribution == "fixed_spacing":
+            positions = positions_on_side_center(length, spacing, include_corners)
+            adjusted = adjust_stitch_positions_and_lengths(
+                positions,
+                length,
+                include_corners,
+                spacing,
+                stitch_length,
+            )
+        else:
+            positions = distribute_distances(
+                length,
+                spacing,
+                distribution=distribution,
+                count=count,
+                include_start=include_corners,
+                include_end=include_corners,
+            )
+            validate_stitch_length(stitch_length, fitted_spacing(length, spacing))
+            adjusted = [(position, stitch_length) for position in positions]
         for local_pos, local_stitch_length in adjusted:
             result.append(segment_on_edge(a, b, local_pos, local_stitch_length, stitch_angle_deg))
     return result
@@ -1384,19 +1768,32 @@ def points_on_closed_edges(
     edge_defs: list[tuple[Point, Point]],
     spacing: float,
     include_corners: bool,
+    distribution: str = "fixed_spacing",
+    count: int | None = None,
 ) -> list[Point]:
+    validate_distribution(spacing, distribution, count)
     result: list[Point] = []
     for a, b in edge_defs:
         length = distance(a, b)
         if length == 0:
             continue
-        positions = positions_on_side_center(length, spacing, include_corners)
-        positions = adjust_positions_near_corners(
-            positions,
-            length,
-            include_corners,
-            spacing,
-        )
+        if distribution == "fixed_spacing":
+            positions = positions_on_side_center(length, spacing, include_corners)
+            positions = adjust_positions_near_corners(
+                positions,
+                length,
+                include_corners,
+                spacing,
+            )
+        else:
+            positions = distribute_distances(
+                length,
+                spacing,
+                distribution=distribution,
+                count=count,
+                include_start=include_corners,
+                include_end=include_corners,
+            )
         for local_pos in positions:
             result.append(point_on_edge(a, b, local_pos))
     return deduplicate_points(result)
@@ -1495,14 +1892,29 @@ def points_on_line(
     p2: Point,
     spacing: float,
     include_corners: bool = False,
+    distribution: str = "fixed_spacing",
+    count: int | None = None,
 ) -> list[Point]:
+    validate_distribution(spacing, distribution, count)
     length = distance(p1, p2)
     if length == 0:
         return []
     dx = (p2.x - p1.x) / length
     dy = (p2.y - p1.y) / length
     points = []
-    for pos in positions_on_line(length, spacing, include_corners):
+    positions = (
+        positions_on_line(length, spacing, include_corners)
+        if distribution == "fixed_spacing"
+        else distribute_distances(
+            length,
+            spacing,
+            distribution=distribution,
+            count=count,
+            include_start=include_corners,
+            include_end=include_corners,
+        )
+    )
+    for pos in positions:
         points.append(Point(p1.x + dx * pos, p1.y + dy * pos))
     return points
 
@@ -1514,7 +1926,10 @@ def segments_on_line(
     stitch_length: float,
     include_corners: bool = False,
     stitch_angle_deg: float = 0.0,
+    distribution: str = "fixed_spacing",
+    count: int | None = None,
 ) -> list[tuple[Point, Point]]:
+    validate_distribution(spacing, distribution, count)
     if (p2.x < p1.x) or (p2.x == p1.x and p2.y < p1.y):
         p1, p2 = p2, p1
 
@@ -1528,7 +1943,19 @@ def segments_on_line(
     dy = ex * sin(angle_rad) + ey * cos(angle_rad)
     half = stitch_length / 2
     segments: list[tuple[Point, Point]] = []
-    for pos in positions_on_line(length, spacing, include_corners):
+    if distribution == "fixed_spacing":
+        positions = positions_on_line(length, spacing, include_corners)
+    else:
+        positions = distribute_distances(
+            length,
+            spacing,
+            distribution=distribution,
+            count=count,
+            include_start=include_corners,
+            include_end=include_corners,
+        )
+        validate_stitch_length(stitch_length, fitted_spacing(length, spacing))
+    for pos in positions:
         cx = p1.x + ex * pos
         cy = p1.y + ey * pos
         segments.append(
@@ -1724,14 +2151,25 @@ def stitch_segments_on_closed_polyline(
     stitch_length: float,
     stitch_angle_deg: float,
     include_corners: bool,
+    distribution: str = "fixed_spacing",
+    count: int | None = None,
 ) -> list[tuple[Point, Point]]:
+    validate_distribution(spacing, distribution, count)
     edges = [(polyline[i], polyline[(i + 1) % len(polyline)]) for i in range(len(polyline))]
     lengths = [distance(a, b) for a, b in edges]
     total = sum(lengths)
     if total <= 0:
         return []
 
-    positions = positions_on_closed_length(total, spacing, include_corners)
+    positions = positions_on_closed_length(
+        total,
+        spacing,
+        include_corners,
+        distribution=distribution,
+        count=count,
+    )
+    if distribution == "fit_evenly":
+        validate_stitch_length(stitch_length, fitted_spacing(total, spacing))
     return map_stitch_positions_on_closed_edges(edges, lengths, positions, stitch_length, stitch_angle_deg)
 
 
@@ -1739,14 +2177,23 @@ def points_on_closed_polyline(
     polyline: list[Point],
     spacing: float,
     include_corners: bool,
+    distribution: str = "fixed_spacing",
+    count: int | None = None,
 ) -> list[Point]:
+    validate_distribution(spacing, distribution, count)
     edges = [(polyline[i], polyline[(i + 1) % len(polyline)]) for i in range(len(polyline))]
     lengths = [distance(a, b) for a, b in edges]
     total = sum(lengths)
     if total <= 0:
         return []
 
-    positions = positions_on_closed_length(total, spacing, include_corners)
+    positions = positions_on_closed_length(
+        total,
+        spacing,
+        include_corners,
+        distribution=distribution,
+        count=count,
+    )
     points: list[Point] = []
     prefixes = [0.0]
     for length in lengths:
@@ -1769,9 +2216,18 @@ def positions_on_closed_length(
     total_length: float,
     spacing: float,
     include_corners: bool,
+    distribution: str = "fixed_spacing",
+    count: int | None = None,
 ) -> list[float]:
+    validate_distribution(spacing, distribution, count)
     if total_length <= 0:
         return []
+
+    if distribution == "fit_evenly":
+        interval_count = max(1, round(total_length / spacing))
+        step = total_length / interval_count
+        offset = 0.0 if include_corners else step / 2
+        return [offset + i * step for i in range(interval_count)]
 
     if include_corners:
         count = max(1, int(total_length / spacing))
@@ -2114,6 +2570,8 @@ def stitch_segments_on_open_polyline(
     spacing: float,
     stitch_length: float,
     stitch_angle_deg: float = 0.0,
+    distribution: str = "fixed_spacing",
+    count: int | None = None,
 ) -> "list[tuple[Point, Point]]":
     """
     Return stitch segments placed every ``spacing`` mm along an open polyline.
@@ -2122,7 +2580,53 @@ def stitch_segments_on_open_polyline(
     ``stitch_angle_deg=0`` aligns stitches with the local path direction;
     ``stitch_angle_deg=45`` rotates them 45 degrees.
     """
+    validate_distribution(spacing, distribution, count)
     result: list[tuple[Point, Point]] = []
+
+    if distribution == "fit_evenly":
+        segment_lengths = [
+            hypot(x2 - x1, y2 - y1)
+            for (x1, y1), (x2, y2) in zip(points, points[1:])
+        ]
+        total_length = sum(segment_lengths)
+        if total_length <= 0:
+            return []
+        actual_spacing = fitted_spacing(total_length, spacing)
+        validate_stitch_length(stitch_length, actual_spacing)
+        positions = distribute_distances(
+            total_length,
+            spacing,
+            distribution=distribution,
+            count=count,
+            include_start=False,
+            include_end=False,
+        )
+        position_index = 0
+        traversed = 0.0
+        for ((x1, y1), (x2, y2)), seg_len in zip(zip(points, points[1:]), segment_lengths):
+            if seg_len == 0:
+                continue
+            dx, dy = x2 - x1, y2 - y1
+            ux, uy = dx / seg_len, dy / seg_len
+            angle_rad = stitch_angle_deg * pi / 180
+            sx = ux * cos(angle_rad) - uy * sin(angle_rad)
+            sy = ux * sin(angle_rad) + uy * cos(angle_rad)
+            half = stitch_length / 2
+            seg_end = traversed + seg_len
+            while position_index < len(positions) and positions[position_index] <= seg_end + 1e-9:
+                position = positions[position_index]
+                if position >= traversed - 1e-9:
+                    t = max(0.0, min(1.0, (position - traversed) / seg_len))
+                    cx = x1 + dx * t
+                    cy = y1 + dy * t
+                    result.append((
+                        Point(cx - sx * half, cy - sy * half),
+                        Point(cx + sx * half, cy + sy * half),
+                    ))
+                position_index += 1
+            traversed = seg_end
+        return result
+
     total = 0.0
     next_pos = spacing
 

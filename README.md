@@ -808,10 +808,15 @@ stitches
   margin 6
   spacing 8
   length 3.5
+  distribution fit_evenly
 end
 ```
 
 The `rounded_path` flag makes stitches and holes follow the smooth curved corners. It works for both `stitches` and `holes` blocks.
+
+Both blocks accept `distribution fixed_spacing` (the default) or
+`distribution fit_evenly`. The fitted mode uses `spacing` as a target and
+adjusts the actual interval to fill each selected edge or closed contour.
 
 ### Holes along shape edges
 
@@ -822,6 +827,7 @@ holes
   margin 4
   spacing 6
   radius 1.2
+  distribution fit_evenly
 end
 ```
 

@@ -782,6 +782,7 @@ stitches
   [angle <degrees>]
   [layer <layer_name>]
   [rounded_path]
+  [distribution fixed_spacing|fit_evenly]
 end
 ```
 
@@ -795,9 +796,14 @@ length 3
 angle 0
 layer stitch
 rounded_path false
+distribution fixed_spacing
 ```
 
 The optional `rounded_path` flag (no value) makes stitch marks follow the smooth rounded contour of a `RoundedTriangle`. It is accepted but has no visible effect on other shape types.
+
+`distribution fit_evenly` treats `spacing` as a target and adjusts the actual
+spacing to fit the selected edge or path. Selected edges are fitted
+independently. The default `fixed_spacing` behavior is unchanged.
 
 Compiler mapping for built-in shapes:
 
@@ -810,6 +816,7 @@ doc.add_stitch_pattern(
     inset=margin,
     layer="stitch",
     stitch_angle_deg=angle,
+    distribution=distribution,
 )
 ```
 
@@ -1041,10 +1048,14 @@ holes
   [radius <r>]
   [layer <layer_name>]
   [rounded_path]
+  [distribution fixed_spacing|fit_evenly]
 end
 ```
 
 The optional `rounded_path` flag makes holes follow the smooth rounded contour of a `RoundedTriangle`.
+
+`distribution` defaults to `fixed_spacing`; use `fit_evenly` to fit the row to
+the available length. Closed contours do not duplicate the seam point.
 
 Compiler mapping:
 
@@ -1056,6 +1067,7 @@ doc.add_holes(
     hole_radius=radius,
     inset=margin,
     layer="cut",
+    distribution=distribution,
 )
 ```
 

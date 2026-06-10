@@ -33,6 +33,7 @@ from leathercraft_svg import (
     adjust_stitch_positions_and_lengths,
     deduplicate_points,
     distance,
+    distribute_distances,
     inset_triangle_vertices,
     inward_unit_normal,
     line_intersection,
@@ -305,6 +306,59 @@ class TestPositionsOnLine(unittest.TestCase):
         pos = positions_on_line(20, 10, True)
         for i in range(1, len(pos)):
             self.assertAlmostEqual(pos[i] - pos[i - 1], 10.0)
+
+
+class TestDistributeDistances(unittest.TestCase):
+    def test_fixed_spacing_without_endpoints(self):
+        self.assertEqual(
+            distribute_distances(100, 10, distribution="fixed_spacing"),
+            [10, 20, 30, 40, 50, 60, 70, 80, 90],
+        )
+
+    def test_fixed_spacing_with_endpoints(self):
+        self.assertEqual(
+            distribute_distances(
+                100,
+                10,
+                distribution="fixed_spacing",
+                include_start=True,
+                include_end=True,
+            ),
+            [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+        )
+
+    def test_fit_evenly_with_endpoints(self):
+        distances = distribute_distances(
+            103,
+            5,
+            distribution="fit_evenly",
+            include_start=True,
+            include_end=True,
+        )
+        self.assertEqual(distances[0], 0)
+        self.assertEqual(distances[-1], 103)
+        intervals = [b - a for a, b in zip(distances, distances[1:])]
+        self.assertTrue(all(abs(value - 103 / 21) < APPROX for value in intervals))
+
+    def test_fit_evenly_without_endpoints(self):
+        distances = distribute_distances(103, 5, distribution="fit_evenly")
+        self.assertNotIn(0, distances)
+        self.assertNotIn(103, distances)
+        self.assertEqual(len(distances), 20)
+
+    def test_invalid_distribution(self):
+        with self.assertRaisesRegex(ValueError, "unknown distribution 'magic'"):
+            distribute_distances(100, 5, distribution="magic")
+
+    def test_nonpositive_spacing(self):
+        for spacing in (0, -1):
+            with self.subTest(spacing=spacing):
+                with self.assertRaisesRegex(ValueError, "spacing must be greater than 0"):
+                    distribute_distances(100, spacing, distribution="fit_evenly")
+
+    def test_fixed_count_not_supported(self):
+        with self.assertRaisesRegex(ValueError, "not supported yet"):
+            distribute_distances(100, 5, distribution="fixed_count", count=12)
 
 
 class TestPositionsOnSideCenter(unittest.TestCase):
@@ -825,6 +879,53 @@ class TestSvgDocumentOutput(unittest.TestCase):
         doc.add_stitch_on_polyline(pts, spacing=10, stitch_length=3, stitch_thickness=0.6)
         self.assertIn('stroke-width="0.6"', doc.to_svg())
 
+    def test_add_holes_fit_evenly(self):
+        doc = self._doc()
+        shape = Rectangle(0, 0, 103, 20)
+        doc.add_holes(
+            shape,
+            edges=[0],
+            spacing=5,
+            inset=0,
+            include_corners=True,
+            distribution="fit_evenly",
+        )
+        self.assertEqual(len(doc.elements), 22)
+
+    def test_add_stitch_pattern_fit_evenly(self):
+        doc = self._doc()
+        shape = Rectangle(0, 0, 103, 20)
+        doc.add_stitch_pattern(
+            shape,
+            edges=[0],
+            spacing=5,
+            stitch_length=3,
+            inset=0,
+            include_corners=True,
+            distribution="fit_evenly",
+        )
+        self.assertEqual(len(doc.elements), 22)
+
+    def test_add_stitch_on_polyline_fit_evenly(self):
+        doc = self._doc()
+        doc.add_stitch_on_polyline(
+            [(0, 0), (103, 0)],
+            spacing=5,
+            stitch_length=3,
+            distribution="fit_evenly",
+        )
+        self.assertEqual(len(doc.elements), 20)
+
+    def test_stitch_length_validated_against_fitted_spacing(self):
+        doc = self._doc()
+        with self.assertRaisesRegex(ValueError, "actual stitch spacing"):
+            doc.add_stitch_on_polyline(
+                [(0, 0), (11, 0)],
+                spacing=5,
+                stitch_length=5.5,
+                distribution="fit_evenly",
+            )
+
 
 # ===========================================================================
 # Path helpers
@@ -1027,6 +1128,46 @@ class TestStitchSegmentsOnOpenPolyline(unittest.TestCase):
         short = stitch_segments_on_open_polyline([(0, 0), (30, 0)], spacing=10, stitch_length=2)
         long_ = stitch_segments_on_open_polyline([(0, 0), (60, 0)], spacing=10, stitch_length=2)
         self.assertGreater(len(long_), len(short))
+
+
+class TestDistributionModesOnShapes(unittest.TestCase):
+    def test_default_matches_explicit_fixed_spacing(self):
+        shape = Rectangle(0, 0, 103, 43)
+        self.assertEqual(
+            shape.hole_points(spacing=5, inset=4),
+            shape.hole_points(
+                spacing=5,
+                inset=4,
+                distribution="fixed_spacing",
+            ),
+        )
+
+    def test_selected_rectangle_edges_fit_independently(self):
+        shape = Rectangle(0, 0, 103, 40)
+        points = shape.hole_points(
+            edges=[0, 2],
+            spacing=5,
+            inset=0,
+            include_corners=True,
+            distribution="fit_evenly",
+        )
+        top = sorted(point.x for point in points if abs(point.y) < APPROX)
+        bottom = sorted(point.x for point in points if abs(point.y - 40) < APPROX)
+        self.assertEqual(len(top), 22)
+        self.assertEqual(len(bottom), 22)
+        for top_x, bottom_x in zip(top, bottom):
+            self.assertAlmostEqual(top_x, bottom_x)
+
+    def test_closed_contour_has_no_duplicate_seam_point(self):
+        shape = Polygon([(0, 0), (30, 0), (30, 20), (0, 20)])
+        points = shape.hole_points(
+            spacing=6,
+            inset=0,
+            include_corners=True,
+            distribution="fit_evenly",
+        )
+        rounded = {(round(point.x, 6), round(point.y, 6)) for point in points}
+        self.assertEqual(len(points), len(rounded))
 
 
 # ===========================================================================

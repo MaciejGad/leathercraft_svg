@@ -73,6 +73,8 @@ doc.add_holes(
     layer="cut",
     include_corners=False,
     rounded_path=False,   # follow rounded contour (RoundedTriangle only)
+    distribution="fixed_spacing",  # or "fit_evenly"
+    count=None,            # reserved; fixed_count is not supported yet
 )
 ```
 
@@ -86,6 +88,8 @@ doc.add_stitch_on_polyline(
     stitch_angle_deg=0.0,    # 0 = parallel to path, 45 = diagonal
     layer="stitch",
     stitch_thickness=None,   # overrides layer stroke width
+    distribution="fixed_spacing",  # or "fit_evenly"
+    count=None,
 )
 ```
 
@@ -103,8 +107,14 @@ doc.add_stitch_pattern(
     stitch_thickness=None,  # float or None; overrides layer stroke width
     stitch_angle_deg=0.0,   # 0 = parallel to edge, 45 = diagonal
     rounded_path=False,
+    distribution="fixed_spacing",  # or "fit_evenly"
+    count=None,
 )
 ```
+
+`fit_evenly` treats `spacing` as a target and adjusts the actual interval to fit
+the edge or path. Selected straight edges are fitted independently; closed
+contours are fitted around the perimeter without duplicating the seam.
 
 ---
 
@@ -422,6 +432,7 @@ Use `doc.add_stitch_on_polyline` to render the result directly.
 | `stitch_thickness` | 0.1–1.0 mm | Stroke width for stitch lines (overrides layer) |
 | `include_corners` | False (default) | True = holes extend to corners |
 | `rounded_path` | False (default) | True = follow curved contour (RoundedTriangle) |
+| `distribution` | `"fixed_spacing"` | Use `"fit_evenly"` to adjust spacing to the available length |
 
 ---
 
@@ -918,12 +929,13 @@ stitches
   [angle <degrees>]
   [layer <layer_name>]
   [rounded_path]
+  [distribution fixed_spacing|fit_evenly]
 end
 ```
 
 Compiles to `doc.add_stitch_pattern(shape, edges=..., inset=margin, rounded_path=..., ...)`.
 
-Default values: `edges all`, `margin 4`, `spacing 5`, `length 3`, `angle 0`, `layer stitch`, `rounded_path false`.
+Default values: `edges all`, `margin 4`, `spacing 5`, `length 3`, `angle 0`, `layer stitch`, `rounded_path false`, `distribution fixed_spacing`.
 
 The `rounded_path` flag (no value) makes stitches follow the smooth curved contour of a `RoundedTriangle`. It is safe to use on other shapes but has no visible effect.
 
@@ -938,6 +950,7 @@ stitches
   length <mm>
   [angle <degrees>]
   [layer <layer_name>]
+  [distribution fixed_spacing|fit_evenly]
 
   path
     <x> <y>
@@ -963,12 +976,13 @@ holes
   [radius <mm>]
   [layer <layer_name>]
   [rounded_path]
+  [distribution fixed_spacing|fit_evenly]
 end
 ```
 
 Compiles to `doc.add_holes(shape, edges=..., inset=margin, hole_radius=radius, rounded_path=..., ...)`.
 
-Default values: `edges all`, `margin 4`, `spacing 6`, `radius 1.2`, `layer cut`, `rounded_path false`.
+Default values: `edges all`, `margin 4`, `spacing 6`, `radius 1.2`, `layer cut`, `rounded_path false`, `distribution fixed_spacing`.
 
 The `rounded_path` flag applies to `RoundedTriangle` (follows smooth corners); safe but no-op on other shapes.
 

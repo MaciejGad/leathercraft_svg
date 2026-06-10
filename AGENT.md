@@ -17,7 +17,8 @@ from leathercraft_svg import (
 )
 ```
 
-Requires Python 3.13+. `save_png` requires `cairosvg`; `save` (SVG only) has no dependencies.
+Requires Python 3.13+. `save_png` requires `cairosvg`; `save_dxf` requires the
+optional `ezdxf` package; `save` (SVG only) has no dependencies.
 
 ---
 
@@ -33,6 +34,7 @@ doc.add_holes(shape, ...)           # OR
 doc.add_stitch_pattern(shape, ...)  # add stitching
 doc.save("output.svg")
 doc.save_png("output.png", background_color="white")  # optional
+doc.save_dxf("output.dxf")  # optional
 ```
 
 ---
@@ -58,6 +60,7 @@ SvgDocument(width_mm: float, height_mm: float, styles: dict[str, StrokeStyle] | 
 | `add_stitch_pattern(shape, ...)` | Add laser stitch lines along shape edges |
 | `save(path)` | Write SVG file |
 | `save_png(path, background_color="white")` | Write PNG via CairoSVG |
+| `save_dxf(path, ...)` | Write DXF via ezdxf |
 | `to_svg()` | Return SVG as a string |
 | `add_stitch_on_polyline(points, ...)` | Add stitch marks along an open `(x,y)` polyline |
 
@@ -115,6 +118,23 @@ doc.add_stitch_pattern(
 `fit_evenly` treats `spacing` as a target and adjusts the actual interval to fit
 the edge or path. Selected straight edges are fitted independently; closed
 contours are fitted around the perimeter without duplicating the seam.
+
+### `save_dxf` signature
+
+```python
+doc.save_dxf(
+    "pattern.dxf",
+    version="R2010",
+    units="mm",
+    preserve_curves=True,
+    curve_tolerance=0.1,
+    flip_y=False,
+)
+```
+
+DXF export preserves layers and writes simple 2D entities such as `LINE`,
+`CIRCLE`, `ARC`, and `LWPOLYLINE`. Raw SVG paths added through `add_path(...)`
+raise a clear error during DXF export.
 
 ---
 
@@ -1055,6 +1075,7 @@ export <name>               # writes <name>.svg + <name>.png
 export svg <filename>       # SVG only
 export png <filename>       # PNG only
 export pdf <filename>       # PDF via cairosvg
+export dxf <filename>       # DXF via ezdxf
 ```
 
 If no `export` command is present, the compiler writes `<pattern_name>.svg` and `<pattern_name>.png` using the `pattern` name or the source filename stem.

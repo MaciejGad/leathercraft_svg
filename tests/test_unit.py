@@ -9,7 +9,12 @@ Run:
 """
 
 import math
+import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
+
+import ezdxf
 
 from leathercraft_svg import (
     Arc,
@@ -925,6 +930,126 @@ class TestSvgDocumentOutput(unittest.TestCase):
                 stitch_length=5.5,
                 distribution="fit_evenly",
             )
+
+    def test_save_dxf_creates_valid_file(self):
+        doc = self._doc()
+        doc.add_shape(Rectangle(10, 10, 80, 40), layer="cut")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "pattern.dxf"
+            doc.save_dxf(path)
+            read_back = ezdxf.readfile(path)
+        self.assertEqual(read_back.dxfversion, "AC1024")
+
+    def test_save_dxf_sets_insunits_to_mm(self):
+        doc = self._doc()
+        doc.add_shape(Rectangle(10, 10, 80, 40), layer="cut")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "units.dxf"
+            doc.save_dxf(path)
+            read_back = ezdxf.readfile(path)
+        self.assertEqual(read_back.header["$INSUNITS"], 4)
+
+    def test_rectangle_exports_as_closed_lwpolyline(self):
+        doc = self._doc()
+        doc.add_shape(Rectangle(10, 10, 80, 40), layer="cut")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "rect.dxf"
+            doc.save_dxf(path)
+            entities = list(ezdxf.readfile(path).modelspace().query("LWPOLYLINE"))
+        self.assertEqual(len(entities), 1)
+        self.assertTrue(entities[0].closed)
+
+    def test_circle_exports_as_circle(self):
+        doc = self._doc()
+        doc.add_shape(Circle(50, 30, 12), layer="cut")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "circle.dxf"
+            doc.save_dxf(path)
+            entities = list(ezdxf.readfile(path).modelspace().query("CIRCLE"))
+        self.assertEqual(len(entities), 1)
+        self.assertEqual(entities[0].dxf.radius, 12)
+
+    def test_stitch_holes_export_as_circles_on_layer(self):
+        doc = self._doc()
+        shape = Rectangle(10, 10, 80, 40)
+        doc.add_holes(shape, edges=[0], spacing=10, hole_radius=1.2, inset=0, layer="stitch")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "holes.dxf"
+            doc.save_dxf(path)
+            circles = list(ezdxf.readfile(path).modelspace().query("CIRCLE"))
+        self.assertGreater(len(circles), 0)
+        self.assertTrue(all(entity.dxf.layer == "stitch" for entity in circles))
+
+    def test_stitch_lines_export_as_lines_on_layer(self):
+        doc = self._doc()
+        shape = Rectangle(10, 10, 80, 40)
+        doc.add_stitch_pattern(shape, edges=[0], spacing=10, stitch_length=3, inset=0, layer="stitch")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "stitch_lines.dxf"
+            doc.save_dxf(path)
+            lines = list(ezdxf.readfile(path).modelspace().query("LINE"))
+        self.assertGreater(len(lines), 0)
+        self.assertTrue(all(entity.dxf.layer == "stitch" for entity in lines))
+
+    def test_dxf_layers_are_preserved(self):
+        doc = self._doc()
+        doc.add_line(0, 0, 10, 0, layer="guide")
+        doc.add_circle(20, 20, 2, layer="stitch")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "layers.dxf"
+            doc.save_dxf(path)
+            read_back = ezdxf.readfile(path)
+        self.assertIn("cut", read_back.layers)
+        self.assertIn("stitch", read_back.layers)
+        self.assertIn("crease", read_back.layers)
+        self.assertIn("guide", read_back.layers)
+
+    def test_save_dxf_rejects_raw_svg_paths(self):
+        doc = self._doc()
+        doc.add_path("M 0 0 L 10 10", layer="cut")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "raw.dxf"
+            with self.assertRaisesRegex(ValueError, "raw SVG paths yet"):
+                doc.save_dxf(path)
+
+    def test_save_dxf_validates_version_units_and_tolerance(self):
+        doc = self._doc()
+        for kwargs, message in (
+            ({"version": "R9"}, "unsupported DXF version"),
+            ({"units": "inch"}, "unsupported DXF units"),
+            ({"curve_tolerance": 0}, "curve_tolerance must be greater than 0"),
+        ):
+            with self.subTest(kwargs=kwargs):
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    path = Path(tmpdir) / "invalid.dxf"
+                    with self.assertRaisesRegex(ValueError, message):
+                        doc.save_dxf(path, **kwargs)
+
+    def test_save_dxf_reports_missing_dependency(self):
+        real_import = __import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "ezdxf":
+                raise ModuleNotFoundError("No module named 'ezdxf'")
+            return real_import(name, *args, **kwargs)
+
+        doc = self._doc()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "missing.dxf"
+            with mock.patch("builtins.__import__", side_effect=fake_import):
+                with self.assertRaisesRegex(RuntimeError, "optional dependency 'ezdxf'"):
+                    doc.save_dxf(path)
+
+    def test_rounded_shapes_export_without_open_gaps(self):
+        doc = self._doc()
+        doc.add_shape(RoundedRectangle(10, 10, 80, 40, radius=8), layer="cut")
+        doc.add_shape(Stadium(10, 10, 80, 30), layer="guide")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "rounded.dxf"
+            doc.save_dxf(path)
+            polylines = list(ezdxf.readfile(path).modelspace().query("LWPOLYLINE"))
+        self.assertGreaterEqual(len(polylines), 2)
+        self.assertTrue(all(polyline.closed for polyline in polylines))
 
 
 # ===========================================================================

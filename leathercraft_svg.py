@@ -23,6 +23,32 @@ class StrokeStyle:
     dasharray: str | None = None
 
 
+@dataclass(frozen=True)
+class DrawRawPath:
+    d: str
+    layer: str
+
+
+@dataclass(frozen=True)
+class DrawLineEntity:
+    start: Point
+    end: Point
+    layer: str
+
+
+@dataclass(frozen=True)
+class DrawCircleEntity:
+    center: Point
+    radius: float
+    layer: str
+
+
+@dataclass(frozen=True)
+class DrawShapeEntity:
+    shape: "Shape"
+    layer: str
+
+
 DEFAULT_STYLES: dict[str, StrokeStyle] = {
     "cut": StrokeStyle("#ff0000", 0.2),
     "stitch": StrokeStyle("#0000ff", 0.2),
@@ -37,9 +63,11 @@ class SvgDocument:
         self.height_mm = height_mm
         self.styles = styles or DEFAULT_STYLES
         self.elements: list[str] = []
+        self._draw_entities: list[DrawRawPath | DrawLineEntity | DrawCircleEntity | DrawShapeEntity] = []
 
     def add_path(self, d: str, layer: LayerName = "cut") -> None:
         self.elements.append(f'<path {self._style_attributes(layer)} d="{d}" />')
+        self._draw_entities.append(DrawRawPath(d=d, layer=layer))
 
     def add_line(
         self,
@@ -54,14 +82,21 @@ class SvgDocument:
             f'<line {self._style_attributes(layer, stroke_width=stroke_width)} '
             f'x1="{x1:.3f}" y1="{y1:.3f}" x2="{x2:.3f}" y2="{y2:.3f}" />'
         )
+        self._draw_entities.append(
+            DrawLineEntity(start=Point(x1, y1), end=Point(x2, y2), layer=layer)
+        )
 
     def add_circle(self, x: float, y: float, radius: float, layer: LayerName = "cut") -> None:
         self.elements.append(
             f'<circle {self._style_attributes(layer)} cx="{x:.3f}" cy="{y:.3f}" r="{radius:.3f}" />'
         )
+        self._draw_entities.append(
+            DrawCircleEntity(center=Point(x, y), radius=radius, layer=layer)
+        )
 
     def add_shape(self, shape: "Shape", layer: LayerName = "cut") -> None:
-        self.add_path(shape.path_d(), layer)
+        self.elements.append(f'<path {self._style_attributes(layer)} d="{shape.path_d()}" />')
+        self._draw_entities.append(DrawShapeEntity(shape=shape, layer=layer))
 
     def add_holes(
         self,
@@ -168,6 +203,49 @@ class SvgDocument:
 
     def save(self, path: str | Path) -> None:
         Path(path).write_text(self.to_svg(), encoding="utf-8")
+
+    def save_dxf(
+        self,
+        path: str | Path,
+        *,
+        version: str = "R2010",
+        units: str = "mm",
+        preserve_curves: bool = True,
+        curve_tolerance: float = 0.1,
+        flip_y: bool = False,
+    ) -> None:
+        if version != "R2010":
+            raise ValueError(f"unsupported DXF version '{version}'. Use: R2010")
+        if units != "mm":
+            raise ValueError(f"unsupported DXF units '{units}'. Use: mm")
+        if curve_tolerance <= 0:
+            raise ValueError("curve_tolerance must be greater than 0")
+
+        try:
+            import ezdxf
+        except ModuleNotFoundError as exc:
+            raise RuntimeError(
+                "save_dxf requires the optional dependency 'ezdxf'. Install it with: pip install ezdxf"
+            ) from exc
+
+        dxf_doc = ezdxf.new(version)
+        dxf_doc.units = ezdxf.units.MM
+        dxf_doc.header["$INSUNITS"] = 4
+
+        _create_dxf_layers(dxf_doc, self.styles)
+
+        modelspace = dxf_doc.modelspace()
+        context = DxfExportContext(
+            document_height=self.height_mm,
+            flip_y=flip_y,
+            preserve_curves=preserve_curves,
+            curve_tolerance=curve_tolerance,
+        )
+
+        for entity in self._draw_entities:
+            _add_draw_entity_to_dxf(modelspace, entity, context)
+
+        dxf_doc.saveas(str(path))
 
     def to_png_bytes(self, background_color: str = "white") -> bytes:
         import cairosvg
@@ -1514,6 +1592,274 @@ class RoundedRegularPolygon(Shape):
             distribution=distribution,
             count=count,
         )
+
+
+DXF_LAYER_COLORS = {
+    "cut": 1,
+    "stitch": 5,
+    "crease": 3,
+    "guide": 8,
+}
+
+
+@dataclass(frozen=True)
+class DxfExportContext:
+    document_height: float
+    flip_y: bool
+    preserve_curves: bool
+    curve_tolerance: float
+
+
+def _style_to_aci_color(layer: str, style: StrokeStyle) -> int:
+    if layer in DXF_LAYER_COLORS:
+        return DXF_LAYER_COLORS[layer]
+    normalized = style.color.lower()
+    return {
+        "#ff0000": 1,
+        "#00aa00": 3,
+        "#0000ff": 5,
+        "#777777": 8,
+    }.get(normalized, 7)
+
+
+def _create_dxf_layers(dxf_doc, styles: dict[str, StrokeStyle]) -> None:
+    for name, style in styles.items():
+        if name in dxf_doc.layers:
+            dxf_doc.layers.get(name).color = _style_to_aci_color(name, style)
+        else:
+            dxf_doc.layers.add(name, color=_style_to_aci_color(name, style))
+
+
+def _transform_point_for_dxf(point: Point, context: DxfExportContext) -> tuple[float, float]:
+    if context.flip_y:
+        return (point.x, context.document_height - point.y)
+    return (point.x, point.y)
+
+
+def _transform_points_for_dxf(points: list[Point], context: DxfExportContext) -> list[tuple[float, float]]:
+    return [_transform_point_for_dxf(point, context) for point in points]
+
+
+def _arc_angles_for_dxf(start_angle: float, end_angle: float, context: DxfExportContext) -> tuple[float, float]:
+    if not context.flip_y:
+        return (start_angle, end_angle)
+    return ((360.0 - end_angle) % 360.0, (360.0 - start_angle) % 360.0)
+
+
+def _add_draw_entity_to_dxf(modelspace, entity, context: DxfExportContext) -> None:
+    if isinstance(entity, DrawRawPath):
+        raise ValueError(
+            "DXF export does not support raw SVG paths yet. "
+            "Use structured shapes or add a path-to-geometry converter."
+        )
+    if isinstance(entity, DrawLineEntity):
+        modelspace.add_line(
+            _transform_point_for_dxf(entity.start, context),
+            _transform_point_for_dxf(entity.end, context),
+            dxfattribs={"layer": entity.layer},
+        )
+        return
+    if isinstance(entity, DrawCircleEntity):
+        modelspace.add_circle(
+            _transform_point_for_dxf(entity.center, context),
+            entity.radius,
+            dxfattribs={"layer": entity.layer},
+        )
+        return
+    if isinstance(entity, DrawShapeEntity):
+        _add_shape_to_dxf(modelspace, entity.shape, entity.layer, context)
+        return
+    raise TypeError(f"unsupported draw entity type: {type(entity)!r}")
+
+
+def _add_shape_to_dxf(modelspace, shape: Shape, layer: str, context: DxfExportContext) -> None:
+    if isinstance(shape, Rectangle) and not isinstance(shape, (RoundedRectangle, Stadium)):
+        _add_closed_lwpolyline(modelspace, _rectangle_points(shape), layer, context)
+        return
+    if isinstance(shape, Circle):
+        modelspace.add_circle(
+            _transform_point_for_dxf(Point(shape.cx, shape.cy), context),
+            shape.radius,
+            dxfattribs={"layer": layer},
+        )
+        return
+    if isinstance(shape, Triangle) and not isinstance(shape, RoundedTriangle):
+        _add_closed_lwpolyline(modelspace, [shape.p1, shape.p2, shape.p3], layer, context)
+        return
+    if isinstance(shape, Polygon):
+        if shape.smooth:
+            _add_closed_lwpolyline(
+                modelspace,
+                _smooth_polygon_contour(shape.points, context.curve_tolerance),
+                layer,
+                context,
+            )
+        else:
+            _add_closed_lwpolyline(modelspace, [Point(x, y) for x, y in shape.points], layer, context)
+        return
+    if isinstance(shape, Arc):
+        _add_arc_shape_to_dxf(modelspace, shape, layer, context)
+        return
+    if isinstance(shape, RoundedRectangle):
+        _add_closed_lwpolyline(
+            modelspace,
+            rounded_rectangle_contour(
+                shape.x,
+                shape.y,
+                shape.width,
+                shape.height,
+                0.0,
+                arc_steps=_curve_steps_for_tolerance(max(shape.width, shape.height), context.curve_tolerance),
+                radii=shape.corner_radii(),
+            ),
+            layer,
+            context,
+        )
+        return
+    if isinstance(shape, Stadium):
+        _add_closed_lwpolyline(
+            modelspace,
+            shape._inner_contour(0.0),
+            layer,
+            context,
+        )
+        return
+    if isinstance(shape, Ellipse):
+        _add_closed_lwpolyline(
+            modelspace,
+            shape._inner_contour(0.0, steps=_curve_steps_for_tolerance(max(shape.rx, shape.ry), context.curve_tolerance)),
+            layer,
+            context,
+        )
+        return
+    if isinstance(shape, RoundedTriangle):
+        _add_closed_lwpolyline(
+            modelspace,
+            rounded_triangle_contour(
+                [shape.p1, shape.p2, shape.p3],
+                shape.radius,
+                arc_steps=_curve_steps_for_tolerance(shape.radius or 1.0, context.curve_tolerance),
+            ),
+            layer,
+            context,
+        )
+        return
+    if isinstance(shape, RegularPolygon) and not isinstance(shape, RoundedRegularPolygon):
+        _add_closed_lwpolyline(modelspace, [Point(x, y) for x, y in shape.vertices()], layer, context)
+        return
+    if isinstance(shape, RoundedRegularPolygon):
+        radii = shape.corner_radii()
+        if any(radii) and context.preserve_curves:
+            contour = rounded_polygon_contour(
+                [Point(x, y) for x, y in shape.vertices()],
+                radii,
+                arc_steps=_curve_steps_for_tolerance(max(radii) or 1.0, context.curve_tolerance),
+            )
+            _add_closed_lwpolyline(modelspace, contour, layer, context)
+        else:
+            _add_closed_lwpolyline(modelspace, [Point(x, y) for x, y in shape.vertices()], layer, context)
+        return
+    raise TypeError(f"DXF export does not support shape type {type(shape).__name__}")
+
+
+def _add_closed_lwpolyline(modelspace, points: list[Point], layer: str, context: DxfExportContext) -> None:
+    transformed = _transform_points_for_dxf(deduplicate_points(points), context)
+    if len(transformed) < 2:
+        return
+    modelspace.add_lwpolyline(transformed, close=True, dxfattribs={"layer": layer})
+
+
+def _rectangle_points(shape: Rectangle) -> list[Point]:
+    return [
+        Point(shape.x, shape.y),
+        Point(shape.x + shape.width, shape.y),
+        Point(shape.x + shape.width, shape.y + shape.height),
+        Point(shape.x, shape.y + shape.height),
+    ]
+
+
+def _curve_steps_for_tolerance(radius_like: float, tolerance: float, minimum: int = 24) -> int:
+    effective = max(radius_like, tolerance)
+    steps = int(max(minimum, (2 * pi * effective) / max(tolerance, 1e-6)))
+    return min(256, steps)
+
+
+def _smooth_polygon_contour(points: list[tuple[float, float]], tolerance: float) -> list[Point]:
+    if len(points) < 3:
+        return [Point(x, y) for x, y in points]
+
+    point_objs = [Point(x, y) for x, y in points]
+    contour: list[Point] = [point_objs[0]]
+    steps = _curve_steps_for_tolerance(
+        max(max(abs(x) for x, _ in points), max(abs(y) for _, y in points), default=1.0),
+        tolerance,
+        minimum=8,
+    )
+    for index in range(1, len(point_objs) - 1):
+        control = point_objs[index]
+        next_point = point_objs[index + 1]
+        anchor = Point((control.x + next_point.x) / 2, (control.y + next_point.y) / 2)
+        start = contour[-1]
+        for step in range(1, steps + 1):
+            contour.append(quadratic_bezier(start, control, anchor, step / steps))
+    last = point_objs[-1]
+    first = point_objs[0]
+    start = contour[-1]
+    for step in range(1, steps + 1):
+        contour.append(quadratic_bezier(start, last, first, step / steps))
+    return deduplicate_points(contour)
+
+
+def _add_arc_shape_to_dxf(modelspace, shape: Arc, layer: str, context: DxfExportContext) -> None:
+    center = _transform_point_for_dxf(Point(shape.cx, shape.cy), context)
+    outer_start, outer_end = _arc_angles_for_dxf(shape.start_angle, shape.end_angle, context)
+    modelspace.add_arc(
+        center,
+        shape.radius,
+        outer_start,
+        outer_end,
+        dxfattribs={"layer": layer},
+    )
+
+    start_rad, span = shape._span_rad()
+    end_rad = start_rad + span
+    outer_start_point = Point(shape.cx + shape.radius * cos(start_rad), shape.cy + shape.radius * sin(start_rad))
+    outer_end_point = Point(shape.cx + shape.radius * cos(end_rad), shape.cy + shape.radius * sin(end_rad))
+
+    if shape.inner_radius <= 0:
+        center_point = Point(shape.cx, shape.cy)
+        modelspace.add_line(
+            _transform_point_for_dxf(center_point, context),
+            _transform_point_for_dxf(outer_start_point, context),
+            dxfattribs={"layer": layer},
+        )
+        modelspace.add_line(
+            _transform_point_for_dxf(outer_end_point, context),
+            _transform_point_for_dxf(center_point, context),
+            dxfattribs={"layer": layer},
+        )
+        return
+
+    inner_start_point = Point(shape.cx + shape.inner_radius * cos(start_rad), shape.cy + shape.inner_radius * sin(start_rad))
+    inner_end_point = Point(shape.cx + shape.inner_radius * cos(end_rad), shape.cy + shape.inner_radius * sin(end_rad))
+    inner_start_angle, inner_end_angle = _arc_angles_for_dxf(shape.start_angle, shape.end_angle, context)
+    modelspace.add_arc(
+        center,
+        shape.inner_radius,
+        inner_start_angle,
+        inner_end_angle,
+        dxfattribs={"layer": layer},
+    )
+    modelspace.add_line(
+        _transform_point_for_dxf(outer_start_point, context),
+        _transform_point_for_dxf(inner_start_point, context),
+        dxfattribs={"layer": layer},
+    )
+    modelspace.add_line(
+        _transform_point_for_dxf(inner_end_point, context),
+        _transform_point_for_dxf(outer_end_point, context),
+        dxfattribs={"layer": layer},
+    )
 
 
 def validate_distribution(

@@ -3,7 +3,8 @@
 ![leathercraft_svg logo](logo-720.png)
 
 Library for generating simple SVG files for laser cutting, stitching, and scoring.
-It supports shapes, edge points, stitching holes, and PNG export with a white background.
+It supports shapes, edge points, stitching holes, PNG export with a white background,
+and DXF export for CAD/CAM workflows.
 
 Main features:
 
@@ -17,11 +18,12 @@ Main features:
 ## Installation
 
 The project uses Python 3.13+ and requires `cairosvg` for PNG export.
+DXF export requires the optional `ezdxf` package.
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install cairosvg
+pip install cairosvg ezdxf
 ```
 
 If you only want to generate SVG, the library works without any extra packages.
@@ -39,6 +41,7 @@ doc.add_holes(shape, spacing=8.0, hole_radius=1.2, inset=5.0)
 
 doc.save("example.svg")
 doc.save_png("example.png", background_color="white")
+doc.save_dxf("example.dxf")
 ```
 
 ## Running the Examples
@@ -235,6 +238,14 @@ Parameters:
 
 - `path` - output PNG path,
 - `background_color` - background color, defaults to `white`.
+
+### `doc.save_dxf(path, version="R2010", units="mm", preserve_curves=True, curve_tolerance=0.1, flip_y=False)`
+
+Saves a DXF using `ezdxf`.
+
+The first implementation supports `R2010`, millimeters, layers, `LINE`,
+`CIRCLE`, `ARC`, and `LWPOLYLINE`. Raw SVG paths added with `doc.add_path(...)`
+are not exported to DXF.
 
 ## Geometry Classes
 

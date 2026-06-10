@@ -1097,6 +1097,7 @@ depending on compiler defaults.
 export svg lighter_sleeve.svg
 export pdf lighter_sleeve.pdf
 export png lighter_sleeve.png
+export dxf lighter_sleeve.dxf
 ```
 
 Syntax:
@@ -1111,9 +1112,12 @@ Supported formats:
 svg
 png
 pdf
+dxf
 ```
 
 PDF export should preserve vector geometry and physical dimensions in millimeters.
+DXF export uses millimeters and is only written when explicitly requested with
+`export dxf ...`; the default `export <name>` behavior is unchanged.
 
 ## 12. Full Examples
 

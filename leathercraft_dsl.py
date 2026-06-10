@@ -1370,9 +1370,9 @@ def parse(text: str) -> PatternDocument:
                 exports.append(ExportDefinition(format=None, filename=rest[0]))
             else:
                 fmt = rest[0].lower()
-                if fmt not in ("svg", "png", "pdf"):
+                if fmt not in ("svg", "png", "pdf", "dxf"):
                     raise DslError(
-                        f"Line {lineno}: unknown export format '{fmt}'. Use: svg, png, pdf."
+                        f"Line {lineno}: unknown export format '{fmt}'. Use: svg, png, pdf, dxf."
                     )
                 exports.append(ExportDefinition(format=fmt, filename=rest[1]))
 
@@ -1661,6 +1661,11 @@ def _export(svg: SvgDocument, exp: ExportDefinition, default_name: str) -> None:
             cairosvg.svg2pdf(bytestring=svg.to_svg().encode(), write_to=exp.filename)
         except Exception as exc:
             raise DslError(f"PDF export failed: {exc}") from exc
+    elif exp.format == "dxf":
+        try:
+            svg.save_dxf(exp.filename)
+        except Exception as exc:
+            raise DslError(f"DXF export failed: {exc}") from exc
 
 
 def build_file(path: str | Path) -> SvgDocument:

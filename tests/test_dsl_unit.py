@@ -3,6 +3,7 @@ Unit tests for leathercraft_dsl — parser and compiler.
 Run with: pytest tests/test_dsl_unit.py -v
 """
 
+import ezdxf
 import pytest
 
 from leathercraft_dsl import (
@@ -17,6 +18,7 @@ from leathercraft_dsl import (
     RoundedRectangleDefinition,
     SingleHoleDefinition,
     StitchesOperation,
+    build_file,
     compile_document,
     parse,
 )
@@ -349,6 +351,11 @@ class TestParseExport:
     def test_explicit_png(self):
         doc = _parse("size 10 10\nexport png output.png")
         assert doc.exports[0].format == "png"
+
+    def test_explicit_dxf(self):
+        doc = _parse("size 10 10\nexport dxf output.dxf")
+        assert doc.exports[0].format == "dxf"
+        assert doc.exports[0].filename == "output.dxf"
 
     def test_unknown_format_raises(self):
         with pytest.raises(DslError, match="unknown export format"):
@@ -1012,6 +1019,23 @@ class TestCompileCircle:
         )
         output = compile_document(doc).to_svg()
         assert "<line" in output
+
+
+class TestDxfExport:
+    def test_build_file_exports_dxf(self, tmp_path):
+        source = tmp_path / "panel.lcraft"
+        output = tmp_path / "card_panel.dxf"
+        source.write_text(
+            "pattern card_panel_dxf\n"
+            "size 120 80\n"
+            "rectangle panel\n  at 10 10\n  size 100 60\nend\n"
+            "holes\n  source panel\n  spacing 6\n  radius 1.2\n  layer stitch\nend\n"
+            f"export dxf {output}\n",
+            encoding="utf-8",
+        )
+        build_file(source)
+        assert output.exists()
+        assert ezdxf.readfile(output).header["$INSUNITS"] == 4
 
 
 class TestCompileTriangle:

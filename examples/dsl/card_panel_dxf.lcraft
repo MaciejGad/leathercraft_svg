@@ -1,0 +1,16 @@
+pattern card_panel_dxf
+size 120 80
+
+rectangle panel
+  at 10 10
+  size 100 60
+end
+
+holes
+  source panel
+  spacing 6
+  radius 1.2
+  layer stitch
+end
+
+export dxf card_panel.dxf

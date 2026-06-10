@@ -640,6 +640,47 @@ end
 """)
 
 
+def _dsl_regular_polygon_holes() -> bytes:
+    return _compile_dsl("""
+size 120 120
+
+regular_polygon hex
+  at 60 60
+  radius 42
+  sides 6
+end
+
+holes
+  source hex
+  margin 6
+  spacing 8
+  radius 1.2
+end
+""")
+
+
+def _dsl_regular_polygon_stitches() -> bytes:
+    return _compile_dsl("""
+size 120 120
+
+regular_polygon oct
+  at 60 60
+  radius 40
+  sides 8
+  rotation 22.5
+end
+
+stitches
+  source oct
+  edges 0 1 2 3
+  margin 5
+  spacing 8
+  length 3
+  angle 30
+end
+""")
+
+
 def _dsl_stadium_stitches() -> bytes:
     return _compile_dsl("""
 size 140 60
@@ -727,6 +768,9 @@ SCENARIOS: dict[str, callable] = {
     # --- ellipse ---
     "dsl_ellipse_stitches.png": _dsl_ellipse_stitches,
     "dsl_ellipse_holes.png": _dsl_ellipse_holes,
+    # --- regular polygon ---
+    "dsl_regular_polygon_holes.png": _dsl_regular_polygon_holes,
+    "dsl_regular_polygon_stitches.png": _dsl_regular_polygon_stitches,
     # --- stadium ---
     "dsl_stadium_stitches.png": _dsl_stadium_stitches,
     "dsl_stadium_holes.png": _dsl_stadium_holes,

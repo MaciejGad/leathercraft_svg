@@ -20,7 +20,7 @@ in `leathercraft_svg.py` (Python library) and `leathercraft_dsl.py` (DSL).
 | `<path>` (raw `d` string) | `add_path(d)` (document-level, not a Shape) | — | ⚠️ partial |
 | Arc / circular sector | `Arc` | `arc` | ✅ full |
 | Stadium / oblong | `Stadium` | `stadium` | ✅ full |
-| Regular n-gon | — | — | ❌ missing |
+| Regular n-gon | `RegularPolygon` | `regular_polygon` | ✅ full |
 | Cubic Bézier path | — | — | ❌ missing |
 
 ---
@@ -180,7 +180,12 @@ radius must be exactly half the short side.
 
 ---
 
-### 5. Regular n-gon
+### 5. Regular n-gon — ✅ IMPLEMENTED
+
+> **Status:** Implemented as `RegularPolygon(cx, cy, radius, sides, rotation_deg=-90)`
+> in `leathercraft_svg.py` and the `regular_polygon` block in the DSL.
+> Supports stitches and holes around the full contour or selected numeric
+> edges. See `examples/dsl/regular_polygon.lcraft`.
 
 **SVG primitive:** expressed as a `<polygon>` with computed vertex coordinates.
 

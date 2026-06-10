@@ -11,6 +11,7 @@ from leathercraft_dsl import (
     HolesOperation,
     OuterPathDefinition,
     PatternDocument,
+    RegularPolygonDefinition,
     RectangleDefinition,
     RoundedRectangleDefinition,
     SingleHoleDefinition,
@@ -1455,6 +1456,81 @@ class TestCompilePerCornerRoundedRectangle:
             "size 120 90\nrounded_rectangle card\n  at 10 10\n  size 100 70\n"
             "  radius 8\n  radius_br 0\nend\n"
             "holes\n  source card\n  margin 5\n  spacing 8\n  radius 1.2\nend"
+        )
+        assert "<circle" in compile_document(doc).to_svg()
+
+
+# ===========================================================================
+# Parser / Compiler — Regular polygon
+# ===========================================================================
+
+
+class TestParseRegularPolygon:
+    def test_basic(self):
+        doc = _parse(
+            "size 120 120\nregular_polygon hex\n  at 60 60\n  radius 40\n  sides 6\nend"
+        )
+        s = doc.shapes[0]
+        assert isinstance(s, RegularPolygonDefinition)
+        assert s.id == "hex"
+        assert s.cx == 60.0
+        assert s.cy == 60.0
+        assert s.radius == 40.0
+        assert s.sides == 6
+        assert s.rotation == -90.0
+
+    def test_rotation_and_layer(self):
+        doc = _parse(
+            "size 120 120\nregular_polygon medallion\n  at 60 60\n  radius 35\n  sides 8\n"
+            "  rotation 22.5\n  layer guide\nend"
+        )
+        s = doc.shapes[0]
+        assert s.rotation == 22.5
+        assert s.layer == "guide"
+
+    def test_missing_sides_raises(self):
+        with pytest.raises(DslError, match="missing 'sides'"):
+            _parse("size 120 120\nregular_polygon hex\n  at 60 60\n  radius 40\nend")
+
+    def test_non_integer_sides_raises(self):
+        with pytest.raises(DslError, match="sides must be a whole number"):
+            _parse("size 120 120\nregular_polygon bad\n  at 60 60\n  radius 40\n  sides 6.5\nend")
+
+    def test_invalid_sides_raises(self):
+        with pytest.raises(DslError, match="sides must be at least 3"):
+            _parse("size 120 120\nregular_polygon bad\n  at 60 60\n  radius 40\n  sides 2\nend")
+
+    def test_zero_radius_raises(self):
+        with pytest.raises(DslError, match="radius must be greater than 0"):
+            _parse("size 120 120\nregular_polygon bad\n  at 60 60\n  radius 0\n  sides 6\nend")
+
+    def test_registered_as_source(self):
+        doc = _parse(
+            "size 120 120\nregular_polygon hex\n  at 60 60\n  radius 40\n  sides 6\nend\n"
+            "holes\n  source hex\n  margin 5\n  spacing 8\n  radius 1.2\nend"
+        )
+        assert len(doc.operations) == 1
+
+
+class TestCompileRegularPolygon:
+    def test_shape_compiles_to_path(self):
+        doc = _parse(
+            "size 120 120\nregular_polygon hex\n  at 60 60\n  radius 40\n  sides 6\nend"
+        )
+        output = compile_document(doc).to_svg()
+        assert "<path" in output
+
+    def test_stitches_compile(self):
+        doc = _parse(
+            "size 120 120\nregular_polygon hex\n  at 60 60\n  radius 40\n  sides 6\nend\n"
+            "stitches\n  source hex\n  edges 0 1 2\n  margin 5\n  spacing 8\n  length 3\nend"
+        )
+        assert "<line" in compile_document(doc).to_svg()
+
+    def test_holes_compile(self):
+        doc = _parse(
+            "size 120 120\nregular_polygon oct\n  at 60 60\n  radius 38\n  sides 8\n  rotation 22.5\nend\n"
+            "holes\n  source oct\n  edges all\n  margin 5\n  spacing 8\n  radius 1.2\nend"
         )
         assert "<circle" in compile_document(doc).to_svg()
 

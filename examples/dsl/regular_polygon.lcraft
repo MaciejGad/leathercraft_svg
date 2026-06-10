@@ -1,0 +1,24 @@
+pattern regular_polygon
+size 120 120
+
+regular_polygon coaster
+  at 60 60
+  radius 42
+  sides 6
+end
+
+holes
+  source coaster
+  margin 6
+  spacing 8
+  radius 1.2
+end
+
+stitches
+  source coaster
+  edges 0 1 2
+  margin 5
+  spacing 8
+  length 3
+  angle 30
+end

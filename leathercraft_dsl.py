@@ -5,7 +5,8 @@ Usage:
     python leathercraft_dsl.py build pattern.lcraft
 
 Supported constructs: pattern, size, layer, symmetry, rectangle,
-rounded_rectangle, circle, triangle, rounded_triangle, outer,
+rounded_rectangle, stadium, circle, ellipse, arc, triangle, rounded_triangle,
+regular_polygon, outer,
 stitches, holes, hole, export.
 """
 
@@ -23,6 +24,7 @@ from leathercraft_svg import (
     Ellipse,
     Point,
     Polygon,
+    RegularPolygon,
     Rectangle,
     RoundedRectangle,
     RoundedTriangle,
@@ -165,6 +167,17 @@ class RoundedTriangleDefinition:
 
 
 @dataclass
+class RegularPolygonDefinition:
+    id: str
+    cx: float
+    cy: float
+    radius: float
+    sides: int
+    rotation: float = -90.0
+    layer: str = "cut"
+
+
+@dataclass
 class OuterPathDefinition:
     smooth: bool
     mirrored: bool
@@ -291,7 +304,7 @@ def _resolve_color(token: str) -> str:
 _BLOCK_STARTERS = {
     "rectangle", "rounded_rectangle", "stadium",
     "circle", "ellipse", "arc",
-    "triangle", "rounded_triangle",
+    "triangle", "rounded_triangle", "regular_polygon",
     "outer",
     "stitches", "holes", "hole",
     "path", "points",
@@ -744,6 +757,50 @@ def parse(text: str) -> PatternDocument:
             shape_ids.add(shape_id)
 
         # ------------------------------------------------------------------
+        elif keyword == "regular_polygon":
+            if len(tokens) < 2:
+                raise DslError(f"Line {lineno}: 'regular_polygon' requires an id")
+            shape_id = tokens[1]
+            data = _parse_block_body(body)
+
+            def _req(k: str, sid=shape_id, ln=lineno) -> tuple[int, list[str]]:
+                if k not in data:
+                    raise DslError(f"Line {ln}: regular_polygon '{sid}' is missing '{k}'")
+                return data[k]
+
+            at_lineno, at_vals = _req("at")
+            radius_lineno, radius_vals = _req("radius")
+            sides_lineno, sides_vals = _req("sides")
+            cx = _parse_float(at_vals[0], at_lineno, "at cx")
+            cy = _parse_float(at_vals[1], at_lineno, "at cy")
+            radius = _parse_float(radius_vals[0], radius_lineno, "radius")
+            sides_value = _parse_float(sides_vals[0], sides_lineno, "sides")
+            sides = int(sides_value)
+            if sides != sides_value:
+                raise DslError(f"Line {sides_lineno}: sides must be a whole number")
+            if radius <= 0:
+                raise DslError(f"Line {radius_lineno}: radius must be greater than 0")
+            if sides < 3:
+                raise DslError(f"Line {sides_lineno}: sides must be at least 3")
+            rotation = -90.0
+            if "rotation" in data:
+                rotation_lineno, rotation_vals = data["rotation"]
+                rotation = _parse_float(rotation_vals[0], rotation_lineno, "rotation")
+            layer_name = "cut"
+            if "layer" in data:
+                layer_name = data["layer"][1][0]
+            shapes.append(RegularPolygonDefinition(
+                id=shape_id,
+                cx=cx,
+                cy=cy,
+                radius=radius,
+                sides=sides,
+                rotation=rotation,
+                layer=layer_name,
+            ))
+            shape_ids.add(shape_id)
+
+        # ------------------------------------------------------------------
         elif keyword == "outer":
             rest = tokens[1:]
             smooth = False
@@ -1109,6 +1166,17 @@ def compile_document(doc: PatternDocument) -> SvgDocument:
                 Point(*shape_def.p2),
                 Point(*shape_def.p3),
                 radius=shape_def.radius,
+            )
+            svg.add_shape(s, layer=shape_def.layer)
+            shape_objects[shape_def.id] = s
+
+        elif isinstance(shape_def, RegularPolygonDefinition):
+            s = RegularPolygon(
+                shape_def.cx,
+                shape_def.cy,
+                shape_def.radius,
+                shape_def.sides,
+                rotation_deg=shape_def.rotation,
             )
             svg.add_shape(s, layer=shape_def.layer)
             shape_objects[shape_def.id] = s

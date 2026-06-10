@@ -176,14 +176,14 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const BLOCK_STARTERS = new Set([
-  "rectangle","rounded_rectangle","stadium","circle","ellipse","arc","triangle","rounded_triangle",
+  "rectangle","rounded_rectangle","stadium","circle","ellipse","arc","triangle","rounded_triangle","regular_polygon",
   "polygon","outer","stitches","holes","hole","path"
 ]);
 const TOP_KEYWORDS = new Set(["pattern","size","export","end"]);
 const ALL_KEYWORDS = new Set([...BLOCK_STARTERS, ...TOP_KEYWORDS]);
 
 const PROPERTY_NAMES = new Set([
-  "at","radius","radius_tl","radius_tr","radius_br","radius_bl","rx","ry","inner_radius","from_angle","to_angle","layer","edges","margin","spacing","length","angle",
+  "at","radius","radius_tl","radius_tr","radius_br","radius_bl","rx","ry","inner_radius","from_angle","to_angle","sides","rotation","layer","edges","margin","spacing","length","angle",
   "source","mirror","side","rounded_path","p1","p2","p3","smooth","step","count","from","to"
 ]);
 
@@ -244,6 +244,7 @@ const BLOCK_PROPS = {
   arc:                ["at","radius","inner_radius","from_angle","to_angle","layer","end"],
   triangle:           ["p1","p2","p3","at","size","layer","end"],
   rounded_triangle:   ["p1","p2","p3","at","size","radius","layer","end"],
+  regular_polygon:    ["at","radius","sides","rotation","layer","end"],
   polygon:            ["layer","end"],
   outer:              ["smooth","mirror","end"],
   stitches:           ["source","edges","margin","spacing","length","angle","layer","mirror","side","rounded_path","path","end"],
@@ -304,7 +305,7 @@ function lcraft_hint(editor) {
       // Top level
       candidates = [
         "pattern","size","rectangle","rounded_rectangle","stadium","circle","ellipse","arc",
-        "triangle","rounded_triangle","polygon","stitches","holes","hole","export"
+        "triangle","rounded_triangle","regular_polygon","polygon","stitches","holes","hole","export"
       ];
     }
   }

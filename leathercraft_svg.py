@@ -972,6 +972,111 @@ class Polygon(Shape):
         )
 
 
+@dataclass
+class RegularPolygon(Shape):
+    """
+    Regular polygon defined by centre point, circumscribed radius, and side count.
+
+    ``rotation_deg`` rotates the whole polygon; the default ``-90`` puts the
+    first vertex at the top.
+    """
+
+    cx: float
+    cy: float
+    radius: float
+    sides: int
+    rotation_deg: float = -90.0
+
+    def vertices(self) -> list[tuple[float, float]]:
+        if self.sides < 3 or self.radius <= 0:
+            return []
+        offset = self.rotation_deg * pi / 180
+        return [
+            (
+                self.cx + self.radius * cos(2 * pi * i / self.sides + offset),
+                self.cy + self.radius * sin(2 * pi * i / self.sides + offset),
+            )
+            for i in range(self.sides)
+        ]
+
+    def _inner_vertices(self, inset: float) -> list[tuple[float, float]]:
+        if self.sides < 3:
+            return []
+        if inset <= 0:
+            return self.vertices()
+        apothem = self.radius * cos(pi / self.sides)
+        inner_apothem = apothem - inset
+        if inner_apothem <= 0:
+            return []
+        inner_radius = inner_apothem / cos(pi / self.sides)
+        offset = self.rotation_deg * pi / 180
+        return [
+            (
+                self.cx + inner_radius * cos(2 * pi * i / self.sides + offset),
+                self.cy + inner_radius * sin(2 * pi * i / self.sides + offset),
+            )
+            for i in range(self.sides)
+        ]
+
+    def path_d(self) -> str:
+        return _straight_path_d(self.vertices())
+
+    def hole_points(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=False,
+        rounded_path=False,
+    ) -> list[Point]:
+        vertices = self._inner_vertices(inset)
+        if len(vertices) < 3:
+            return []
+        edge_defs = [
+            (Point(*vertices[i]), Point(*vertices[(i + 1) % len(vertices)]))
+            for i in range(len(vertices))
+        ]
+        selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
+        if selected == list(range(len(edge_defs))):
+            return points_on_closed_edges(edge_defs, spacing, include_corners)
+        return points_on_selected_edges(edge_defs, selected, spacing, include_corners)
+
+    def stitch_segments(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=False,
+        stitch_length=2.0,
+        stitch_angle_deg=0.0,
+        rounded_path=False,
+    ) -> list[tuple[Point, Point]]:
+        vertices = self._inner_vertices(inset)
+        if len(vertices) < 3:
+            return []
+        edge_defs = [
+            (Point(*vertices[i]), Point(*vertices[(i + 1) % len(vertices)]))
+            for i in range(len(vertices))
+        ]
+        selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
+        if selected == list(range(len(edge_defs))):
+            return segments_on_closed_edges(
+                edge_defs,
+                spacing,
+                stitch_length,
+                include_corners,
+                stitch_angle_deg,
+            )
+        return segments_on_selected_edges(
+            edge_defs,
+            selected,
+            spacing,
+            stitch_length,
+            include_corners,
+            stitch_angle_deg,
+        )
+
+
 def points_on_selected_edges(edge_defs, edges, spacing, include_corners) -> list[Point]:
     selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
 

@@ -17,6 +17,7 @@ from leathercraft_svg import (
     Ellipse,
     Point,
     Polygon,
+    RegularPolygon,
     Rectangle,
     RoundedRectangle,
     RoundedTriangle,
@@ -175,6 +176,36 @@ class TestSignedDoubleArea(unittest.TestCase):
     def test_collinear_zero(self):
         area = signed_double_area(Point(0, 0), Point(1, 1), Point(2, 2))
         self.assertAlmostEqual(area, 0)
+
+
+class TestRegularPolygon(unittest.TestCase):
+    def test_vertices_default_rotation_puts_first_point_on_top(self):
+        shape = RegularPolygon(50, 50, 20, 6)
+        vertices = shape.vertices()
+        self.assertEqual(len(vertices), 6)
+        self.assertAlmostEqual(vertices[0][0], 50.0, places=6)
+        self.assertAlmostEqual(vertices[0][1], 30.0, places=6)
+
+    def test_path_has_expected_vertex_count(self):
+        shape = RegularPolygon(40, 40, 15, 5)
+        path = shape.path_d()
+        self.assertTrue(path.startswith("M "))
+        self.assertEqual(path.count(" L "), 4)
+        self.assertTrue(path.endswith(" Z"))
+
+    def test_holes_support_partial_edges(self):
+        shape = RegularPolygon(50, 50, 30, 6)
+        partial = shape.hole_points(edges=[0], spacing=8.0, inset=4.0)
+        full = shape.hole_points(edges="all", spacing=8.0, inset=4.0)
+        self.assertGreater(len(partial), 0)
+        self.assertLess(len(partial), len(full))
+
+    def test_stitches_support_partial_edges(self):
+        shape = RegularPolygon(50, 50, 30, 6)
+        partial = shape.stitch_segments(edges=[1, 2], spacing=8.0, inset=4.0)
+        full = shape.stitch_segments(edges="all", spacing=8.0, inset=4.0)
+        self.assertGreater(len(partial), 0)
+        self.assertLess(len(partial), len(full))
 
 
 class TestLineIntersection(unittest.TestCase):

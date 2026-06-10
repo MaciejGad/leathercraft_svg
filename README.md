@@ -673,6 +673,27 @@ end
 
 Stitches and holes are spaced evenly along the elliptical contour.
 
+### Regular polygon
+
+A regular n-gon is defined by its center, circumscribed radius, and number of sides. By default the first vertex points upward; `rotation` rotates the whole shape.
+
+```text
+regular_polygon coaster
+  at 60 60
+  radius 42
+  sides 6
+end
+
+holes
+  source coaster
+  margin 6
+  spacing 8
+  radius 1.2
+end
+```
+
+Regular polygons support stitches and holes around the full contour or on selected numeric edges such as `0 1 2`.
+
 ### Arc / sector
 
 A pie wedge, or a ring segment when `inner_radius` is given. Angles are in degrees: `0` = right (3 o'clock), increasing clockwise.
@@ -759,7 +780,7 @@ Do not write unit suffixes such as `mm` or `cm`. Every numeric value is already 
 
 ### Supported keywords
 
-`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `stadium`, `circle`, `ellipse`, `arc`, `triangle`, `rounded_triangle`, `outer`, `stitches`, `holes`, `hole`, `export`
+`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `stadium`, `circle`, `ellipse`, `arc`, `triangle`, `rounded_triangle`, `regular_polygon`, `outer`, `stitches`, `holes`, `hole`, `export`
 
 Edge names for rectangles: `top`, `right`, `bottom`, `left`, `all`, `except_top`, `sides`, `horizontal`, `vertical`
 

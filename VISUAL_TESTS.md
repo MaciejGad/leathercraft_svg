@@ -9,7 +9,7 @@ This document describes every scenario covered by [tests/test_visual.py](/Users/
 All examples assume:
 
 ```python
-from leathercraft_svg import Circle, Point, Rectangle, RoundedRectangle, RoundedTriangle, SvgDocument, Triangle
+from leathercraft_svg import Circle, Point, Rectangle, RegularPolygon, RoundedRectangle, RoundedTriangle, SvgDocument, Triangle
 ```
 
 ## Rectangle Hole Pattern On All Edges
@@ -244,6 +244,49 @@ doc.add_holes(
 ```
 
 ![Stadium holes](tests/baselines/stadium_holes.png)
+
+## Regular Polygon Hole Pattern
+
+Tests holes distributed around a regular hexagon.
+
+```python
+doc = SvgDocument(120, 120)
+shape = RegularPolygon(60, 60, 42, 6)
+
+doc.add_shape(shape, layer="cut")
+doc.add_holes(
+    shape,
+    spacing=8.0,
+    hole_radius=1.2,
+    inset=6.0,
+    layer="stitch",
+)
+```
+
+![Regular polygon holes](tests/baselines/regular_polygon_holes.png)
+
+## Regular Polygon Partial Stitch Pattern
+
+Tests angled stitches on only half of a rotated octagon.
+
+```python
+doc = SvgDocument(120, 120)
+shape = RegularPolygon(60, 60, 40, 8, rotation_deg=22.5)
+
+doc.add_shape(shape, layer="cut")
+doc.add_stitch_pattern(
+    shape,
+    edges=[0, 1, 2, 3],
+    spacing=8.0,
+    stitch_length=3.0,
+    stitch_angle_deg=30.0,
+    inset=5.0,
+    layer="stitch",
+    stitch_thickness=0.8,
+)
+```
+
+![Regular polygon partial stitches](tests/baselines/regular_polygon_stitches_partial.png)
 
 ## Vertical Stadium Stitch Pattern
 

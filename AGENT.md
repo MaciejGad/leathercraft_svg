@@ -776,6 +776,20 @@ end
 
 Compiles to `Ellipse(cx, cy, rx, ry)`. Both radii must be > 0. The `edges` parameter in `stitches`/`holes` is accepted but has no effect — the full contour is always used.
 
+#### `regular_polygon`
+
+```text
+regular_polygon <id>
+  at <cx> <cy>
+  radius <r>
+  sides <n>
+  [rotation <deg>]
+  [layer <layer_name>]
+end
+```
+
+Compiles to `RegularPolygon(cx, cy, radius, sides, rotation_deg=rotation)`. `radius` must be > 0. `sides` must be a whole number >= 3. The default rotation is `-90`, which places the first vertex at the top. Stitches and holes can use the full contour or selected numeric edges such as `0 1 2`.
+
 #### `triangle`
 
 Two forms are supported.
@@ -959,7 +973,7 @@ Places circles at `(axis_x − distance, y)` and `(axis_x + distance, y)`.
 
 Multiple names can be combined: `edges left bottom right`.
 
-**Triangle / RoundedTriangle** — numeric indices:
+**Triangle / RoundedTriangle / RegularPolygon** — numeric indices:
 
 | Index | Edge |
 |-------|------|

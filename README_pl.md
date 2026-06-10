@@ -673,6 +673,27 @@ end
 
 Szwy i otwory są rozmieszczane równomiernie wzdłuż konturu elipsy.
 
+### Wielokąt foremny
+
+Foremny n-kąt jest definiowany przez środek, promień okręgu opisanego i liczbę boków. Domyślnie pierwszy wierzchołek jest skierowany do góry, a `rotation` obraca całą figurę.
+
+```text
+regular_polygon podstawka
+  at 60 60
+  radius 42
+  sides 6
+end
+
+holes
+  source podstawka
+  margin 6
+  spacing 8
+  radius 1.2
+end
+```
+
+Wielokąty foremne obsługują ściegi i otwory wzdłuż całego konturu albo na wybranych krawędziach wskazanych numerami, np. `0 1 2`.
+
 ### Łuk / wycinek
 
 Klin (wycinek koła) lub wycinek pierścienia, gdy podane jest `inner_radius`. Kąty są w stopniach: `0` = prawo (godzina 3), rosnąco zgodnie z ruchem wskazówek zegara.
@@ -759,7 +780,7 @@ Nie stosuj przyrostków jednostek takich jak `mm` ani `cm`. Każda liczba jest j
 
 ### Obsługiwane słowa kluczowe
 
-`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `stadium`, `circle`, `ellipse`, `arc`, `triangle`, `rounded_triangle`, `outer`, `stitches`, `holes`, `hole`, `export`
+`pattern`, `size`, `layer`, `symmetry`, `rectangle`, `rounded_rectangle`, `stadium`, `circle`, `ellipse`, `arc`, `triangle`, `rounded_triangle`, `regular_polygon`, `outer`, `stitches`, `holes`, `hole`, `export`
 
 Nazwy krawędzi prostokąta: `top`, `right`, `bottom`, `left`, `all`, `except_top`, `sides`, `horizontal`, `vertical`
 

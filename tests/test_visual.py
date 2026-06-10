@@ -222,6 +222,33 @@ def _arc_ring_segment_holes() -> bytes:
     return render(doc)
 
 
+def _regular_polygon_holes() -> bytes:
+    from leathercraft_svg import RegularPolygon, SvgDocument
+    doc = SvgDocument(120, 120)
+    s = RegularPolygon(60, 60, 42, 6)
+    doc.add_shape(s, layer="cut")
+    doc.add_holes(s, spacing=8.0, hole_radius=1.2, inset=6.0, layer="stitch")
+    return render(doc)
+
+
+def _regular_polygon_stitches_partial() -> bytes:
+    from leathercraft_svg import RegularPolygon, SvgDocument
+    doc = SvgDocument(120, 120)
+    s = RegularPolygon(60, 60, 40, 8, rotation_deg=22.5)
+    doc.add_shape(s, layer="cut")
+    doc.add_stitch_pattern(
+        s,
+        edges=[0, 1, 2, 3],
+        spacing=8.0,
+        stitch_length=3.0,
+        stitch_angle_deg=30.0,
+        inset=5.0,
+        layer="stitch",
+        stitch_thickness=0.8,
+    )
+    return render(doc)
+
+
 def _triangle_holes_all_edges() -> bytes:
     from leathercraft_svg import Point, SvgDocument, Triangle
     doc = SvgDocument(120, 90)
@@ -419,6 +446,8 @@ SCENARIOS: list[tuple[str, object]] = [
     ("ellipse_stitches.png",                     _ellipse_stitches),
     ("arc_wedge_stitches.png",                   _arc_wedge_stitches),
     ("arc_ring_segment_holes.png",               _arc_ring_segment_holes),
+    ("regular_polygon_holes.png",                _regular_polygon_holes),
+    ("regular_polygon_stitches_partial.png",     _regular_polygon_stitches_partial),
     ("triangle_holes_all_edges.png",             _triangle_holes_all_edges),
     ("triangle_holes_partial_edges.png",         _triangle_holes_partial_edges),
     ("triangle_stitch_45deg.png",                _triangle_stitch_45deg),

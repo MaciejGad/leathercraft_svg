@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import cos, hypot, pi, sin
+from math import asin, cos, hypot, pi, sin
 from pathlib import Path
 from typing import Iterable, Literal, Sequence
 
@@ -639,8 +639,85 @@ class Arc(Shape):
         ]
         return outer + inner
 
+    def _inset_contour(self, inset: float, arc_steps: int = 48) -> list[tuple[float, float]]:
+        """
+        Exact inward inset of the arc contour.
+
+        Built analytically (inset radii + angular trim of asin(inset / r))
+        rather than via generic polygon offsetting, so every point keeps the
+        full ``inset`` distance from the straight cap edges as well as from
+        the arcs — a naive edge offset produces corner spikes that dip back
+        towards the cut line.
+        """
+        if inset <= 0:
+            return self._contour(arc_steps)
+
+        start, span = self._span_rad()
+        ro = self.radius - inset
+        if ro <= 0 or inset / ro > 1:
+            return []
+        d_out = asin(inset / ro)
+        a0 = start + d_out
+        a1 = start + span - d_out
+        if a1 <= a0:
+            return []
+
+        steps = max(8, int(arc_steps * (a1 - a0) / (2 * pi)) * 4)
+        outer = [
+            (self.cx + ro * cos(a0 + (a1 - a0) * i / steps),
+             self.cy + ro * sin(a0 + (a1 - a0) * i / steps))
+            for i in range(steps + 1)
+        ]
+
+        if self.inner_radius > 0:
+            ri = self.inner_radius + inset
+            if ri >= ro or inset / ri > 1:
+                return []
+            d_in = asin(inset / ri)
+            b0 = start + d_in
+            b1 = start + span - d_in
+            if b1 <= b0:
+                return []
+            inner = [
+                (self.cx + ri * cos(b1 + (b0 - b1) * i / steps),
+                 self.cy + ri * sin(b1 + (b0 - b1) * i / steps))
+                for i in range(steps + 1)
+            ]
+            return outer + inner
+
+        # Wedge: close the contour near the centre.
+        end = start + span
+        # Inward normals of the two radial cap edges
+        ns = (-sin(start), cos(start))
+        ne = (sin(end), -cos(end))
+        if span < pi - 1e-9:
+            # Caps converge: corner = intersection of the two inset cap lines
+            p1 = Point(self.cx + inset * ns[0], self.cy + inset * ns[1])
+            p2 = Point(p1.x + cos(start), p1.y + sin(start))
+            p3 = Point(self.cx + inset * ne[0], self.cy + inset * ne[1])
+            p4 = Point(p3.x + cos(end), p3.y + sin(end))
+            corner = line_intersection(p1, p2, p3, p4)
+            if corner is None:
+                return []
+            return [(corner.x, corner.y)] + outer
+        if abs(span - pi) <= 1e-9:
+            # Caps are parallel (half disc): the chord between the arc
+            # endpoints already lies on the inset line.
+            return outer
+        # Reflex wedge (span > 180°): the centre corner insets to an arc of
+        # radius ``inset`` around the centre, between the two cap normals.
+        phi1 = end - pi / 2
+        phi0 = start + pi / 2
+        centre_steps = max(4, int(8 * (phi1 - phi0) / (2 * pi)) * 4)
+        centre_arc = [
+            (self.cx + inset * cos(phi1 + (phi0 - phi1) * i / centre_steps),
+             self.cy + inset * sin(phi1 + (phi0 - phi1) * i / centre_steps))
+            for i in range(centre_steps + 1)
+        ]
+        return outer + centre_arc
+
     def hole_points(self, edges="all", spacing=5.0, inset=4.0, include_corners=False, rounded_path=False) -> list[Point]:
-        pts = _offset_closed_polygon(self._contour(), inset) if inset > 0 else self._contour()
+        pts = self._inset_contour(inset)
         if len(pts) < 3:
             return []
         polyline = [Point(x, y) for x, y in pts]
@@ -656,7 +733,7 @@ class Arc(Shape):
         stitch_angle_deg=0.0,
         rounded_path=False,
     ) -> list[tuple[Point, Point]]:
-        pts = _offset_closed_polygon(self._contour(), inset) if inset > 0 else self._contour()
+        pts = self._inset_contour(inset)
         if len(pts) < 3:
             return []
         polyline = [Point(x, y) for x, y in pts]

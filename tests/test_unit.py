@@ -1409,3 +1409,47 @@ class TestArcStitchSegments(unittest.TestCase):
         self.assertIn("<path", out)
         self.assertIn("<line", out)
         self.assertIn("<circle", out)
+
+
+class TestArcInsetDistance(unittest.TestCase):
+    """Regression: inset points must keep full distance from the straight cap
+    edges, not only from the arcs (naive polygon offset produced corner
+    spikes that dipped back towards the cut line)."""
+
+    @staticmethod
+    def _min_boundary_dist(a, p, samples=720):
+        start, span = a._span_rad()
+        dists = []
+        for i in range(samples + 1):
+            t = start + span * i / samples
+            dists.append(math.hypot(p.x - (a.cx + a.radius * math.cos(t)),
+                                    p.y - (a.cy + a.radius * math.sin(t))))
+            if a.inner_radius > 0:
+                dists.append(math.hypot(p.x - (a.cx + a.inner_radius * math.cos(t)),
+                                        p.y - (a.cy + a.inner_radius * math.sin(t))))
+        end = start + span
+        for ang in (start, end):
+            ax = a.cx + a.inner_radius * math.cos(ang)
+            ay = a.cy + a.inner_radius * math.sin(ang)
+            bx = a.cx + a.radius * math.cos(ang)
+            by = a.cy + a.radius * math.sin(ang)
+            dx, dy = bx - ax, by - ay
+            L2 = dx * dx + dy * dy
+            t = max(0.0, min(1.0, ((p.x - ax) * dx + (p.y - ay) * dy) / L2))
+            dists.append(math.hypot(p.x - (ax + t * dx), p.y - (ay + t * dy)))
+        return min(dists)
+
+    def test_ring_segment_holes_respect_inset_near_caps(self):
+        a = Arc(65, 75, 55, start_angle=180, end_angle=360, inner_radius=30)
+        for p in a.hole_points(spacing=6, inset=5):
+            self.assertGreaterEqual(self._min_boundary_dist(a, p), 5.0 - 0.05)
+
+    def test_wedge_holes_respect_inset_near_caps(self):
+        a = Arc(60, 60, 50, start_angle=-90, end_angle=0)
+        for p in a.hole_points(spacing=6, inset=4):
+            self.assertGreaterEqual(self._min_boundary_dist(a, p), 4.0 - 0.05)
+
+    def test_reflex_wedge_holes_respect_inset(self):
+        a = Arc(60, 60, 50, start_angle=0, end_angle=270)
+        for p in a.hole_points(spacing=6, inset=4):
+            self.assertGreaterEqual(self._min_boundary_dist(a, p), 4.0 - 0.05)

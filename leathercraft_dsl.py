@@ -383,17 +383,46 @@ class ExpressionEvaluator:
 
     # -- expression evaluation ---------------------------------------------
 
+    # Guard against pathological expressions that would otherwise raise
+    # uncaught RecursionError/OverflowError instead of a clean DslError.
+    _MAX_EXPRESSION_LENGTH = 2000
+
     def eval(self, expression: str, lineno: int) -> float:
         expr = expression.strip()
         if not expr:
             raise DslError(f"Line {lineno}: invalid expression ''")
+        if len(expr) > self._MAX_EXPRESSION_LENGTH:
+            raise DslError(
+                f"Line {lineno}: expression is too long "
+                f"({len(expr)} characters, limit {self._MAX_EXPRESSION_LENGTH})"
+            )
         for token in expr.replace("(", " ").replace(")", " ").replace(",", " ").split():
             _check_no_unit_suffix(token, lineno)
         try:
             tree = _ast.parse(expr, mode="eval")
         except SyntaxError:
             raise DslError(f"Line {lineno}: invalid expression '{expr}'")
-        return float(self._eval_node(tree.body, expr, lineno))
+        except (RecursionError, MemoryError):
+            raise DslError(f"Line {lineno}: expression is too complex")
+        try:
+            value = self._eval_node(tree.body, expr, lineno)
+        except RecursionError:
+            raise DslError(f"Line {lineno}: expression is too complex")
+        except OverflowError:
+            raise DslError(
+                f"Line {lineno}: expression value is out of range in '{expr}'"
+            )
+        try:
+            result = float(value)
+        except (OverflowError, ValueError):
+            raise DslError(
+                f"Line {lineno}: expression value is out of range in '{expr}'"
+            )
+        if not _math.isfinite(result):
+            raise DslError(
+                f"Line {lineno}: expression value is not a finite number in '{expr}'"
+            )
+        return result
 
     def _eval_node(self, node, expr: str, lineno: int) -> float:
         if isinstance(node, _ast.Constant):

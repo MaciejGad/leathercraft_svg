@@ -1842,6 +1842,46 @@ class TestVariableErrors:
             _parse('x = __import__("os").system("ls")\nsize 10 10')
 
 
+class TestExpressionSecurityHardening:
+    """Pathological expressions must raise a clean DslError, never an
+    uncaught RecursionError / OverflowError or produce inf/nan geometry."""
+
+    def test_power_operator_rejected(self):
+        with pytest.raises(DslError, match="unsupported expression syntax"):
+            _parse("x = 9 ** 9 ** 9\nsize 10 10")
+
+    def test_attribute_access_rejected(self):
+        with pytest.raises(DslError, match="unsupported expression syntax"):
+            _parse("x = (1).__class__\nsize 10 10")
+
+    def test_infinity_literal_rejected(self):
+        with pytest.raises(DslError, match="not a finite number"):
+            _parse("x = 1e1000\nsize 10 10")
+
+    def test_nan_rejected(self):
+        with pytest.raises(DslError, match="not a finite number"):
+            _parse("x = 1e1000 - 1e1000\nsize 10 10")
+
+    def test_huge_integer_overflow_rejected(self):
+        expr = "*".join(["9"] * 400)
+        with pytest.raises(DslError, match="out of range"):
+            _parse(f"x = {expr}\nsize 10 10")
+
+    def test_overlong_expression_rejected(self):
+        expr = "1+" * 1500 + "1"
+        with pytest.raises(DslError, match="too long"):
+            _parse(f"x = {expr}\nsize 10 10")
+
+    def test_long_flat_chain_rejected_cleanly(self):
+        expr = "*".join(["9"] * 10000)
+        with pytest.raises(DslError):  # too long / too complex, not RecursionError
+            _parse(f"x = {expr}\nsize 10 10")
+
+    def test_large_finite_value_still_allowed(self):
+        doc = _parse("x = 1e300\nsize x 10")
+        assert doc.width_mm == 1e300
+
+
 class TestParameterNamesAllowedAsVariables:
     def test_radius_as_variable(self):
         doc = _parse(

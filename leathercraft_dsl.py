@@ -216,6 +216,9 @@ class StitchesOperation:
     path_points: list[tuple[float, float]]  # empty if source-based
     rounded_path: bool = False
     distribution: str = "fixed_spacing"
+    path_mode: str = "continuous"
+    first_margin: float | None = None
+    last_margin: float | None = None
 
 
 @dataclass
@@ -228,6 +231,9 @@ class HolesOperation:
     layer: str
     rounded_path: bool = False
     distribution: str = "fixed_spacing"
+    path_mode: str = "continuous"
+    first_margin: float | None = None
+    last_margin: float | None = None
 
 
 @dataclass
@@ -1141,9 +1147,15 @@ def parse(text: str) -> PatternDocument:
             _KNOWN_STITCH_KEYS = {
                 "source", "edges", "margin", "spacing", "length", "angle",
                 "layer", "mirror", "side", "path", "rounded_path",
-                "distribution",
+                "distribution", "path_mode", "first_margin", "last_margin",
             }
             for _k in data:
+                if _k == "include_corners":
+                    _kln = data[_k][0] if isinstance(data[_k], tuple) else lineno
+                    raise DslError(
+                        f"Line {_kln}: 'include_corners' has been removed; "
+                        "use first_margin / last_margin instead"
+                    )
                 if _k not in _KNOWN_STITCH_KEYS:
                     _kln = data[_k][0] if isinstance(data[_k], tuple) else lineno
                     raise DslError(
@@ -1163,6 +1175,9 @@ def parse(text: str) -> PatternDocument:
             path_pts: list[tuple[float, float]] = []
             rounded_path = False
             distribution = "fixed_spacing"
+            path_mode_val = "continuous"
+            first_margin_val: float | None = None
+            last_margin_val: float | None = None
 
             if "source" in data:
                 src_ln, src_vals = data["source"]
@@ -1212,6 +1227,22 @@ def parse(text: str) -> PatternDocument:
                         f"Line {dist_ln}: unknown distribution '{distribution}'. "
                         "Use: fixed_spacing, fit_evenly"
                     )
+            if "path_mode" in data:
+                pm_ln, pm_vals = data["path_mode"]
+                if len(pm_vals) != 1:
+                    raise DslError(f"Line {pm_ln}: path_mode requires exactly one value")
+                path_mode_val = pm_vals[0]
+                if path_mode_val not in ("per_edge", "continuous", "continuous_rounded"):
+                    raise DslError(
+                        f"Line {pm_ln}: unknown path_mode '{path_mode_val}'. "
+                        "Use: per_edge, continuous, continuous_rounded"
+                    )
+            if "first_margin" in data:
+                fm_ln, fm_vals = data["first_margin"]
+                first_margin_val = _eval_value(fm_vals, evaluator, fm_ln, "first_margin")
+            if "last_margin" in data:
+                lm_ln, lm_vals = data["last_margin"]
+                last_margin_val = _eval_value(lm_vals, evaluator, lm_ln, "last_margin")
 
             operations.append(StitchesOperation(
                 source=source,
@@ -1226,6 +1257,9 @@ def parse(text: str) -> PatternDocument:
                 path_points=path_pts,
                 rounded_path=rounded_path,
                 distribution=distribution,
+                path_mode=path_mode_val,
+                first_margin=first_margin_val,
+                last_margin=last_margin_val,
             ))
 
         # ------------------------------------------------------------------
@@ -1234,9 +1268,15 @@ def parse(text: str) -> PatternDocument:
 
             _KNOWN_HOLES_KEYS = {
                 "source", "edges", "margin", "spacing", "radius",
-                "layer", "rounded_path", "distribution",
+                "layer", "rounded_path", "distribution", "path_mode", "first_margin", "last_margin",
             }
             for _k in data:
+                if _k == "include_corners":
+                    _kln = data[_k][0] if isinstance(data[_k], tuple) else lineno
+                    raise DslError(
+                        f"Line {_kln}: 'include_corners' has been removed; "
+                        "use first_margin / last_margin instead"
+                    )
                 if _k not in _KNOWN_HOLES_KEYS:
                     _kln = data[_k][0] if isinstance(data[_k], tuple) else lineno
                     raise DslError(
@@ -1263,6 +1303,9 @@ def parse(text: str) -> PatternDocument:
             layer_name = "cut"
             rounded_path = False
             distribution = "fixed_spacing"
+            path_mode_val = "continuous"
+            first_margin_val: float | None = None
+            last_margin_val: float | None = None
 
             if "edges" in data:
                 e_ln, e_vals = data["edges"]
@@ -1298,6 +1341,22 @@ def parse(text: str) -> PatternDocument:
                         f"Line {dist_ln}: unknown distribution '{distribution}'. "
                         "Use: fixed_spacing, fit_evenly"
                     )
+            if "path_mode" in data:
+                pm_ln, pm_vals = data["path_mode"]
+                if len(pm_vals) != 1:
+                    raise DslError(f"Line {pm_ln}: path_mode requires exactly one value")
+                path_mode_val = pm_vals[0]
+                if path_mode_val not in ("per_edge", "continuous", "continuous_rounded"):
+                    raise DslError(
+                        f"Line {pm_ln}: unknown path_mode '{path_mode_val}'. "
+                        "Use: per_edge, continuous, continuous_rounded"
+                    )
+            if "first_margin" in data:
+                fm_ln, fm_vals = data["first_margin"]
+                first_margin_val = _eval_value(fm_vals, evaluator, fm_ln, "first_margin")
+            if "last_margin" in data:
+                lm_ln, lm_vals = data["last_margin"]
+                last_margin_val = _eval_value(lm_vals, evaluator, lm_ln, "last_margin")
 
             operations.append(HolesOperation(
                 source=source,
@@ -1308,6 +1367,9 @@ def parse(text: str) -> PatternDocument:
                 layer=layer_name,
                 rounded_path=rounded_path,
                 distribution=distribution,
+                path_mode=path_mode_val,
+                first_margin=first_margin_val,
+                last_margin=last_margin_val,
             ))
 
         # ------------------------------------------------------------------
@@ -1579,6 +1641,9 @@ def compile_document(doc: PatternDocument) -> SvgDocument:
                     stitch_angle_deg=op.angle,
                     rounded_path=op.rounded_path,
                     distribution=op.distribution,
+                    path_mode=op.path_mode,
+                    first_margin=op.first_margin,
+                    last_margin=op.last_margin,
                 )
             else:
                 if not op.path_points:
@@ -1619,6 +1684,9 @@ def compile_document(doc: PatternDocument) -> SvgDocument:
                 layer=op.layer,
                 rounded_path=op.rounded_path,
                 distribution=op.distribution,
+                path_mode=op.path_mode,
+                first_margin=op.first_margin,
+                last_margin=op.last_margin,
             )
 
         elif isinstance(op, SingleHoleDefinition):

@@ -8,6 +8,9 @@ from typing import Iterable, Literal, Sequence
 LayerName = Literal["cut", "stitch", "crease", "guide"]
 
 SUPPORTED_DISTRIBUTIONS = ("fixed_spacing", "fit_evenly")
+SUPPORTED_PATH_MODES = ("per_edge", "continuous", "continuous_rounded")
+
+_REMOVED = object()  # Sentinel for parameters that have been removed from the public API
 
 
 @dataclass(frozen=True)
@@ -106,20 +109,29 @@ class SvgDocument:
         hole_radius: float = 1.2,
         inset: float = 4.0,
         layer: LayerName = "cut",
-        include_corners: bool = False,
+        include_corners: object = _REMOVED,
         rounded_path: bool = False,
         distribution: str = "fixed_spacing",
         count: int | None = None,
+        path_mode: str = "continuous",
+        first_margin: float | None = None,
+        last_margin: float | None = None,
     ) -> None:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         for p in shape.hole_points(
             edges=edges,
             spacing=spacing,
             inset=inset,
-            include_corners=include_corners,
             rounded_path=rounded_path,
             distribution=distribution,
             count=count,
+            path_mode=path_mode,
+            first_margin=first_margin,
+            last_margin=last_margin,
         ):
             self.add_circle(p.x, p.y, hole_radius, layer)
 
@@ -154,22 +166,18 @@ class SvgDocument:
         hole_radius: float = 1.2,
         inset: float = 4.0,
         layer: LayerName = "cut",
-        include_corners: bool = False,
+        include_corners: object = _REMOVED,
         rounded_path: bool = False,
         distribution: str = "fixed_spacing",
         count: int | None = None,
+        path_mode: str = "continuous",
+        first_margin: float | None = None,
+        last_margin: float | None = None,
     ) -> None:
         self.add_holes(
-            shape,
-            edges,
-            spacing,
-            hole_radius,
-            inset,
-            layer,
-            include_corners,
-            rounded_path,
-            distribution,
-            count,
+            shape, edges, spacing, hole_radius, inset, layer,
+            rounded_path=rounded_path, distribution=distribution, count=count,
+            path_mode=path_mode, first_margin=first_margin, last_margin=last_margin,
         )
 
     def add_stitch_pattern(
@@ -180,24 +188,33 @@ class SvgDocument:
         stitch_length: float = 2.0,
         inset: float = 4.0,
         layer: LayerName = "stitch",
-        include_corners: bool = False,
+        include_corners: object = _REMOVED,
         stitch_thickness: float | None = None,
         stitch_angle_deg: float = 0.0,
         rounded_path: bool = False,
         distribution: str = "fixed_spacing",
         count: int | None = None,
+        path_mode: str = "continuous",
+        first_margin: float | None = None,
+        last_margin: float | None = None,
     ) -> None:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         for p1, p2 in shape.stitch_segments(
             edges=edges,
             spacing=spacing,
             inset=inset,
-            include_corners=include_corners,
             stitch_length=stitch_length,
             stitch_angle_deg=stitch_angle_deg,
             rounded_path=rounded_path,
             distribution=distribution,
             count=count,
+            path_mode=path_mode,
+            first_margin=first_margin,
+            last_margin=last_margin,
         ):
             self.add_line(p1.x, p1.y, p2.x, p2.y, layer=layer, stroke_width=stitch_thickness)
 
@@ -287,10 +304,13 @@ class Shape:
         edges: Sequence[int] | Literal["all"] = "all",
         spacing: float = 5.0,
         inset: float = 4.0,
-        include_corners: bool = False,
+        include_corners: object = _REMOVED,
         rounded_path: bool = False,
         distribution: str = "fixed_spacing",
         count: int | None = None,
+        path_mode: str = "continuous",
+        first_margin: float | None = None,
+        last_margin: float | None = None,
     ) -> list[Point]:
         raise NotImplementedError
 
@@ -299,12 +319,15 @@ class Shape:
         edges: Sequence[int] | Literal["all"] = "all",
         spacing: float = 5.0,
         inset: float = 4.0,
-        include_corners: bool = False,
+        include_corners: object = _REMOVED,
         stitch_length: float = 2.0,
         stitch_angle_deg: float = 0.0,
         rounded_path: bool = False,
         distribution: str = "fixed_spacing",
         count: int | None = None,
+        path_mode: str = "continuous",
+        first_margin: float | None = None,
+        last_margin: float | None = None,
     ) -> list[tuple[Point, Point]]:
         raise NotImplementedError
 
@@ -320,54 +343,76 @@ class Rectangle(Shape):
         x, y, w, h = self.x, self.y, self.width, self.height
         return f"M {x:.3f} {y:.3f} L {x+w:.3f} {y:.3f} L {x+w:.3f} {y+h:.3f} L {x:.3f} {y+h:.3f} Z"
 
-    def hole_points(
-        self,
-        edges="all",
-        spacing=5.0,
-        inset=4.0,
-        include_corners=False,
-        rounded_path=False,
-        distribution="fixed_spacing",
-        count=None,
-    ) -> list[Point]:
-        validate_distribution(spacing, distribution, count)
+    def _edge_defs(self, inset: float) -> list[tuple[Point, Point]]:
         x = self.x + inset
         y = self.y + inset
         w = self.width - 2 * inset
         h = self.height - 2 * inset
-        edge_defs = [
+        return [
             (Point(x, y), Point(x + w, y)),
             (Point(x + w, y), Point(x + w, y + h)),
             (Point(x + w, y + h), Point(x, y + h)),
             (Point(x, y + h), Point(x, y)),
         ]
-        selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
-        selected_set = set(selected)
-        result: list[Point] = []
-        for edge_index, (p1, p2) in enumerate(edge_defs):
-            length = distance(p1, p2)
-            if length == 0:
-                continue
-            if distribution == "fixed_spacing":
-                positions = positions_on_side_center(length, spacing, include_corners)
-                positions = adjust_positions_near_corners(
-                    positions,
-                    length,
-                    include_corners,
-                    spacing,
-                )
-            else:
-                positions = distribute_distances(
-                    length,
-                    spacing,
-                    distribution=distribution,
-                    include_start=include_corners,
-                    include_end=include_corners,
-                )
-            for local_pos in positions:
-                if edge_index not in selected_set:
+
+    @staticmethod
+    def _chain_waypoints(
+        edge_defs: list[tuple[Point, Point]], chain: list[int]
+    ) -> list[Point]:
+        return [edge_defs[chain[0]][0]] + [edge_defs[i][1] for i in chain]
+
+    def hole_points(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=_REMOVED,
+        rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
+    ) -> list[Point]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
+        validate_distribution(spacing, distribution, count)
+        edge_defs = self._edge_defs(inset)
+        if edge_defs[0][0].x >= edge_defs[0][1].x or edge_defs[1][0].y >= edge_defs[1][1].y:
+            return []
+
+        if edges == "all":
+            return points_on_closed_edges(edge_defs, spacing, False, distribution, count)
+
+        selected = list(edges)
+        if path_mode == "per_edge":
+            result: list[Point] = []
+            for ei in selected:
+                p1, p2 = edge_defs[ei]
+                length = distance(p1, p2)
+                if length == 0:
                     continue
-                result.append(point_on_edge(p1, p2, local_pos))
+                if distribution == "fixed_spacing":
+                    positions = positions_on_side_center(length, spacing, False)
+                    positions = adjust_positions_near_corners(positions, length, False, spacing)
+                else:
+                    positions = distribute_distances(length, spacing, distribution=distribution)
+                for pos in positions:
+                    result.append(point_on_edge(p1, p2, pos))
+            return deduplicate_points(result)
+
+        chains = _connected_chains(len(edge_defs), selected)
+        result = []
+        for chain in chains:
+            waypoints = self._chain_waypoints(edge_defs, chain)
+            result.extend(
+                points_on_polyline_chain(
+                    waypoints, spacing, distribution,
+                    first_margin=first_margin, last_margin=last_margin,
+                )
+            )
         return deduplicate_points(result)
 
     def stitch_segments(
@@ -375,54 +420,61 @@ class Rectangle(Shape):
         edges="all",
         spacing=5.0,
         inset=4.0,
-        include_corners=False,
+        include_corners=_REMOVED,
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
         distribution="fixed_spacing",
         count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
     ) -> list[tuple[Point, Point]]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
-        x = self.x + inset
-        y = self.y + inset
-        w = self.width - 2 * inset
-        h = self.height - 2 * inset
-        edge_defs = [
-            (Point(x, y), Point(x + w, y)),
-            (Point(x + w, y), Point(x + w, y + h)),
-            (Point(x + w, y + h), Point(x, y + h)),
-            (Point(x, y + h), Point(x, y)),
-        ]
-        selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
-        selected_set = set(selected)
-        result: list[tuple[Point, Point]] = []
-        for edge_index, (p1, p2) in enumerate(edge_defs):
-            length = distance(p1, p2)
-            if length == 0:
-                continue
-            if distribution == "fixed_spacing":
-                positions = positions_on_side_center(length, spacing, include_corners)
-                adjusted = adjust_stitch_positions_and_lengths(
-                    positions,
-                    length,
-                    include_corners,
-                    spacing,
-                    stitch_length,
-                )
-            else:
-                positions = distribute_distances(
-                    length,
-                    spacing,
-                    distribution=distribution,
-                    include_start=include_corners,
-                    include_end=include_corners,
-                )
-                validate_stitch_length(stitch_length, fitted_spacing(length, spacing))
-                adjusted = [(position, stitch_length) for position in positions]
-            for local_pos, local_stitch_length in adjusted:
-                if edge_index not in selected_set:
+        edge_defs = self._edge_defs(inset)
+        if edge_defs[0][0].x >= edge_defs[0][1].x or edge_defs[1][0].y >= edge_defs[1][1].y:
+            return []
+
+        if edges == "all":
+            return segments_on_closed_edges(
+                edge_defs, spacing, stitch_length, False, stitch_angle_deg, distribution, count
+            )
+
+        selected = list(edges)
+        if path_mode == "per_edge":
+            result: list[tuple[Point, Point]] = []
+            for ei in selected:
+                p1, p2 = edge_defs[ei]
+                length = distance(p1, p2)
+                if length == 0:
                     continue
-                result.append(segment_on_edge(p1, p2, local_pos, local_stitch_length, stitch_angle_deg))
+                if distribution == "fixed_spacing":
+                    positions = positions_on_side_center(length, spacing, False)
+                    adjusted = adjust_stitch_positions_and_lengths(
+                        positions, length, False, spacing, stitch_length
+                    )
+                else:
+                    positions = distribute_distances(length, spacing, distribution=distribution)
+                    validate_stitch_length(stitch_length, fitted_spacing(length, spacing))
+                    adjusted = [(p, stitch_length) for p in positions]
+                for pos, slen in adjusted:
+                    result.append(segment_on_edge(p1, p2, pos, slen, stitch_angle_deg))
+            return result
+
+        chains = _connected_chains(len(edge_defs), selected)
+        result = []
+        for chain in chains:
+            waypoints = self._chain_waypoints(edge_defs, chain)
+            result.extend(
+                segments_on_polyline_chain(
+                    waypoints, spacing, stitch_length, stitch_angle_deg, distribution,
+                    first_margin=first_margin, last_margin=last_margin,
+                )
+            )
         return result
 
 
@@ -480,54 +532,124 @@ class RoundedRectangle(Rectangle):
             parts.append(f"Q {x:.3f} {y:.3f} {x+tl:.3f} {y:.3f}")
         return " ".join(parts) + " Z"
 
+    def _inner_params(self, inset: float) -> tuple[float, float, float, float, tuple]:
+        x = self.x + inset
+        y = self.y + inset
+        w = self.width - 2 * inset
+        h = self.height - 2 * inset
+        radii = tuple(max(0.0, min(r - inset, w / 2, h / 2)) for r in self.corner_radii())
+        return x, y, w, h, radii
+
+    def hole_points(
+        self,
+        edges="all",
+        spacing=5.0,
+        inset=4.0,
+        include_corners=_REMOVED,
+        rounded_path=False,
+        distribution="fixed_spacing",
+        count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
+    ) -> list[Point]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
+        validate_distribution(spacing, distribution, count)
+        all_rectangle_edges = edges == "all" or sorted(set(edges)) == [0, 1, 2, 3]
+        x, y, w, h, radii = self._inner_params(inset)
+        if w <= 0 or h <= 0:
+            return []
+
+        if all_rectangle_edges:
+            contour = rounded_rectangle_contour(x, y, w, h, 0.0, radii=radii)
+            if len(contour) < 2:
+                return []
+            return points_on_closed_polyline(contour, spacing=spacing, include_corners=False,
+                                             distribution=distribution, count=count)
+
+        if path_mode != "continuous_rounded":
+            return super().hole_points(
+                edges=edges, spacing=spacing, inset=inset,
+                distribution=distribution, count=count,
+                path_mode=path_mode, first_margin=first_margin, last_margin=last_margin,
+            )
+
+        selected = list(edges)
+        chains = _connected_chains(4, selected)
+        result: list[Point] = []
+        for chain in chains:
+            waypoints = _rounded_rect_chain_waypoints(x, y, w, h, radii, chain)
+            result.extend(
+                points_on_polyline_chain(
+                    waypoints, spacing, distribution,
+                    first_margin=first_margin, last_margin=last_margin,
+                )
+            )
+        return result
+
     def stitch_segments(
         self,
         edges="all",
         spacing=5.0,
         inset=4.0,
-        include_corners=False,
+        include_corners=_REMOVED,
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
         distribution="fixed_spacing",
         count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
     ) -> list[tuple[Point, Point]]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         all_rectangle_edges = edges == "all" or sorted(set(edges)) == [0, 1, 2, 3]
-        if not all_rectangle_edges:
-            return super().stitch_segments(
-                edges=edges,
+        x, y, w, h, radii = self._inner_params(inset)
+        if w <= 0 or h <= 0:
+            return []
+
+        if all_rectangle_edges:
+            contour = rounded_rectangle_contour(x, y, w, h, 0.0, radii=radii)
+            if len(contour) < 2:
+                return []
+            return stitch_segments_on_closed_polyline(
+                contour,
                 spacing=spacing,
-                inset=inset,
-                include_corners=include_corners,
                 stitch_length=stitch_length,
                 stitch_angle_deg=stitch_angle_deg,
-                rounded_path=rounded_path,
+                include_corners=False,
                 distribution=distribution,
                 count=count,
             )
 
-        x = self.x + inset
-        y = self.y + inset
-        w = self.width - 2 * inset
-        h = self.height - 2 * inset
-        if w <= 0 or h <= 0:
-            return []
+        if path_mode != "continuous_rounded":
+            return super().stitch_segments(
+                edges=edges, spacing=spacing, inset=inset,
+                stitch_length=stitch_length, stitch_angle_deg=stitch_angle_deg,
+                distribution=distribution, count=count,
+                path_mode=path_mode, first_margin=first_margin, last_margin=last_margin,
+            )
 
-        radii = tuple(max(0.0, min(r - inset, w / 2, h / 2)) for r in self.corner_radii())
-        contour = rounded_rectangle_contour(x, y, w, h, 0.0, radii=radii)
-        if len(contour) < 2:
-            return []
-
-        return stitch_segments_on_closed_polyline(
-            contour,
-            spacing=spacing,
-            stitch_length=stitch_length,
-            stitch_angle_deg=stitch_angle_deg,
-            include_corners=include_corners,
-            distribution=distribution,
-            count=count,
-        )
+        # continuous_rounded: follow corner arcs for partial edge chains
+        selected = list(edges)
+        chains = _connected_chains(4, selected)
+        result: list[tuple[Point, Point]] = []
+        for chain in chains:
+            waypoints = _rounded_rect_chain_waypoints(x, y, w, h, radii, chain)
+            result.extend(
+                segments_on_polyline_chain(
+                    waypoints, spacing, stitch_length, stitch_angle_deg, distribution,
+                    first_margin=first_margin, last_margin=last_margin,
+                )
+            )
+        return result
 
 
 @dataclass
@@ -573,32 +695,32 @@ class Stadium(Rectangle):
         edges="all",
         spacing=5.0,
         inset=4.0,
-        include_corners=False,
+        include_corners=_REMOVED,
         rounded_path=False,
         distribution="fixed_spacing",
         count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
     ) -> list[Point]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         all_edges = edges == "all" or sorted(set(edges)) == [0, 1, 2, 3]
         if not all_edges:
             return super().hole_points(
-                edges=edges,
-                spacing=spacing,
-                inset=inset,
-                include_corners=include_corners,
-                rounded_path=rounded_path,
-                distribution=distribution,
-                count=count,
+                edges=edges, spacing=spacing, inset=inset,
+                distribution=distribution, count=count,
+                path_mode=path_mode, first_margin=first_margin, last_margin=last_margin,
             )
         contour = self._inner_contour(inset)
         if len(contour) < 2:
             return []
         return points_on_closed_polyline(
-            contour,
-            spacing=spacing,
-            include_corners=include_corners,
-            distribution=distribution,
-            count=count,
+            contour, spacing=spacing, include_corners=False,
+            distribution=distribution, count=count,
         )
 
     def stitch_segments(
@@ -606,26 +728,28 @@ class Stadium(Rectangle):
         edges="all",
         spacing=5.0,
         inset=4.0,
-        include_corners=False,
+        include_corners=_REMOVED,
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
         distribution="fixed_spacing",
         count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
     ) -> list[tuple[Point, Point]]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         all_edges = edges == "all" or sorted(set(edges)) == [0, 1, 2, 3]
         if not all_edges:
             return super().stitch_segments(
-                edges=edges,
-                spacing=spacing,
-                inset=inset,
-                include_corners=include_corners,
-                stitch_length=stitch_length,
-                stitch_angle_deg=stitch_angle_deg,
-                rounded_path=rounded_path,
-                distribution=distribution,
-                count=count,
+                edges=edges, spacing=spacing, inset=inset,
+                stitch_length=stitch_length, stitch_angle_deg=stitch_angle_deg,
+                distribution=distribution, count=count,
+                path_mode=path_mode, first_margin=first_margin, last_margin=last_margin,
             )
         contour = self._inner_contour(inset)
         if len(contour) < 2:
@@ -635,7 +759,7 @@ class Stadium(Rectangle):
             spacing=spacing,
             stitch_length=stitch_length,
             stitch_angle_deg=stitch_angle_deg,
-            include_corners=include_corners,
+            include_corners=False,
             distribution=distribution,
             count=count,
         )
@@ -656,11 +780,18 @@ class Circle(Shape):
         edges="all",
         spacing=5.0,
         inset=4.0,
-        include_corners=False,
+        include_corners=_REMOVED,
         rounded_path=False,
         distribution="fixed_spacing",
         count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
     ) -> list[Point]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         r = max(self.radius - inset, 0.1)
         if distribution == "fixed_spacing":
@@ -680,13 +811,20 @@ class Circle(Shape):
         edges="all",
         spacing=5.0,
         inset=4.0,
-        include_corners=False,
+        include_corners=_REMOVED,
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
         distribution="fixed_spacing",
         count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
     ) -> list[tuple[Point, Point]]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         r = max(self.radius - inset, 0.1)
         circumference = 2 * pi * r
@@ -750,21 +888,25 @@ class Ellipse(Shape):
         edges="all",
         spacing=5.0,
         inset=4.0,
-        include_corners=False,
+        include_corners=_REMOVED,
         rounded_path=False,
         distribution="fixed_spacing",
         count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
     ) -> list[Point]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         contour = self._inner_contour(inset)
         if len(contour) < 2:
             return []
         return points_on_closed_polyline(
-            contour,
-            spacing=spacing,
-            include_corners=include_corners,
-            distribution=distribution,
-            count=count,
+            contour, spacing=spacing, include_corners=False,
+            distribution=distribution, count=count,
         )
 
     def stitch_segments(
@@ -772,25 +914,28 @@ class Ellipse(Shape):
         edges="all",
         spacing=5.0,
         inset=4.0,
-        include_corners=False,
+        include_corners=_REMOVED,
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
         distribution="fixed_spacing",
         count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
     ) -> list[tuple[Point, Point]]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         contour = self._inner_contour(inset)
         if len(contour) < 2:
             return []
         return stitch_segments_on_closed_polyline(
-            contour,
-            spacing=spacing,
-            stitch_length=stitch_length,
-            stitch_angle_deg=stitch_angle_deg,
-            include_corners=include_corners,
-            distribution=distribution,
-            count=count,
+            contour, spacing=spacing, stitch_length=stitch_length,
+            stitch_angle_deg=stitch_angle_deg, include_corners=False,
+            distribution=distribution, count=count,
         )
 
 
@@ -948,22 +1093,26 @@ class Arc(Shape):
         edges="all",
         spacing=5.0,
         inset=4.0,
-        include_corners=False,
+        include_corners=_REMOVED,
         rounded_path=False,
         distribution="fixed_spacing",
         count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
     ) -> list[Point]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         pts = self._inset_contour(inset)
         if len(pts) < 3:
             return []
         polyline = [Point(x, y) for x, y in pts]
         return points_on_closed_polyline(
-            polyline,
-            spacing=spacing,
-            include_corners=include_corners,
-            distribution=distribution,
-            count=count,
+            polyline, spacing=spacing, include_corners=False,
+            distribution=distribution, count=count,
         )
 
     def stitch_segments(
@@ -971,26 +1120,29 @@ class Arc(Shape):
         edges="all",
         spacing=5.0,
         inset=4.0,
-        include_corners=False,
+        include_corners=_REMOVED,
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
         distribution="fixed_spacing",
         count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
     ) -> list[tuple[Point, Point]]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         pts = self._inset_contour(inset)
         if len(pts) < 3:
             return []
         polyline = [Point(x, y) for x, y in pts]
         return stitch_segments_on_closed_polyline(
-            polyline,
-            spacing=spacing,
-            stitch_length=stitch_length,
-            stitch_angle_deg=stitch_angle_deg,
-            include_corners=include_corners,
-            distribution=distribution,
-            count=count,
+            polyline, spacing=spacing, stitch_length=stitch_length,
+            stitch_angle_deg=stitch_angle_deg, include_corners=False,
+            distribution=distribution, count=count,
         )
 
 
@@ -1012,33 +1164,26 @@ class Triangle(Shape):
         edges="all",
         spacing=5.0,
         inset=4.0,
-        include_corners=False,
+        include_corners=_REMOVED,
         rounded_path=False,
         distribution="fixed_spacing",
         count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
     ) -> list[Point]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         p1, p2, p3 = inset_triangle_vertices(self.p1, self.p2, self.p3, inset)
         edge_defs = [(p1, p2), (p2, p3), (p3, p1)]
-        selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
-
-        if selected == [0, 1, 2]:
-            selected_edge_defs = [edge_defs[i] for i in selected]
-            return points_on_closed_edges(
-                selected_edge_defs,
-                spacing,
-                include_corners,
-                distribution,
-                count,
-            )
-
+        if edges == "all":
+            return points_on_closed_edges(edge_defs, spacing, False, distribution, count)
         return points_on_selected_edges(
-            edge_defs,
-            edges,
-            spacing,
-            include_corners,
-            distribution,
-            count,
+            edge_defs, edges, spacing, distribution=distribution, count=count,
+            path_mode=path_mode, first_margin=first_margin, last_margin=last_margin,
         )
 
     def stitch_segments(
@@ -1046,39 +1191,31 @@ class Triangle(Shape):
         edges="all",
         spacing=5.0,
         inset=4.0,
-        include_corners=False,
+        include_corners=_REMOVED,
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
         distribution="fixed_spacing",
         count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
     ) -> list[tuple[Point, Point]]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         p1, p2, p3 = inset_triangle_vertices(self.p1, self.p2, self.p3, inset)
         edge_defs = [(p1, p2), (p2, p3), (p3, p1)]
-        selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
-
-        if selected == [0, 1, 2]:
-            selected_edge_defs = [edge_defs[i] for i in selected]
+        if edges == "all":
             return segments_on_closed_edges(
-                selected_edge_defs,
-                spacing,
-                stitch_length,
-                include_corners,
-                stitch_angle_deg,
-                distribution,
-                count,
+                edge_defs, spacing, stitch_length, False, stitch_angle_deg, distribution, count
             )
-
         return segments_on_selected_edges(
-            edge_defs,
-            edges,
-            spacing,
-            stitch_length,
-            include_corners,
-            stitch_angle_deg,
-            distribution,
-            count,
+            edge_defs, edges, spacing, stitch_length, stitch_angle_deg=stitch_angle_deg,
+            distribution=distribution, count=count,
+            path_mode=path_mode, first_margin=first_margin, last_margin=last_margin,
         )
 
 
@@ -1112,22 +1249,25 @@ class RoundedTriangle(Triangle):
         edges="all",
         spacing=5.0,
         inset=4.0,
-        include_corners=False,
+        include_corners=_REMOVED,
         rounded_path=False,
         distribution="fixed_spacing",
         count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
     ) -> list[Point]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         all_triangle_edges = edges == "all" or sorted(set(edges)) == [0, 1, 2]
-        if not rounded_path or not all_triangle_edges:
+        if path_mode != "continuous_rounded" or not all_triangle_edges:
             return super().hole_points(
-                edges=edges,
-                spacing=spacing,
-                inset=inset,
-                include_corners=include_corners,
-                rounded_path=rounded_path,
-                distribution=distribution,
-                count=count,
+                edges=edges, spacing=spacing, inset=inset,
+                distribution=distribution, count=count,
+                path_mode=path_mode, first_margin=first_margin, last_margin=last_margin,
             )
 
         p1, p2, p3 = inset_triangle_vertices(self.p1, self.p2, self.p3, inset)
@@ -1136,11 +1276,8 @@ class RoundedTriangle(Triangle):
         if len(contour) < 2:
             return []
         return points_on_closed_polyline(
-            contour,
-            spacing=spacing,
-            include_corners=include_corners,
-            distribution=distribution,
-            count=count,
+            contour, spacing=spacing, include_corners=False,
+            distribution=distribution, count=count,
         )
 
     def stitch_segments(
@@ -1148,26 +1285,28 @@ class RoundedTriangle(Triangle):
         edges="all",
         spacing=5.0,
         inset=4.0,
-        include_corners=False,
+        include_corners=_REMOVED,
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
         distribution="fixed_spacing",
         count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
     ) -> list[tuple[Point, Point]]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         all_triangle_edges = edges == "all" or sorted(set(edges)) == [0, 1, 2]
-        if not rounded_path or not all_triangle_edges:
+        if path_mode != "continuous_rounded" or not all_triangle_edges:
             return super().stitch_segments(
-                edges=edges,
-                spacing=spacing,
-                inset=inset,
-                include_corners=include_corners,
-                stitch_length=stitch_length,
-                stitch_angle_deg=stitch_angle_deg,
-                rounded_path=rounded_path,
-                distribution=distribution,
-                count=count,
+                edges=edges, spacing=spacing, inset=inset,
+                stitch_length=stitch_length, stitch_angle_deg=stitch_angle_deg,
+                distribution=distribution, count=count,
+                path_mode=path_mode, first_margin=first_margin, last_margin=last_margin,
             )
 
         p1, p2, p3 = inset_triangle_vertices(self.p1, self.p2, self.p3, inset)
@@ -1176,13 +1315,9 @@ class RoundedTriangle(Triangle):
         if len(contour) < 2:
             return []
         return stitch_segments_on_closed_polyline(
-            contour,
-            spacing=spacing,
-            stitch_length=stitch_length,
-            stitch_angle_deg=stitch_angle_deg,
-            include_corners=include_corners,
-            distribution=distribution,
-            count=count,
+            contour, spacing=spacing, stitch_length=stitch_length,
+            stitch_angle_deg=stitch_angle_deg, include_corners=False,
+            distribution=distribution, count=count,
         )
 
 
@@ -1232,20 +1367,24 @@ class Polygon(Shape):
         edges: "Sequence[int] | Literal['all']" = "all",
         spacing: float = 5.0,
         inset: float = 4.0,
-        include_corners: bool = False,
+        include_corners: object = _REMOVED,
         rounded_path: bool = False,
         distribution: str = "fixed_spacing",
         count: int | None = None,
+        path_mode: str = "continuous",
+        first_margin: float | None = None,
+        last_margin: float | None = None,
     ) -> list[Point]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         pts = _offset_closed_polygon(self.points, inset) if inset > 0 else self.points
         polyline = [Point(x, y) for x, y in pts]
         return points_on_closed_polyline(
-            polyline,
-            spacing=spacing,
-            include_corners=include_corners,
-            distribution=distribution,
-            count=count,
+            polyline, spacing=spacing, include_corners=False,
+            distribution=distribution, count=count,
         )
 
     def stitch_segments(
@@ -1253,24 +1392,27 @@ class Polygon(Shape):
         edges: "Sequence[int] | Literal['all']" = "all",
         spacing: float = 5.0,
         inset: float = 4.0,
-        include_corners: bool = False,
+        include_corners: object = _REMOVED,
         stitch_length: float = 2.0,
         stitch_angle_deg: float = 0.0,
         rounded_path: bool = False,
         distribution: str = "fixed_spacing",
         count: int | None = None,
+        path_mode: str = "continuous",
+        first_margin: float | None = None,
+        last_margin: float | None = None,
     ) -> "list[tuple[Point, Point]]":
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         pts = _offset_closed_polygon(self.points, inset) if inset > 0 else self.points
         polyline = [Point(x, y) for x, y in pts]
         return stitch_segments_on_closed_polyline(
-            polyline,
-            spacing=spacing,
-            stitch_length=stitch_length,
-            stitch_angle_deg=stitch_angle_deg,
-            include_corners=include_corners,
-            distribution=distribution,
-            count=count,
+            polyline, spacing=spacing, stitch_length=stitch_length,
+            stitch_angle_deg=stitch_angle_deg, include_corners=False,
+            distribution=distribution, count=count,
         )
 
 
@@ -1328,11 +1470,18 @@ class RegularPolygon(Shape):
         edges="all",
         spacing=5.0,
         inset=4.0,
-        include_corners=False,
+        include_corners=_REMOVED,
         rounded_path=False,
         distribution="fixed_spacing",
         count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
     ) -> list[Point]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         vertices = self._inner_vertices(inset)
         if len(vertices) < 3:
@@ -1341,22 +1490,11 @@ class RegularPolygon(Shape):
             (Point(*vertices[i]), Point(*vertices[(i + 1) % len(vertices)]))
             for i in range(len(vertices))
         ]
-        selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
-        if selected == list(range(len(edge_defs))):
-            return points_on_closed_edges(
-                edge_defs,
-                spacing,
-                include_corners,
-                distribution,
-                count,
-            )
+        if edges == "all":
+            return points_on_closed_edges(edge_defs, spacing, False, distribution, count)
         return points_on_selected_edges(
-            edge_defs,
-            selected,
-            spacing,
-            include_corners,
-            distribution,
-            count,
+            edge_defs, list(edges), spacing, distribution=distribution, count=count,
+            path_mode=path_mode, first_margin=first_margin, last_margin=last_margin,
         )
 
     def stitch_segments(
@@ -1364,13 +1502,20 @@ class RegularPolygon(Shape):
         edges="all",
         spacing=5.0,
         inset=4.0,
-        include_corners=False,
+        include_corners=_REMOVED,
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
         distribution="fixed_spacing",
         count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
     ) -> list[tuple[Point, Point]]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         vertices = self._inner_vertices(inset)
         if len(vertices) < 3:
@@ -1379,26 +1524,14 @@ class RegularPolygon(Shape):
             (Point(*vertices[i]), Point(*vertices[(i + 1) % len(vertices)]))
             for i in range(len(vertices))
         ]
-        selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
-        if selected == list(range(len(edge_defs))):
+        if edges == "all":
             return segments_on_closed_edges(
-                edge_defs,
-                spacing,
-                stitch_length,
-                include_corners,
-                stitch_angle_deg,
-                distribution,
-                count,
+                edge_defs, spacing, stitch_length, False, stitch_angle_deg, distribution, count
             )
         return segments_on_selected_edges(
-            edge_defs,
-            selected,
-            spacing,
-            stitch_length,
-            include_corners,
-            stitch_angle_deg,
-            distribution,
-            count,
+            edge_defs, list(edges), spacing, stitch_length, stitch_angle_deg=stitch_angle_deg,
+            distribution=distribution, count=count,
+            path_mode=path_mode, first_margin=first_margin, last_margin=last_margin,
         )
 
 
@@ -1482,11 +1615,18 @@ class RoundedRegularPolygon(Shape):
         edges="all",
         spacing=5.0,
         inset=4.0,
-        include_corners=False,
+        include_corners=_REMOVED,
         rounded_path=False,
         distribution="fixed_spacing",
         count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
     ) -> list[Point]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         all_edges = edges == "all" or sorted(set(edges)) == list(range(self.sides))
         radii = self.corner_radii()
@@ -1498,22 +1638,11 @@ class RoundedRegularPolygon(Shape):
                 (Point(*vertices[i]), Point(*vertices[(i + 1) % len(vertices)]))
                 for i in range(len(vertices))
             ]
-            selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
-            if selected == list(range(len(edge_defs))):
-                return points_on_closed_edges(
-                    edge_defs,
-                    spacing,
-                    include_corners,
-                    distribution,
-                    count,
-                )
+            if edges == "all":
+                return points_on_closed_edges(edge_defs, spacing, False, distribution, count)
             return points_on_selected_edges(
-                edge_defs,
-                selected,
-                spacing,
-                include_corners,
-                distribution,
-                count,
+                edge_defs, list(edges), spacing, distribution=distribution, count=count,
+                path_mode=path_mode, first_margin=first_margin, last_margin=last_margin,
             )
 
         inner_vertices = [Point(x, y) for x, y in self._inner_vertices(inset)]
@@ -1524,11 +1653,8 @@ class RoundedRegularPolygon(Shape):
         if len(contour) < 2:
             return []
         return points_on_closed_polyline(
-            contour,
-            spacing=spacing,
-            include_corners=include_corners,
-            distribution=distribution,
-            count=count,
+            contour, spacing=spacing, include_corners=False,
+            distribution=distribution, count=count,
         )
 
     def stitch_segments(
@@ -1536,13 +1662,20 @@ class RoundedRegularPolygon(Shape):
         edges="all",
         spacing=5.0,
         inset=4.0,
-        include_corners=False,
+        include_corners=_REMOVED,
         stitch_length=2.0,
         stitch_angle_deg=0.0,
         rounded_path=False,
         distribution="fixed_spacing",
         count=None,
+        path_mode="continuous",
+        first_margin=None,
+        last_margin=None,
     ) -> list[tuple[Point, Point]]:
+        if include_corners is not _REMOVED:
+            raise ValueError(
+                "include_corners has been removed; use first_margin / last_margin instead"
+            )
         validate_distribution(spacing, distribution, count)
         all_edges = edges == "all" or sorted(set(edges)) == list(range(self.sides))
         radii = self.corner_radii()
@@ -1554,26 +1687,14 @@ class RoundedRegularPolygon(Shape):
                 (Point(*vertices[i]), Point(*vertices[(i + 1) % len(vertices)]))
                 for i in range(len(vertices))
             ]
-            selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
-            if selected == list(range(len(edge_defs))):
+            if edges == "all":
                 return segments_on_closed_edges(
-                    edge_defs,
-                    spacing,
-                    stitch_length,
-                    include_corners,
-                    stitch_angle_deg,
-                    distribution,
-                    count,
+                    edge_defs, spacing, stitch_length, False, stitch_angle_deg, distribution, count
                 )
             return segments_on_selected_edges(
-                edge_defs,
-                selected,
-                spacing,
-                stitch_length,
-                include_corners,
-                stitch_angle_deg,
-                distribution,
-                count,
+                edge_defs, list(edges), spacing, stitch_length, stitch_angle_deg=stitch_angle_deg,
+                distribution=distribution, count=count,
+                path_mode=path_mode, first_margin=first_margin, last_margin=last_margin,
             )
 
         inner_vertices = [Point(x, y) for x, y in self._inner_vertices(inset)]
@@ -1584,13 +1705,9 @@ class RoundedRegularPolygon(Shape):
         if len(contour) < 2:
             return []
         return stitch_segments_on_closed_polyline(
-            contour,
-            spacing=spacing,
-            stitch_length=stitch_length,
-            stitch_angle_deg=stitch_angle_deg,
-            include_corners=include_corners,
-            distribution=distribution,
-            count=count,
+            contour, spacing=spacing, stitch_length=stitch_length,
+            stitch_angle_deg=stitch_angle_deg, include_corners=False,
+            distribution=distribution, count=count,
         )
 
 
@@ -1895,10 +2012,31 @@ def distribute_distances(
     include_start: bool = False,
     include_end: bool = False,
     min_count: int = 1,
+    first_margin: float | None = None,
+    last_margin: float | None = None,
 ) -> list[float]:
     validate_distribution(spacing, distribution, count)
     if length <= 0:
         return []
+
+    has_margins = first_margin is not None or last_margin is not None
+    if has_margins:
+        fm = first_margin if first_margin is not None else 0.0
+        lm = last_margin if last_margin is not None else 0.0
+        usable = length - fm - lm
+        if usable <= 0:
+            return []
+        if distribution == "fixed_spacing":
+            distances = [fm]
+            pos = fm + spacing
+            while pos <= length - lm + 1e-9:
+                distances.append(min(pos, length - lm))
+                pos += spacing
+            return distances
+        # fit_evenly with explicit margins: endpoints at fm and length-lm
+        interval_count = max(1, round(usable / spacing))
+        actual_spacing = usable / interval_count
+        return [fm + i * actual_spacing for i in range(interval_count + 1)]
 
     if distribution == "fixed_spacing":
         distances = [0.0] if include_start else []
@@ -1910,40 +2048,269 @@ def distribute_distances(
             distances.append(length)
         return distances
 
+    # fit_evenly: half-offset by default (first stitch at actual/2 from each end)
     actual_spacing = fitted_spacing(length, spacing)
     interval_count = max(1, round(length / spacing))
-    distances = [
-        index * actual_spacing
-        for index in range(interval_count + 1)
-        if (include_start or index > 0) and (include_end or index < interval_count)
-    ]
-    if len(distances) < min_count and not include_start and not include_end:
+    if include_start and include_end:
+        distances = [i * actual_spacing for i in range(interval_count + 1)]
+    elif include_start:
+        distances = [i * actual_spacing for i in range(interval_count)]
+    elif include_end:
+        distances = [(i + 1) * actual_spacing for i in range(interval_count)]
+    else:
+        # Half-offset: each stitch centred in its interval
+        distances = [(i + 0.5) * actual_spacing for i in range(interval_count)]
+    if len(distances) < min_count:
         return [length / 2]
     return distances
+
+
+def _connected_chains(n_edges: int, selected: list[int]) -> list[list[int]]:
+    """Split selected edge indices into groups of consecutive connected chains.
+
+    Two edges are connected when they share a corner (edge i ends where edge i+1
+    starts). Wrap-around is handled via modular arithmetic.
+    """
+    if not selected:
+        return []
+    selected_set = set(selected)
+    chain_starts = [i for i in selected if (i - 1) % n_edges not in selected_set]
+    if not chain_starts:
+        # All selected edges form one closed loop; pick an arbitrary start.
+        chain_starts = [selected[0]]
+    chains: list[list[int]] = []
+    visited: set[int] = set()
+    for start in sorted(chain_starts):
+        if start in visited:
+            continue
+        chain: list[int] = []
+        j = start
+        while j in selected_set and j not in visited:
+            chain.append(j)
+            visited.add(j)
+            j = (j + 1) % n_edges
+        if chain:
+            chains.append(chain)
+    return chains
+
+
+def _polyline_cumulative(
+    waypoints: list[Point],
+) -> tuple[list[tuple[Point, Point, float]], list[float]]:
+    """Return (segments, cumulative_distances) for a list of waypoints."""
+    segs: list[tuple[Point, Point, float]] = []
+    cumul: list[float] = [0.0]
+    for i in range(len(waypoints) - 1):
+        p1, p2 = waypoints[i], waypoints[i + 1]
+        d = distance(p1, p2)
+        segs.append((p1, p2, d))
+        cumul.append(cumul[-1] + d)
+    return segs, cumul
+
+
+def _point_and_dir_on_polyline(
+    segs: list[tuple[Point, Point, float]],
+    cumul: list[float],
+    pos: float,
+) -> tuple[Point, tuple[float, float]]:
+    """Return (point, unit_edge_vector) at arc-length pos along a polyline."""
+    for i, (p1, p2, seg_len) in enumerate(segs):
+        if cumul[i + 1] >= pos - 1e-9:
+            local = pos - cumul[i]
+            if seg_len > 1e-12:
+                ex = (p2.x - p1.x) / seg_len
+                ey = (p2.y - p1.y) / seg_len
+            else:
+                ex, ey = 1.0, 0.0
+            return Point(p1.x + ex * local, p1.y + ey * local), (ex, ey)
+    # Fallback: clamp to end of last segment
+    p1, p2, seg_len = segs[-1]
+    if seg_len > 1e-12:
+        ex = (p2.x - p1.x) / seg_len
+        ey = (p2.y - p1.y) / seg_len
+    else:
+        ex, ey = 1.0, 0.0
+    return p2, (ex, ey)
+
+
+def points_on_polyline_chain(
+    waypoints: list[Point],
+    spacing: float,
+    distribution: str = "fixed_spacing",
+    first_margin: float | None = None,
+    last_margin: float | None = None,
+) -> list[Point]:
+    """Distribute hole points along a polyline defined by *waypoints*.
+
+    When no explicit margins are given, ``fixed_spacing`` centres stitches
+    along the total chain length (same aesthetic as per-edge centring, but
+    now applied across the whole chain).  ``fit_evenly`` uses half-offset so
+    the margin at each open end ≈ actual_spacing / 2.
+    """
+    if len(waypoints) < 2:
+        return []
+    segs, cumul = _polyline_cumulative(waypoints)
+    total = cumul[-1]
+    if total <= 0:
+        return []
+    has_margins = first_margin is not None or last_margin is not None
+    if has_margins:
+        positions = distribute_distances(
+            total, spacing, distribution=distribution,
+            first_margin=first_margin, last_margin=last_margin,
+        )
+    elif distribution == "fixed_spacing":
+        positions = positions_on_side_center(total, spacing, include_corners=False)
+    else:
+        positions = distribute_distances(total, spacing, distribution=distribution)
+    result: list[Point] = []
+    for pos in positions:
+        pt, _ = _point_and_dir_on_polyline(segs, cumul, pos)
+        result.append(pt)
+    return result
+
+
+def segments_on_polyline_chain(
+    waypoints: list[Point],
+    spacing: float,
+    stitch_length: float,
+    stitch_angle_deg: float = 0.0,
+    distribution: str = "fixed_spacing",
+    first_margin: float | None = None,
+    last_margin: float | None = None,
+) -> list[tuple[Point, Point]]:
+    """Distribute stitch segments along a polyline defined by *waypoints*.
+
+    Same centring / half-offset logic as :func:`points_on_polyline_chain`.
+    """
+    if len(waypoints) < 2:
+        return []
+    segs, cumul = _polyline_cumulative(waypoints)
+    total = cumul[-1]
+    if total <= 0:
+        return []
+    has_margins = first_margin is not None or last_margin is not None
+    if has_margins:
+        positions = distribute_distances(
+            total, spacing, distribution=distribution,
+            first_margin=first_margin, last_margin=last_margin,
+        )
+    elif distribution == "fixed_spacing":
+        positions = positions_on_side_center(total, spacing, include_corners=False)
+    else:
+        positions = distribute_distances(total, spacing, distribution=distribution)
+    if positions:
+        actual_spacing = fitted_spacing(total, spacing) if distribution == "fit_evenly" else spacing
+        validate_stitch_length(stitch_length, actual_spacing)
+    result: list[tuple[Point, Point]] = []
+    angle_rad = stitch_angle_deg * pi / 180
+    half = stitch_length / 2
+    for pos in positions:
+        pt, (ex, ey) = _point_and_dir_on_polyline(segs, cumul, pos)
+        dx = ex * cos(angle_rad) - ey * sin(angle_rad)
+        dy = ex * sin(angle_rad) + ey * cos(angle_rad)
+        result.append((
+            Point(pt.x - dx * half, pt.y - dy * half),
+            Point(pt.x + dx * half, pt.y + dy * half),
+        ))
+    return result
+
+
+def _rounded_rect_chain_waypoints(
+    x: float,
+    y: float,
+    w: float,
+    h: float,
+    inner_radii: tuple[float, float, float, float],
+    chain: list[int],
+    arc_steps: int = 8,
+) -> list[Point]:
+    """Build waypoints for a continuous edge chain on the inner contour of a
+    rounded rectangle.
+
+    x, y, w, h  — inner rectangle coordinates (inset already applied).
+    inner_radii — (tl, tr, br, bl) radii of the inner contour.
+    chain       — ordered list of edge indices (0=top, 1=right, 2=bottom, 3=left).
+    arc_steps   — intermediate arc sample points per corner (higher = smoother).
+    """
+    tl, tr, br, bl = inner_radii
+
+    # Start and end of each edge's straight segment
+    edge_start = {
+        0: Point(x + tl, y),
+        1: Point(x + w, y + tr),
+        2: Point(x + w - br, y + h),
+        3: Point(x, y + h - bl),
+    }
+    edge_end = {
+        0: Point(x + w - tr, y),
+        1: Point(x + w, y + h - br),
+        2: Point(x + bl, y + h),
+        3: Point(x, y + tl),
+    }
+    # Arc connecting edge i to edge (i+1)%4: (center, start_angle, end_angle, radius)
+    arc_after: dict[int, tuple[Point, float, float, float]] = {
+        0: (Point(x + w - tr, y + tr), -pi / 2, 0.0, tr),
+        1: (Point(x + w - br, y + h - br), 0.0, pi / 2, br),
+        2: (Point(x + bl, y + h - bl), pi / 2, pi, bl),
+        3: (Point(x + tl, y + tl), pi, 3 * pi / 2, tl),
+    }
+
+    if not chain:
+        return []
+
+    waypoints: list[Point] = [edge_start[chain[0]]]
+    for chain_idx, edge_idx in enumerate(chain):
+        is_last = chain_idx == len(chain) - 1
+        waypoints.append(edge_end[edge_idx])
+        if not is_last:
+            center, a0, a1, ar = arc_after[edge_idx]
+            if ar > 1e-9:
+                for step in range(1, arc_steps + 1):
+                    t = step / (arc_steps + 1)
+                    angle = a0 + t * (a1 - a0)
+                    waypoints.append(Point(center.x + ar * cos(angle), center.y + ar * sin(angle)))
+            waypoints.append(edge_start[chain[chain_idx + 1]])
+    return waypoints
 
 
 def points_on_selected_edges(
     edge_defs,
     edges,
     spacing,
-    include_corners,
+    include_corners=None,
     distribution="fixed_spacing",
     count=None,
+    path_mode="continuous",
+    first_margin=None,
+    last_margin=None,
 ) -> list[Point]:
+    if include_corners is not None:
+        raise ValueError(
+            "include_corners has been removed; use first_margin / last_margin instead"
+        )
     validate_distribution(spacing, distribution, count)
     selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
+    n = len(edge_defs)
 
+    if edges == "all":
+        return points_on_closed_edges(edge_defs, spacing, False, distribution, count)
+
+    if path_mode == "per_edge":
+        result: list[Point] = []
+        for index in selected:
+            p1, p2 = edge_defs[index]
+            result.extend(points_on_line(p1, p2, spacing, False, distribution, count))
+        return deduplicate_points(result)
+
+    chains = _connected_chains(n, selected)
     result = []
-    for index in selected:
-        p1, p2 = edge_defs[index]
+    for chain in chains:
+        waypoints = [edge_defs[chain[0]][0]] + [edge_defs[i][1] for i in chain]
         result.extend(
-            points_on_line(
-                p1,
-                p2,
-                spacing,
-                include_corners,
-                distribution,
-                count,
+            points_on_polyline_chain(
+                waypoints, spacing, distribution,
+                first_margin=first_margin, last_margin=last_margin,
             )
         )
     return deduplicate_points(result)
@@ -1954,27 +2321,44 @@ def segments_on_selected_edges(
     edges,
     spacing,
     stitch_length,
-    include_corners,
-    stitch_angle_deg,
+    include_corners=None,
+    stitch_angle_deg=0.0,
     distribution="fixed_spacing",
     count=None,
+    path_mode="continuous",
+    first_margin=None,
+    last_margin=None,
 ) -> list[tuple[Point, Point]]:
+    if include_corners is not None:
+        raise ValueError(
+            "include_corners has been removed; use first_margin / last_margin instead"
+        )
     validate_distribution(spacing, distribution, count)
     selected = list(range(len(edge_defs))) if edges == "all" else list(edges)
+    n = len(edge_defs)
 
-    result: list[tuple[Point, Point]] = []
-    for index in selected:
-        p1, p2 = edge_defs[index]
+    if edges == "all":
+        return segments_on_closed_edges(
+            edge_defs, spacing, stitch_length, False, stitch_angle_deg, distribution, count
+        )
+
+    if path_mode == "per_edge":
+        result: list[tuple[Point, Point]] = []
+        for index in selected:
+            p1, p2 = edge_defs[index]
+            result.extend(
+                segments_on_line(p1, p2, spacing, stitch_length, False, stitch_angle_deg, distribution, count)
+            )
+        return result
+
+    chains = _connected_chains(n, selected)
+    result = []
+    for chain in chains:
+        waypoints = [edge_defs[chain[0]][0]] + [edge_defs[i][1] for i in chain]
         result.extend(
-            segments_on_line(
-                p1,
-                p2,
-                spacing,
-                stitch_length,
-                include_corners,
-                stitch_angle_deg,
-                distribution,
-                count,
+            segments_on_polyline_chain(
+                waypoints, spacing, stitch_length, stitch_angle_deg, distribution,
+                first_margin=first_margin, last_margin=last_margin,
             )
         )
     return result

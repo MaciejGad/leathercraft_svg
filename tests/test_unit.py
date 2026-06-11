@@ -31,6 +31,7 @@ from leathercraft_svg import (
     StrokeStyle,
     SvgDocument,
     Triangle,
+    _connected_chains,
     _offset_closed_polygon,
     _smooth_path_d,
     _straight_path_d,
@@ -47,6 +48,7 @@ from leathercraft_svg import (
     offset_polyline,
     point_on_edge,
     points_on_closed_polyline,
+    points_on_polyline_chain,
     positions_on_closed_length,
     positions_on_line,
     positions_on_side_center,
@@ -55,6 +57,7 @@ from leathercraft_svg import (
     rounded_polygon_contour,
     rounded_triangle_contour,
     segment_on_edge,
+    segments_on_polyline_chain,
     signed_double_area,
     stitch_segments_on_closed_polyline,
     stitch_segments_on_open_polyline,
@@ -346,10 +349,14 @@ class TestDistributeDistances(unittest.TestCase):
         self.assertTrue(all(abs(value - 103 / 21) < APPROX for value in intervals))
 
     def test_fit_evenly_without_endpoints(self):
+        # Half-offset: n stitches centred in their intervals (first at actual/2).
         distances = distribute_distances(103, 5, distribution="fit_evenly")
         self.assertNotIn(0, distances)
         self.assertNotIn(103, distances)
-        self.assertEqual(len(distances), 20)
+        self.assertEqual(len(distances), 21)
+        actual = 103 / 21
+        self.assertAlmostEqual(distances[0], actual / 2, places=9)
+        self.assertAlmostEqual(distances[-1], 103 - actual / 2, places=9)
 
     def test_invalid_distribution(self):
         with self.assertRaisesRegex(ValueError, "unknown distribution 'magic'"):
@@ -542,10 +549,17 @@ class TestRectangleHolePoints(unittest.TestCase):
         partial = Rectangle(0, 0, 60, 40).hole_points(edges=[0], spacing=10, inset=5)
         self.assertLess(len(partial), len(full))
 
-    def test_include_corners_more_or_equal_points(self):
-        without = Rectangle(0, 0, 60, 40).hole_points(spacing=10, inset=5, include_corners=False)
-        with_ = Rectangle(0, 0, 60, 40).hole_points(spacing=10, inset=5, include_corners=True)
-        self.assertGreaterEqual(len(with_), len(without))
+    def test_include_corners_raises(self):
+        with self.assertRaisesRegex(ValueError, "first_margin"):
+            Rectangle(0, 0, 60, 40).hole_points(spacing=10, inset=5, include_corners=False)
+
+    def test_first_margin_pins_endpoints(self):
+        pts = Rectangle(0, 0, 60, 40).hole_points(
+            edges=[0], spacing=10, inset=5, first_margin=0, last_margin=0
+        )
+        xs = sorted(p.x for p in pts)
+        self.assertAlmostEqual(xs[0], 5.0)  # left end of inner edge
+        self.assertAlmostEqual(xs[-1], 55.0)  # right end of inner edge
 
     def test_no_duplicates(self):
         pts = Rectangle(0, 0, 60, 40).hole_points(spacing=10, inset=5)
@@ -892,7 +906,8 @@ class TestSvgDocumentOutput(unittest.TestCase):
             edges=[0],
             spacing=5,
             inset=0,
-            include_corners=True,
+            first_margin=0,
+            last_margin=0,
             distribution="fit_evenly",
         )
         self.assertEqual(len(doc.elements), 22)
@@ -906,7 +921,8 @@ class TestSvgDocumentOutput(unittest.TestCase):
             spacing=5,
             stitch_length=3,
             inset=0,
-            include_corners=True,
+            first_margin=0,
+            last_margin=0,
             distribution="fit_evenly",
         )
         self.assertEqual(len(doc.elements), 22)
@@ -919,7 +935,7 @@ class TestSvgDocumentOutput(unittest.TestCase):
             stitch_length=3,
             distribution="fit_evenly",
         )
-        self.assertEqual(len(doc.elements), 20)
+        self.assertEqual(len(doc.elements), 21)
 
     def test_stitch_length_validated_against_fitted_spacing(self):
         doc = self._doc()
@@ -1268,12 +1284,14 @@ class TestDistributionModesOnShapes(unittest.TestCase):
         )
 
     def test_selected_rectangle_edges_fit_independently(self):
+        # Non-adjacent edges form independent chains; with explicit margins they align.
         shape = Rectangle(0, 0, 103, 40)
         points = shape.hole_points(
             edges=[0, 2],
             spacing=5,
             inset=0,
-            include_corners=True,
+            first_margin=0,
+            last_margin=0,
             distribution="fit_evenly",
         )
         top = sorted(point.x for point in points if abs(point.y) < APPROX)
@@ -1288,7 +1306,6 @@ class TestDistributionModesOnShapes(unittest.TestCase):
         points = shape.hole_points(
             spacing=6,
             inset=0,
-            include_corners=True,
             distribution="fit_evenly",
         )
         rounded = {(round(point.x, 6), round(point.y, 6)) for point in points}
@@ -1787,3 +1804,167 @@ class TestArcInsetDistance(unittest.TestCase):
         a = Arc(60, 60, 50, start_angle=0, end_angle=270)
         for p in a.hole_points(spacing=6, inset=4):
             self.assertGreaterEqual(self._min_boundary_dist(a, p), 4.0 - 0.05)
+
+
+# ===========================================================================
+# _connected_chains
+# ===========================================================================
+
+
+class TestConnectedChains(unittest.TestCase):
+    def test_empty_selection(self):
+        self.assertEqual(_connected_chains(4, []), [])
+
+    def test_all_edges_forms_single_chain(self):
+        # All 4 edges of a rectangle — closed loop, so one chain starting at first
+        chains = _connected_chains(4, [0, 1, 2, 3])
+        self.assertEqual(len(chains), 1)
+        self.assertEqual(sorted(chains[0]), [0, 1, 2, 3])
+
+    def test_two_adjacent_edges_form_one_chain(self):
+        chains = _connected_chains(4, [0, 1])
+        self.assertEqual(chains, [[0, 1]])
+
+    def test_two_non_adjacent_edges_form_two_chains(self):
+        chains = _connected_chains(4, [0, 2])
+        self.assertEqual(len(chains), 2)
+        all_indices = sorted(sum(chains, []))
+        self.assertEqual(all_indices, [0, 2])
+
+    def test_three_adjacent_edges_is_one_chain(self):
+        chains = _connected_chains(4, [1, 2, 3])
+        self.assertEqual(chains, [[1, 2, 3]])
+
+    def test_top_and_bottom_are_two_chains(self):
+        # Rectangle edges: 0=top,1=right,2=bottom,3=left; top+bottom = 0,2
+        chains = _connected_chains(4, [0, 2])
+        self.assertEqual(len(chains), 2)
+
+    def test_single_edge_is_one_chain(self):
+        chains = _connected_chains(4, [2])
+        self.assertEqual(chains, [[2]])
+
+    def test_triangle_all_edges(self):
+        chains = _connected_chains(3, [0, 1, 2])
+        self.assertEqual(len(chains), 1)
+        self.assertEqual(sorted(chains[0]), [0, 1, 2])
+
+
+# ===========================================================================
+# points_on_polyline_chain
+# ===========================================================================
+
+
+class TestPointsOnPolylineChain(unittest.TestCase):
+    def _horizontal_waypoints(self, length=100.0):
+        return [Point(0, 0), Point(length, 0)]
+
+    def test_fixed_spacing_centered(self):
+        # 100mm, spacing=10 → centers at 5,15,...,95 → 10 points
+        pts = points_on_polyline_chain(self._horizontal_waypoints(100), spacing=10)
+        self.assertEqual(len(pts), 10)
+        self.assertAlmostEqual(pts[0].x, 5.0)
+        self.assertAlmostEqual(pts[-1].x, 95.0)
+
+    def test_fit_evenly_half_offset(self):
+        # 100mm, spacing=10 → 10 intervals, half-offset → 10 stitches at 5,15,...,95
+        pts = points_on_polyline_chain(self._horizontal_waypoints(100), spacing=10,
+                                        distribution="fit_evenly")
+        self.assertEqual(len(pts), 10)
+        self.assertAlmostEqual(pts[0].x, 5.0, places=5)
+        self.assertAlmostEqual(pts[-1].x, 95.0, places=5)
+
+    def test_first_margin_pins_first_point(self):
+        pts = points_on_polyline_chain(self._horizontal_waypoints(100), spacing=10,
+                                        first_margin=0, last_margin=0)
+        self.assertAlmostEqual(pts[0].x, 0.0)
+        self.assertAlmostEqual(pts[-1].x, 100.0)
+
+    def test_two_segment_polyline(self):
+        # L-shaped: (0,0)→(50,0)→(50,50), total=100, spacing=10 → 10 centered pts
+        waypoints = [Point(0, 0), Point(50, 0), Point(50, 50)]
+        pts = points_on_polyline_chain(waypoints, spacing=10)
+        self.assertEqual(len(pts), 10)
+        # First point at 5mm from start → x=5, y=0
+        self.assertAlmostEqual(pts[0].x, 5.0)
+        self.assertAlmostEqual(pts[0].y, 0.0)
+        # Point at 55mm from start → x=50, y=5
+        self.assertAlmostEqual(pts[5].x, 50.0)
+        self.assertAlmostEqual(pts[5].y, 5.0)
+
+    def test_empty_for_zero_length(self):
+        pts = points_on_polyline_chain([Point(0, 0), Point(0, 0)], spacing=10)
+        self.assertEqual(pts, [])
+
+
+# ===========================================================================
+# segments_on_polyline_chain
+# ===========================================================================
+
+
+class TestSegmentsOnPolylineChain(unittest.TestCase):
+    def _horizontal_waypoints(self, length=100.0):
+        return [Point(0, 0), Point(length, 0)]
+
+    def test_count_matches_points_on_chain(self):
+        waypoints = self._horizontal_waypoints(100)
+        segs = segments_on_polyline_chain(waypoints, spacing=10, stitch_length=3)
+        self.assertEqual(len(segs), 10)
+
+    def test_stitch_length_respected(self):
+        waypoints = self._horizontal_waypoints(100)
+        segs = segments_on_polyline_chain(waypoints, spacing=10, stitch_length=4)
+        for p1, p2 in segs:
+            self.assertAlmostEqual(distance(p1, p2), 4.0, places=5)
+
+    def test_stitches_perpendicular_to_horizontal_edge(self):
+        # stitch_angle_deg=90 rotates 90° from edge direction → vertical stitches
+        waypoints = self._horizontal_waypoints(100)
+        segs = segments_on_polyline_chain(waypoints, spacing=10, stitch_length=3,
+                                           stitch_angle_deg=90)
+        for p1, p2 in segs:
+            self.assertAlmostEqual(p1.x, p2.x, places=5)  # same x → vertical
+
+    def test_fit_evenly_distribution(self):
+        waypoints = self._horizontal_waypoints(100)
+        segs = segments_on_polyline_chain(waypoints, spacing=10, stitch_length=3,
+                                           distribution="fit_evenly")
+        self.assertEqual(len(segs), 10)
+
+
+# ===========================================================================
+# Continuous chain integration: Rectangle
+# ===========================================================================
+
+
+class TestRectangleContinuousChain(unittest.TestCase):
+    def test_all_edges_no_corner_gaps(self):
+        # With continuous mode, holes flow through corners without double gaps
+        r = Rectangle(0, 0, 100, 60)
+        pts = r.hole_points(spacing=10, inset=0)
+        # Total perimeter = 320; centered fixed_spacing with spacing=10 → 32 points
+        self.assertEqual(len(pts), 32)
+
+    def test_partial_edges_left_right_form_two_chains(self):
+        r = Rectangle(0, 0, 100, 60)
+        pts = r.hole_points(edges=[1, 3], spacing=10, inset=0)
+        # Two independent chains of length 60 each → 6 centered pts per chain = 12
+        self.assertEqual(len(pts), 12)
+
+    def test_partial_adjacent_edges_form_one_chain(self):
+        # edges [0,1] = top+right = 100+60=160 total
+        r = Rectangle(0, 0, 100, 60)
+        pts = r.hole_points(edges=[0, 1], spacing=10, inset=0)
+        # One chain 160mm, centered spacing=10 → 16 pts
+        self.assertEqual(len(pts), 16)
+
+    def test_include_corners_raises(self):
+        r = Rectangle(0, 0, 100, 60)
+        with self.assertRaises(ValueError, msg="include_corners"):
+            r.hole_points(include_corners=True, spacing=10, inset=0)
+
+    def test_per_edge_mode_still_works(self):
+        r = Rectangle(0, 0, 100, 60)
+        pts = r.hole_points(edges=[0], spacing=10, inset=0, path_mode="per_edge")
+        # Single edge 100mm, centered → 10 pts
+        self.assertEqual(len(pts), 10)

@@ -69,17 +69,21 @@ SvgDocument(width_mm: float, height_mm: float, styles: dict[str, StrokeStyle] | 
 ```python
 doc.add_holes(
     shape,
-    edges="all",          # "all" or list of int edge indices
-    spacing=5.0,          # mm between hole centers
-    hole_radius=1.2,      # mm hole radius
-    inset=4.0,            # mm offset inward from edge
+    edges="all",              # "all" or list of int edge indices
+    spacing=5.0,              # mm between hole centers
+    hole_radius=1.2,          # mm hole radius
+    inset=4.0,                # mm offset inward from edge
     layer="cut",
-    include_corners=False,
-    rounded_path=False,   # follow rounded contour (RoundedTriangle only)
+    rounded_path=False,       # follow rounded contour (RoundedTriangle only)
     distribution="fixed_spacing",  # or "fit_evenly"
-    count=None,            # reserved; fixed_count is not supported yet
+    count=None,               # reserved; fixed_count is not supported yet
+    path_mode="continuous",   # "continuous" | "per_edge" | "continuous_rounded"
+    first_margin=None,        # mm from chain start; None = centered / half-offset
+    last_margin=None,         # mm from chain end
 )
 ```
+
+`include_corners` has been **removed**. Use `first_margin=0, last_margin=0` to pin holes at chain endpoints.
 
 ### `add_stitch_on_polyline` signature
 
@@ -103,21 +107,23 @@ doc.add_stitch_pattern(
     shape,
     edges="all",
     spacing=5.0,
-    stitch_length=2.0,    # mm length of each stitch line
+    stitch_length=2.0,        # mm length of each stitch line
     inset=4.0,
     layer="stitch",
-    include_corners=False,
-    stitch_thickness=None,  # float or None; overrides layer stroke width
-    stitch_angle_deg=0.0,   # 0 = parallel to edge, 45 = diagonal
+    stitch_thickness=None,    # float or None; overrides layer stroke width
+    stitch_angle_deg=0.0,     # 0 = along edge, 90 = perpendicular
     rounded_path=False,
     distribution="fixed_spacing",  # or "fit_evenly"
     count=None,
+    path_mode="continuous",   # "continuous" | "per_edge" | "continuous_rounded"
+    first_margin=None,        # mm from chain start; None = centered / half-offset
+    last_margin=None,         # mm from chain end
 )
 ```
 
-`fit_evenly` treats `spacing` as a target and adjusts the actual interval to fit
-the edge or path. Selected straight edges are fitted independently; closed
-contours are fitted around the perimeter without duplicating the seam.
+`include_corners` has been **removed**. Use `first_margin=0, last_margin=0` to pin stitches at chain endpoints.
+
+`fit_evenly` uses half-offset distribution: stitches are centred within their intervals (margin ≈ `actual_spacing / 2` at each open chain end). `fixed_spacing` centres the stitch run across the total chain length.
 
 ### `save_dxf` signature
 
@@ -448,11 +454,13 @@ Use `doc.add_stitch_on_polyline` to render the result directly.
 | `hole_radius` | 0.8–1.8 mm | Punch hole size |
 | `inset` | 4–8 mm | How far holes/stitches sit from the edge |
 | `stitch_length` | 2–5 mm | Line length for laser stitch pattern |
-| `stitch_angle_deg` | 0 or 45 | 0 = parallel to edge, 45 = diagonal cross |
+| `stitch_angle_deg` | 0 or 45 | 0 = along edge, 90 = perpendicular, 45 = diagonal |
 | `stitch_thickness` | 0.1–1.0 mm | Stroke width for stitch lines (overrides layer) |
-| `include_corners` | False (default) | True = holes extend to corners |
+| `path_mode` | `"continuous"` | `"continuous"` = distribute along connected chain; `"per_edge"` = each edge independently; `"continuous_rounded"` = follow arc at rounded corners |
+| `first_margin` | `None` | mm from chain start to first hole/stitch; `None` = auto-center |
+| `last_margin` | `None` | mm from chain end to last hole/stitch; `None` = auto-center |
 | `rounded_path` | False (default) | True = follow curved contour (RoundedTriangle) |
-| `distribution` | `"fixed_spacing"` | Use `"fit_evenly"` to adjust spacing to the available length |
+| `distribution` | `"fixed_spacing"` | Use `"fit_evenly"` to adjust spacing to the available length (half-offset margins) |
 
 ---
 
@@ -952,12 +960,21 @@ stitches
   [layer <layer_name>]
   [rounded_path]
   [distribution fixed_spacing|fit_evenly]
+  [path_mode per_edge|continuous|continuous_rounded]
+  [first_margin <mm>]
+  [last_margin <mm>]
 end
 ```
 
 Compiles to `doc.add_stitch_pattern(shape, edges=..., inset=margin, rounded_path=..., ...)`.
 
-Default values: `edges all`, `margin 4`, `spacing 5`, `length 3`, `angle 0`, `layer stitch`, `rounded_path false`, `distribution fixed_spacing`.
+Default values: `edges all`, `margin 4`, `spacing 5`, `length 3`, `angle 0`, `layer stitch`, `rounded_path false`, `distribution fixed_spacing`, `path_mode continuous`.
+
+- `path_mode continuous` (default) distributes stitches along connected edge chains, eliminating the double gap at shared corners.
+- `path_mode per_edge` distributes each selected edge independently (old behaviour).
+- `path_mode continuous_rounded` like `continuous` but follows arc curves at rounded corners (`RoundedRectangle`).
+- `first_margin` / `last_margin`: explicit margin in mm from each open chain end. Omit for auto-centering.
+- `include_corners` has been **removed** — use `first_margin 0` / `last_margin 0` instead.
 
 The `rounded_path` flag (no value) makes stitches follow the smooth curved contour of a `RoundedTriangle`. It is safe to use on other shapes but has no visible effect.
 
@@ -999,12 +1016,19 @@ holes
   [layer <layer_name>]
   [rounded_path]
   [distribution fixed_spacing|fit_evenly]
+  [path_mode per_edge|continuous|continuous_rounded]
+  [first_margin <mm>]
+  [last_margin <mm>]
 end
 ```
 
 Compiles to `doc.add_holes(shape, edges=..., inset=margin, hole_radius=radius, rounded_path=..., ...)`.
 
-Default values: `edges all`, `margin 4`, `spacing 6`, `radius 1.2`, `layer cut`, `rounded_path false`, `distribution fixed_spacing`.
+Default values: `edges all`, `margin 4`, `spacing 6`, `radius 1.2`, `layer cut`, `rounded_path false`, `distribution fixed_spacing`, `path_mode continuous`.
+
+- `path_mode continuous` (default) distributes holes along connected edge chains without double corner gaps.
+- `first_margin` / `last_margin`: explicit margin in mm at each open chain end. Omit for auto-centering.
+- `include_corners` has been **removed** — use `first_margin 0` / `last_margin 0` instead.
 
 The `rounded_path` flag applies to `RoundedTriangle` (follows smooth corners); safe but no-op on other shapes.
 

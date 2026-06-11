@@ -484,7 +484,7 @@ class TestCompileStitchesOnShape:
             "stitches\n  source panel\n  edges top\n  margin 0\n"
             "  spacing 30\n  length 3\n  distribution fit_evenly\nend"
         )
-        assert compile_document(doc).to_svg().count("<line") == 2
+        assert compile_document(doc).to_svg().count("<line") == 3
 
 
 class TestCompileHolesOnShape:
@@ -2039,3 +2039,85 @@ class TestBackwardCompatibility:
     def test_symmetry_vertical_x_equals_expression(self):
         doc = _parse("w = 150\nsize w 100\nsymmetry vertical x=w / 2")
         assert doc.symmetry_axis_x == 75.0
+
+
+# ===========================================================================
+# DSL: new stitch/holes parameters (path_mode, first_margin, last_margin)
+# ===========================================================================
+
+
+_RECT_HEADER = (
+    "size 120 80\n"
+    "rectangle panel\n  at 10 10\n  size 100 60\nend\n"
+)
+
+
+class TestStitchesNewParams:
+    def test_defaults_are_continuous_no_margins(self):
+        doc = _parse(_RECT_HEADER + "stitches\n  source panel\n  spacing 5\n  length 3\nend")
+        op = doc.operations[0]
+        assert op.path_mode == "continuous"
+        assert op.first_margin is None
+        assert op.last_margin is None
+
+    def test_path_mode_per_edge(self):
+        doc = _parse(_RECT_HEADER + "stitches\n  source panel\n  spacing 5\n  length 3\n  path_mode per_edge\nend")
+        assert doc.operations[0].path_mode == "per_edge"
+
+    def test_path_mode_continuous_rounded(self):
+        doc = _parse(_RECT_HEADER + "stitches\n  source panel\n  spacing 5\n  length 3\n  path_mode continuous_rounded\nend")
+        assert doc.operations[0].path_mode == "continuous_rounded"
+
+    def test_path_mode_unknown_raises(self):
+        with pytest.raises(DslError, match="unknown path_mode"):
+            _parse(_RECT_HEADER + "stitches\n  source panel\n  spacing 5\n  length 3\n  path_mode zigzag\nend")
+
+    def test_first_margin_parsed(self):
+        doc = _parse(_RECT_HEADER + "stitches\n  source panel\n  spacing 5\n  length 3\n  first_margin 0\nend")
+        assert doc.operations[0].first_margin == 0.0
+
+    def test_last_margin_parsed(self):
+        doc = _parse(_RECT_HEADER + "stitches\n  source panel\n  spacing 5\n  length 3\n  last_margin 2.5\nend")
+        assert doc.operations[0].last_margin == 2.5
+
+    def test_include_corners_raises(self):
+        with pytest.raises(DslError, match="include_corners.*removed"):
+            _parse(_RECT_HEADER + "stitches\n  source panel\n  spacing 5\n  length 3\n  include_corners\nend")
+
+    def test_path_mode_passed_to_compile(self):
+        doc = _parse(_RECT_HEADER + "stitches\n  source panel\n  spacing 5\n  length 3\n  path_mode per_edge\nend")
+        # compile must not raise; result svg has stitch elements
+        svg = compile_document(doc)
+        assert svg is not None
+
+
+class TestHolesNewParams:
+    def test_defaults_are_continuous_no_margins(self):
+        doc = _parse(_RECT_HEADER + "holes\n  source panel\n  spacing 6\n  radius 1\nend")
+        op = doc.operations[0]
+        assert op.path_mode == "continuous"
+        assert op.first_margin is None
+        assert op.last_margin is None
+
+    def test_path_mode_per_edge(self):
+        doc = _parse(_RECT_HEADER + "holes\n  source panel\n  spacing 6\n  radius 1\n  path_mode per_edge\nend")
+        assert doc.operations[0].path_mode == "per_edge"
+
+    def test_first_and_last_margin(self):
+        doc = _parse(_RECT_HEADER + "holes\n  source panel\n  spacing 6\n  radius 1\n  first_margin 0\n  last_margin 0\nend")
+        op = doc.operations[0]
+        assert op.first_margin == 0.0
+        assert op.last_margin == 0.0
+
+    def test_include_corners_raises(self):
+        with pytest.raises(DslError, match="include_corners.*removed"):
+            _parse(_RECT_HEADER + "holes\n  source panel\n  spacing 6\n  radius 1\n  include_corners\nend")
+
+    def test_path_mode_unknown_raises(self):
+        with pytest.raises(DslError, match="unknown path_mode"):
+            _parse(_RECT_HEADER + "holes\n  source panel\n  spacing 6\n  radius 1\n  path_mode wavy\nend")
+
+    def test_margins_passed_to_compile(self):
+        doc = _parse(_RECT_HEADER + "holes\n  source panel\n  spacing 6\n  radius 1\n  first_margin 0\n  last_margin 0\nend")
+        svg = compile_document(doc)
+        assert svg is not None

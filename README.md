@@ -191,7 +191,7 @@ Parameters:
 - `radius` - radius,
 - `layer` - style layer.
 
-### `doc.add_holes(shape, edges="all", spacing=5.0, hole_radius=1.2, inset=4.0, layer="cut", include_corners=False)`
+### `doc.add_holes(shape, edges="all", spacing=5.0, hole_radius=1.2, inset=4.0, layer="cut", path_mode="continuous", first_margin=None, last_margin=None)`
 
 Adds holes computed from the edges of a shape.
 
@@ -203,13 +203,16 @@ Parameters:
 - `hole_radius` - radius of the holes,
 - `inset` - distance from the edge,
 - `layer` - layer for the holes,
-- `include_corners` - if `True`, hole placement starts and ends at corners; if `False`, holes are offset from edge endpoints.
+- `path_mode` - `"continuous"` (default) distributes holes along connected edge chains; `"per_edge"` distributes each edge independently; `"continuous_rounded"` follows arc curves at rounded corners,
+- `first_margin` / `last_margin` - explicit mm margin from each chain end (`None` = auto-centre).
+
+> **Breaking change:** `include_corners` has been removed. Use `first_margin=0, last_margin=0` to place holes at chain endpoints.
 
 ### `doc.add_stitch_holes(...)`
 
 Alias for `add_holes(...)` with the same parameters.
 
-### `doc.add_stitch_pattern(shape, edges="all", spacing=5.0, stitch_length=2.0, inset=4.0, layer="stitch", include_corners=False, stitch_thickness=None, stitch_angle_deg=0.0)`
+### `doc.add_stitch_pattern(shape, edges="all", spacing=5.0, stitch_length=2.0, inset=4.0, layer="stitch", stitch_thickness=None, stitch_angle_deg=0.0, path_mode="continuous", first_margin=None, last_margin=None)`
 
 Adds a laser stitch pattern (short line segments) on selected shape edges.
 
@@ -221,9 +224,12 @@ Parameters:
 - `stitch_length` - length of each stitch segment,
 - `inset` - distance from the edge,
 - `layer` - layer for the stitches,
-- `include_corners` - whether stitches are also placed at corners,
-- `stitch_thickness` - optional per-pattern stroke width override (if `None`, the layer default is used).
-- `stitch_angle_deg` - stitch tilt angle in degrees (default `0.0` = flat, custom values allowed, e.g. `45`).
+- `stitch_thickness` - optional per-pattern stroke width override (if `None`, the layer default is used),
+- `stitch_angle_deg` - stitch tilt angle in degrees (default `0.0` = along edge, `90` = perpendicular),
+- `path_mode` - `"continuous"` (default), `"per_edge"`, or `"continuous_rounded"`,
+- `first_margin` / `last_margin` - explicit mm margin from each chain end.
+
+> **Breaking change:** `include_corners` has been removed. Use `first_margin=0, last_margin=0` instead.
 
 ### `doc.add_stitch_on_polyline(points, spacing=5.0, stitch_length=2.0, stitch_angle_deg=0.0, layer="stitch", stitch_thickness=None)`
 
@@ -283,7 +289,7 @@ Parameters:
 Methods:
 
 - `path_d()` - returns the SVG path,
-- `hole_points(edges="all", spacing=5.0, inset=4.0, include_corners=False)` - returns hole points on selected edges.
+- `hole_points(edges="all", spacing=5.0, inset=4.0, path_mode="continuous", first_margin=None, last_margin=None)` - returns hole points on selected edges.
 
 Rectangle edge indices:
 
@@ -476,7 +482,9 @@ hole_points(
     edges="all",
     spacing=5.0,
     inset=4.0,
-    include_corners=False,
+    path_mode="continuous",
+    first_margin=None,
+    last_margin=None,
 )
 ```
 
@@ -485,7 +493,10 @@ Parameter meaning:
 - `edges` - edges on which points should be generated,
 - `spacing` - distance between consecutive points,
 - `inset` - offset from edges or corners,
-- `include_corners` - whether corners are used as start and end points.
+- `path_mode` - `"continuous"` (default): connected edges treated as a single chain; `"per_edge"`: each edge distributed independently; `"continuous_rounded"`: continuous with arc interpolation at rounded corners,
+- `first_margin` / `last_margin` - mm from chain endpoints to first/last point; `None` = auto-centre.
+
+> **Breaking change:** `include_corners` has been removed. Use `first_margin=0, last_margin=0` to place holes at chain endpoints.
 
 If `edges="all"`, all edges of the shape are used.
 
@@ -837,9 +848,15 @@ end
 
 The `rounded_path` flag makes stitches and holes follow the smooth curved corners. It works for both `stitches` and `holes` blocks.
 
-Both blocks accept `distribution fixed_spacing` (the default) or
-`distribution fit_evenly`. The fitted mode uses `spacing` as a target and
-adjusts the actual interval to fill each selected edge or closed contour.
+Both `stitches` and `holes` blocks accept:
+
+- `distribution fixed_spacing` (default) or `distribution fit_evenly` — fitted mode uses `spacing` as a target and adjusts the actual interval. With `fit_evenly`, stitches/holes are half-offset (centred in their intervals, margin ≈ `actual/2` at open ends).
+- `path_mode continuous` (default) — connected edges are distributed as a single chain, eliminating the double gap at shared corners.
+- `path_mode per_edge` — each edge is distributed independently (old behaviour).
+- `path_mode continuous_rounded` — like `continuous` but follows arc curves at rounded corners (useful for `rounded_rectangle`).
+- `first_margin <mm>` / `last_margin <mm>` — explicit mm margin from each open chain end.
+
+> **Breaking change:** `include_corners` has been removed from both blocks. Use `first_margin 0` and `last_margin 0` instead.
 
 ### Holes along shape edges
 

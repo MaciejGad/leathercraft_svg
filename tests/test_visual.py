@@ -70,7 +70,7 @@ def _rectangle_holes_include_corners() -> bytes:
     doc = SvgDocument(100, 60)
     s = Rectangle(10, 10, 80, 40)
     doc.add_shape(s, layer="cut")
-    doc.add_holes(s, spacing=8.0, hole_radius=1.0, inset=5.0, include_corners=True, layer="stitch")
+    doc.add_holes(s, spacing=8.0, hole_radius=1.0, inset=5.0, first_margin=0, last_margin=0, layer="stitch")
     return render(doc)
 
 

@@ -176,7 +176,7 @@ Parametry:
 - `radius` - promień,
 - `layer` - warstwa stylu.
 
-### `doc.add_holes(shape, edges="all", spacing=5.0, hole_radius=1.2, inset=4.0, layer="cut", include_corners=False)`
+### `doc.add_holes(shape, edges="all", spacing=5.0, hole_radius=1.2, inset=4.0, layer="cut", path_mode="continuous", first_margin=None, last_margin=None)`
 
 Dodaje dziurki wyliczone na podstawie krawędzi figury.
 
@@ -188,13 +188,16 @@ Parametry:
 - `hole_radius` - promień dziurek,
 - `inset` - odsunięcie od krawędzi,
 - `layer` - warstwa dziurek,
-- `include_corners` - jeśli `True`, punktowanie zaczyna się od narożników; jeśli `False`, dziurki są odsunięte od końców krawędzi.
+- `path_mode` - `"continuous"` (domyślnie): połączone krawędzie traktowane jako jeden łańcuch; `"per_edge"`: każda krawędź niezależnie; `"continuous_rounded"`: z interpolacją łuku przy zaokrąglonych narożnikach,
+- `first_margin` / `last_margin` - margines w mm od końców łańcucha; `None` = wyśrodkowanie automatyczne.
+
+> **Zmiana niekompatybilna:** `include_corners` zostało usunięte. Zamiast tego użyj `first_margin=0, last_margin=0`.
 
 ### `doc.add_stitch_holes(...)`
 
 Alias dla `add_holes(...)` z tymi samymi parametrami.
 
-### `doc.add_stitch_pattern(shape, edges="all", spacing=5.0, stitch_length=2.0, inset=4.0, layer="stitch", include_corners=False, stitch_thickness=None, stitch_angle_deg=0.0)`
+### `doc.add_stitch_pattern(shape, edges="all", spacing=5.0, stitch_length=2.0, inset=4.0, layer="stitch", stitch_thickness=None, stitch_angle_deg=0.0, path_mode="continuous", first_margin=None, last_margin=None)`
 
 Dodaje laserowy wzór ściegu (krótkie odcinki linii) na wybranych krawędziach figury.
 
@@ -206,9 +209,12 @@ Parametry:
 - `stitch_length` - długość pojedynczego odcinka ściegu,
 - `inset` - odsunięcie od krawędzi,
 - `layer` - warstwa ściegów,
-- `include_corners` - czy dodawać ściegi także w narożnikach,
-- `stitch_thickness` - opcjonalna grubość linii dla ściegów (jeśli `None`, używana jest domyślna grubość warstwy).
-- `stitch_angle_deg` - kąt pochylenia ściegu w stopniach (domyślnie `0.0` = na płasko, można podać własną wartość, np. `45`).
+- `stitch_thickness` - opcjonalna grubość linii dla ściegów (jeśli `None`, używana jest domyślna grubość warstwy),
+- `stitch_angle_deg` - kąt pochylenia ściegu w stopniach (domyślnie `0.0` = wzdłuż krawędzi, `90` = prostopadle),
+- `path_mode` - jak wyżej (`"continuous"`, `"per_edge"`, `"continuous_rounded"`),
+- `first_margin` / `last_margin` - margines w mm od końców łańcucha.
+
+> **Zmiana niekompatybilna:** `include_corners` zostało usunięte. Użyj `first_margin=0, last_margin=0`.
 
 ### `doc.add_stitch_on_polyline(points, spacing=5.0, stitch_length=2.0, stitch_angle_deg=0.0, layer="stitch", stitch_thickness=None)`
 
@@ -260,7 +266,7 @@ Parametry:
 Metoda:
 
 - `path_d()` - zwraca ścieżkę SVG,
-- `hole_points(edges="all", spacing=5.0, inset=4.0, include_corners=False)` - zwraca punkty dziurek na wskazanych krawędziach.
+- `hole_points(edges="all", spacing=5.0, inset=4.0, path_mode="continuous", first_margin=None, last_margin=None)` - zwraca punkty dziurek na wskazanych krawędziach.
 
 Indeksy krawędzi prostokąta:
 
@@ -453,7 +459,9 @@ hole_points(
     edges="all",
     spacing=5.0,
     inset=4.0,
-    include_corners=False,
+    path_mode="continuous",
+    first_margin=None,
+    last_margin=None,
 )
 ```
 
@@ -462,7 +470,10 @@ Znaczenie parametrów:
 - `edges` - krawędzie, na których mają pojawić się punkty,
 - `spacing` - odstęp między kolejnymi punktami,
 - `inset` - odsunięcie punktów od krawędzi lub narożników,
-- `include_corners` - czy uwzględniać narożniki jako punkty startowe i końcowe.
+- `path_mode` - `"continuous"` (domyślnie): połączone krawędzie jako jeden łańcuch; `"per_edge"`: każda krawędź niezależnie; `"continuous_rounded"`: z łukiem w zaokrąglonych narożnikach,
+- `first_margin` / `last_margin` - margines w mm od końców łańcucha; `None` = wyśrodkowanie automatyczne.
+
+> **Zmiana niekompatybilna:** `include_corners` zostało usunięte. Użyj `first_margin=0, last_margin=0`.
 
 Jeśli `edges="all"`, używane są wszystkie krawędzie figury.
 
